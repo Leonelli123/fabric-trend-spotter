@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fabric Trend Spotter</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <h1>Fabric Trend Spotter</h1>
+            <p class="subtitle">Real-time fabric trends from Etsy, Amazon & Spoonflower</p>
+            <div class="header-actions">
+                <button id="scrape-btn" class="btn btn-primary" onclick="triggerScrape()">
+                    <span class="btn-icon">&#x21bb;</span> Refresh Data
+                </button>
+                <span id="last-update" class="meta-text">
+                    {% if scrape_status.last_run %}
+                        Last updated: {{ scrape_status.last_run[:16] }}
+                    {% else %}
+                        No data yet - click Refresh to start
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <!-- Status Banner -->
+        <div id="status-banner" class="status-banner hidden">
+            <span id="status-text"></span>
+        </div>
+
+        <!-- Insights Section -->
+        <section class="insights-section">
+            <h2>Actionable Insights</h2>
+            <div id="insights-container" class="insights-grid">
+                {% if not trends.fabric_types and not trends.patterns and not trends.colors %}
+                    <div class="empty-state">
+                        <p>No trend data yet. Click <strong>Refresh Data</strong> to scrape the latest listings.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </section>
+
+        <!-- Charts Row -->
+        <section class="charts-section">
+            <div class="chart-card">
+                <h3>Top Fabric Types</h3>
+                <canvas id="fabric-chart"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>Top Patterns</h3>
+                <canvas id="pattern-chart"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>Top Colors</h3>
+                <canvas id="color-chart"></canvas>
+            </div>
+        </section>
+
+        <!-- Trend Tables -->
+        <section class="tables-section">
+            <div class="table-tabs">
+                <button class="tab active" data-tab="fabrics" onclick="switchTab('fabrics')">Fabric Types</button>
+                <button class="tab" data-tab="patterns" onclick="switchTab('patterns')">Patterns</button>
+                <button class="tab" data-tab="colors" onclick="switchTab('colors')">Colors</button>
+                <button class="tab" data-tab="listings" onclick="switchTab('listings')">Raw Listings</button>
+            </div>
+
+            <div id="tab-fabrics" class="tab-content active">
+                <table class="trend-table">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Fabric Type</th>
+                            <th>Score</th>
+                            <th>Listings</th>
+                            <th>Avg Price</th>
+                            <th>Avg Favorites</th>
+                            <th>Google Trend</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in trends.fabric_types %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td class="term-name">{{ t.term|title }}</td>
+                            <td><span class="score-badge" style="--score: {{ t.score }}">{{ t.score }}</span></td>
+                            <td>{{ t.mention_count }}</td>
+                            <td>{{ "$%.2f"|format(t.avg_price) if t.avg_price else "N/A" }}</td>
+                            <td>{{ t.avg_favorites }}</td>
+                            <td>
+                                {% if t.score > 50 %}
+                                    <span class="trend-up">&#9650; Hot</span>
+                                {% elif t.score > 25 %}
+                                    <span class="trend-neutral">&#9654; Steady</span>
+                                {% else %}
+                                    <span class="trend-down">&#9660; Low</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="tab-patterns" class="tab-content">
+                <table class="trend-table">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Pattern</th>
+                            <th>Score</th>
+                            <th>Listings</th>
+                            <th>Avg Price</th>
+                            <th>Avg Favorites</th>
+                            <th>Google Trend</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in trends.patterns %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td class="term-name">{{ t.term|title }}</td>
+                            <td><span class="score-badge" style="--score: {{ t.score }}">{{ t.score }}</span></td>
+                            <td>{{ t.mention_count }}</td>
+                            <td>{{ "$%.2f"|format(t.avg_price) if t.avg_price else "N/A" }}</td>
+                            <td>{{ t.avg_favorites }}</td>
+                            <td>
+                                {% if t.score > 50 %}
+                                    <span class="trend-up">&#9650; Hot</span>
+                                {% elif t.score > 25 %}
+                                    <span class="trend-neutral">&#9654; Steady</span>
+                                {% else %}
+                                    <span class="trend-down">&#9660; Low</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="tab-colors" class="tab-content">
+                <table class="trend-table">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Color</th>
+                            <th>Score</th>
+                            <th>Listings</th>
+                            <th>Avg Price</th>
+                            <th>Avg Favorites</th>
+                            <th>Google Trend</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in trends.colors %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td class="term-name">
+                                <span class="color-dot" style="background: {{ t.term|replace(' ', '') }}"></span>
+                                {{ t.term|title }}
+                            </td>
+                            <td><span class="score-badge" style="--score: {{ t.score }}">{{ t.score }}</span></td>
+                            <td>{{ t.mention_count }}</td>
+                            <td>{{ "$%.2f"|format(t.avg_price) if t.avg_price else "N/A" }}</td>
+                            <td>{{ t.avg_favorites }}</td>
+                            <td>
+                                {% if t.score > 50 %}
+                                    <span class="trend-up">&#9650; Hot</span>
+                                {% elif t.score > 25 %}
+                                    <span class="trend-neutral">&#9654; Steady</span>
+                                {% else %}
+                                    <span class="trend-down">&#9660; Low</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="tab-listings" class="tab-content">
+                <div class="listing-filters">
+                    <button class="filter-btn active" onclick="filterListings('all')">All Sources</button>
+                    <button class="filter-btn" onclick="filterListings('etsy')">Etsy</button>
+                    <button class="filter-btn" onclick="filterListings('amazon')">Amazon</button>
+                    <button class="filter-btn" onclick="filterListings('spoonflower')">Spoonflower</button>
+                </div>
+                <div id="listings-container" class="listings-grid"></div>
+            </div>
+        </section>
+
+        <!-- Data Stats Footer -->
+        <section class="stats-section">
+            <h3>Data Collection Stats</h3>
+            <div class="stats-grid">
+                {% for source, stat in stats.items() %}
+                {% if source != 'total_snapshots' %}
+                <div class="stat-card">
+                    <div class="stat-source">{{ source|title }}</div>
+                    <div class="stat-count">{{ stat.count }} listings</div>
+                    <div class="stat-date">
+                        {{ stat.last_scrape[:16] if stat.last_scrape else "Never" }}
+                    </div>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    <script>
+        // Initialize charts with server-rendered data
+        const fabricData = {{ trends.fabric_types|tojson }};
+        const patternData = {{ trends.patterns|tojson }};
+        const colorData = {{ trends.colors|tojson }};
+        initCharts(fabricData, patternData, colorData);
+    </script>
+</body>
+</html>
