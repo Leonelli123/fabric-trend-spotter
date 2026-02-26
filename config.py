@@ -141,3 +141,199 @@ LIFECYCLE_THRESHOLDS = {
     "declining": {"max_velocity": -0.1},
     "stable": {"min_score": 20, "max_velocity": 0.2, "min_velocity": -0.1},
 }
+
+# --------------------------------------------------------------------------
+# European Markets
+# --------------------------------------------------------------------------
+EUROPEAN_COUNTRIES = {
+    "NL": {
+        "name": "Netherlands",
+        "flag": "\U0001F1F3\U0001F1F1",
+        "currency": "EUR",
+        "geo": "NL",
+        "region": "western",
+        "local_marketplaces": [
+            "Stof&Stil NL", "Stoffenwinkel", "Textielstad", "Etsy NL",
+            "De Stoffenkamer", "Mooie Stof", "Driessen Stoffen",
+            "Bel'Etoile Fabrics", "De Naaihoek", "Stoff4you",
+        ],
+        "local_terms": [
+            "stof per meter", "katoen stof", "linnen stof", "quiltstof",
+            "naaistoffen", "bekledingsstof", "gordijnstof",
+        ],
+        "google_keywords": [
+            "stof per meter", "quiltstof", "linnen stof", "naaistoffen",
+            "katoen stof", "bekledingsstof", "tricot stof",
+        ],
+    },
+    "DE": {
+        "name": "Germany",
+        "flag": "\U0001F1E9\U0001F1EA",
+        "currency": "EUR",
+        "geo": "DE",
+        "region": "western",
+        "local_marketplaces": [
+            "Stoffe.de", "Stoffkontor", "Stoff&Stil DE", "Amazon.de",
+            "Stoffwelten", "Nähwelt Flach", "myfabrics.co.uk (DE)",
+            "Snaply", "Alles für Selbermacher", "Zierstoff",
+            "Swafing", "Buttinette", "HEMMERS Itex",
+        ],
+        "local_terms": [
+            "stoff meterware", "baumwollstoff", "leinenstoff", "patchworkstoff",
+            "jersey stoff", "polsterstoff", "gardinenstoff", "dekostoff",
+        ],
+        "google_keywords": [
+            "stoff meterware", "baumwollstoff", "patchworkstoff", "jersey stoff",
+            "leinenstoff", "polsterstoff", "dekostoff",
+        ],
+    },
+    "SE": {
+        "name": "Sweden",
+        "flag": "\U0001F1F8\U0001F1EA",
+        "currency": "SEK",
+        "geo": "SE",
+        "region": "nordic",
+        "local_marketplaces": ["Stoff&Stil SE", "Tyg.se", "Textilgallerian"],
+        "local_terms": [
+            "tyg metervara", "bomullstyg", "linnetyg", "quilttyg",
+            "jerseytyg", "möbeltyg",
+        ],
+        "google_keywords": [
+            "tyg metervara", "bomullstyg", "linnetyg", "quilttyg",
+            "jerseytyg", "möbeltyg", "sy tyg",
+        ],
+    },
+    "FI": {
+        "name": "Finland",
+        "flag": "\U0001F1EB\U0001F1EE",
+        "currency": "EUR",
+        "geo": "FI",
+        "region": "nordic",
+        "local_marketplaces": ["Eurokangas", "Kankaita", "Stoff&Stil FI"],
+        "local_terms": [
+            "kangas metrittäin", "puuvillakangas", "pellavakangas",
+            "trikookangas", "tilkkutyökangas",
+        ],
+        "google_keywords": [
+            "kangas metritavarana", "puuvillakangas", "pellavakangas",
+            "trikookangas", "ompelu kangas",
+        ],
+    },
+    "DK": {
+        "name": "Denmark",
+        "flag": "\U0001F1E9\U0001F1F0",
+        "currency": "DKK",
+        "geo": "DK",
+        "region": "nordic",
+        "local_marketplaces": ["Stof&Stil DK", "Stofdepotet", "SySiden"],
+        "local_terms": [
+            "stof metervare", "bomuldsstof", "hørrestof", "quiltestof",
+            "jerseystof", "møbelstof",
+        ],
+        "google_keywords": [
+            "stof metervare", "bomuldsstof", "quilte stof", "jerseystof",
+            "hør stof", "møbelstof", "sy stof",
+        ],
+    },
+    "PL": {
+        "name": "Poland",
+        "flag": "\U0001F1F5\U0001F1F1",
+        "currency": "PLN",
+        "geo": "PL",
+        "region": "eastern",
+        "local_marketplaces": ["Dresówka", "TkaninySklep", "Allegro", "Tkaniny.net"],
+        "local_terms": [
+            "tkanina bawełniana", "tkanina na metry", "dresówka",
+            "dzianina", "tkanina tapicerska", "tkanina lniana",
+        ],
+        "google_keywords": [
+            "tkanina na metry", "tkanina bawełniana", "dresówka",
+            "dzianina", "tkanina tapicerska", "tkanina lniana",
+        ],
+    },
+    "CZ": {
+        "name": "Czech Republic",
+        "flag": "\U0001F1E8\U0001F1FF",
+        "currency": "CZK",
+        "geo": "CZ",
+        "region": "eastern",
+        "local_marketplaces": ["Textilní galerie", "Metrax", "Stoklasa"],
+        "local_terms": [
+            "látka metráž", "bavlněná látka", "lněná látka",
+            "úplet", "dekorační látka", "čalounická látka",
+        ],
+        "google_keywords": [
+            "látka metráž", "bavlněná látka", "úplet",
+            "dekorační látka", "lněná látka", "patchwork látka",
+        ],
+    },
+    "NO": {
+        "name": "Norway",
+        "flag": "\U0001F1F3\U0001F1F4",
+        "currency": "NOK",
+        "geo": "NO",
+        "region": "nordic",
+        "local_marketplaces": ["Stoff&Stil NO", "Stoffbutikken", "Sy-Spansen"],
+        "local_terms": [
+            "stoff metervare", "bomullsstoff", "linstoff", "quiltestoff",
+            "jerseystoff", "møbelstoff",
+        ],
+        "google_keywords": [
+            "stoff metervare", "bomullsstoff", "quiltestoff", "jerseystoff",
+            "linstoff", "møbelstoff", "sy stoff",
+        ],
+    },
+    "BE": {
+        "name": "Belgium",
+        "flag": "\U0001F1E7\U0001F1EA",
+        "currency": "EUR",
+        "geo": "BE",
+        "region": "western",
+        "local_marketplaces": ["Stoffen.net", "Stof&Stil BE", "Textielstad"],
+        "local_terms": [
+            "stof per meter", "katoenen stof", "linnen stof",
+            "tissu au mètre", "tissu coton", "tissu lin",
+        ],
+        "google_keywords": [
+            "stof per meter", "tissu au mètre", "katoenen stof",
+            "linnen stof", "tissu coton", "naaistoffen",
+        ],
+    },
+    "FR": {
+        "name": "France",
+        "flag": "\U0001F1EB\U0001F1F7",
+        "currency": "EUR",
+        "geo": "FR",
+        "region": "western",
+        "local_marketplaces": [
+            "Mondial Tissus", "Les Coupons de Saint-Pierre", "Tissus.net",
+            "Ma Petite Mercerie", "Tissus Price", "Pretty Mercerie",
+            "Bennytex", "Motif Personnel", "Atelier de la Création",
+            "Driessen Stoffen FR", "Toto Tissus", "Sacrés Coupons",
+        ],
+        "local_terms": [
+            "tissu au mètre", "tissu coton", "tissu lin", "tissu liberty",
+            "toile de jouy", "tissu ameublement", "tissu jersey",
+        ],
+        "google_keywords": [
+            "tissu au mètre", "tissu coton", "tissu lin", "tissu liberty",
+            "toile de jouy", "tissu ameublement", "tissu jersey",
+        ],
+    },
+}
+
+# Region groupings for "area" view
+EUROPEAN_REGIONS = {
+    "nordic": {
+        "label": "Scandinavia & Nordics",
+        "countries": ["SE", "NO", "DK", "FI"],
+    },
+    "western": {
+        "label": "Western Europe",
+        "countries": ["NL", "DE", "BE", "FR"],
+    },
+    "eastern": {
+        "label": "Central/Eastern Europe",
+        "countries": ["PL", "CZ"],
+    },
+}

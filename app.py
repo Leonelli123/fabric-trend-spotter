@@ -11,11 +11,12 @@ from database import (
 )
 from scrapers import (
     scrape_etsy, scrape_amazon, scrape_spoonflower,
-    fetch_google_trends, get_seed_listings,
+    fetch_google_trends, fetch_european_trends,
+    get_seed_listings, get_european_seed_listings,
 )
-from analysis import analyze_trends, run_forecasts
+from analysis import analyze_trends, analyze_european_trends, run_forecasts
 from database import save_listings
-from config import SEGMENTS
+from config import SEGMENTS, EUROPEAN_COUNTRIES, EUROPEAN_REGIONS
 import config
 
 logging.basicConfig(
@@ -63,6 +64,9 @@ def dashboard():
                 "trends": seg_trends,
             }
 
+    # Get European market data from latest snapshots
+    eu_data = scrape_status.get("eu_result", {})
+
     return render_template(
         "dashboard.html",
         trends=trends,
@@ -72,6 +76,9 @@ def dashboard():
         scrape_status=scrape_status,
         segments=SEGMENTS,
         segment_data=segment_data,
+        eu_data=eu_data,
+        eu_countries=EUROPEAN_COUNTRIES,
+        eu_regions=EUROPEAN_REGIONS,
     )
 
 
@@ -133,6 +140,27 @@ def api_images():
     limit = int(request.args.get("limit", 40))
     images = get_trend_images(term, category, segment, limit)
     return jsonify(images)
+
+
+@app.route("/api/european-trends")
+def api_european_trends():
+    """API endpoint for European market trend data."""
+    country = request.args.get("country")
+    eu_data = scrape_status.get("eu_result", {})
+    try:
+        if country:
+            country_data = eu_data.get("countries", {}).get(country, {})
+            return jsonify(country_data)
+        # Return summary to avoid serialization issues with full data
+        summary = {
+            "total_listings": eu_data.get("total_listings", 0),
+            "total_countries": eu_data.get("total_countries", 0),
+            "countries": list(eu_data.get("countries", {}).keys()),
+            "regions": list(eu_data.get("regions", {}).keys()),
+        }
+        return jsonify(summary)
+    except Exception:
+        return jsonify({"error": "EU data not yet available"})
 
 
 @app.route("/api/status")
@@ -239,6 +267,35 @@ def _run_scrape():
         emerging = [f for f in forecasts if f["lifecycle"] == "emerging"]
         rising = [f for f in forecasts if f["lifecycle"] == "rising"]
 
+        # Step 6: European Markets
+        logger.info("Loading European market data...")
+        eu_listings = get_european_seed_listings()
+        if eu_listings:
+            save_listings(eu_listings)
+        source_status["EU Markets"] = {
+            "status": "ok",
+            "count": len(eu_listings),
+            "note": f"{len(EUROPEAN_COUNTRIES)} countries",
+        }
+
+        # European Google Trends (optional, may be rate-limited)
+        eu_google = {}
+        try:
+            logger.info("Fetching European Google Trends...")
+            eu_google = fetch_european_trends()
+            if eu_google:
+                source_status["EU Google Trends"] = {
+                    "status": "ok",
+                    "count": sum(len(v) for v in eu_google.values()),
+                    "note": f"{len(eu_google)} countries",
+                }
+        except Exception as e:
+            logger.warning("European Google Trends failed: %s", e)
+
+        logger.info("Analyzing European trends...")
+        eu_result = analyze_european_trends(eu_listings, eu_google)
+        scrape_status["eu_result"] = eu_result
+
         # Build status report
         ok_sources = [k for k, v in source_status.items() if v["status"] == "ok"]
         failed_sources = [
@@ -251,6 +308,8 @@ def _run_scrape():
             "sources": result["sources"],
             "live_listings": live_count,
             "seed_listings": len(seed_listings),
+            "eu_listings": len(eu_listings),
+            "eu_countries": eu_result.get("total_countries", 0),
             "google_keywords": len(google_data),
             "top_fabric": (
                 result["fabric_types"][0]["term"] if result["fabric_types"] else "N/A"
@@ -270,10 +329,11 @@ def _run_scrape():
             "failed_sources": failed_sources,
         }
         logger.info(
-            "Collection complete! %d listings (%d live), %d forecasts, "
-            "%d Google keywords. Sources OK: %s. Failed: %s",
-            len(all_listings), live_count, len(forecasts),
-            len(google_data), ok_sources, failed_sources,
+            "Collection complete! %d US listings (%d live), %d EU listings "
+            "(%d countries), %d forecasts. Sources OK: %s. Failed: %s",
+            len(all_listings), live_count, len(eu_listings),
+            eu_result.get("total_countries", 0), len(forecasts),
+            ok_sources, failed_sources,
         )
 
     except Exception as e:

@@ -28,6 +28,7 @@
         <!-- Navigation -->
         <nav class="main-nav">
             <a href="#forecasts" class="nav-link active" onclick="scrollToSection('forecasts')">Forecasts</a>
+            <a href="#european" class="nav-link" onclick="scrollToSection('european')">European Markets</a>
             <a href="#gallery" class="nav-link" onclick="scrollToSection('gallery')">Visual Gallery</a>
             <a href="#segments" class="nav-link" onclick="scrollToSection('segments')">Market Segments</a>
             <a href="#trends" class="nav-link" onclick="scrollToSection('trends')">Trend Rankings</a>
@@ -190,7 +191,179 @@
             {% endif %}
         </section>
 
-        <!-- ========== SECTION 2: VISUAL GALLERY ========== -->
+        <!-- ========== SECTION 2: EUROPEAN MARKETS ========== -->
+        <section id="european" class="section">
+            <div class="section-header">
+                <h2>European Markets</h2>
+                <p class="section-subtitle">Fabric trends across 10 European countries &mdash; by country, region, and overall</p>
+            </div>
+
+            {% if eu_data and eu_data.countries %}
+            <!-- EU Country Tabs -->
+            <div class="eu-tabs">
+                <button class="eu-tab active" data-eu="overall" onclick="switchEU('overall')">
+                    Overall EU
+                </button>
+                {% for region_key, region_info in eu_regions.items() %}
+                <button class="eu-tab eu-tab-region" data-eu="region-{{ region_key }}" onclick="switchEU('region-{{ region_key }}')">
+                    {{ region_info.label }}
+                </button>
+                {% endfor %}
+                {% for cc, info in eu_data.countries.items() %}
+                <button class="eu-tab" data-eu="{{ cc }}" onclick="switchEU('{{ cc }}')">
+                    {{ info.flag }} {{ info.name }}
+                </button>
+                {% endfor %}
+            </div>
+
+            <!-- Overall EU View -->
+            <div class="eu-content active" id="eu-overall">
+                <div class="eu-summary-bar">
+                    <span class="eu-stat">{{ eu_data.total_listings }} listings</span>
+                    <span class="eu-stat">{{ eu_data.total_countries }} countries</span>
+                </div>
+                {% if eu_data.overall.fabric_types %}
+                <div class="eu-trends-grid">
+                    <div class="eu-trend-col">
+                        <h4>Top Fabrics (All Europe)</h4>
+                        {% for t in eu_data.overall.fabric_types[:8] %}
+                        <div class="eu-trend-item">
+                            <span class="rank">#{{ loop.index }}</span>
+                            <span class="eu-term">{{ t.term|title }}</span>
+                            <span class="eu-score">{{ t.score }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="eu-trend-col">
+                        <h4>Top Patterns (All Europe)</h4>
+                        {% for t in eu_data.overall.patterns[:8] %}
+                        <div class="eu-trend-item">
+                            <span class="rank">#{{ loop.index }}</span>
+                            <span class="eu-term">{{ t.term|title }}</span>
+                            <span class="eu-score">{{ t.score }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="eu-trend-col">
+                        <h4>Top Colors (All Europe)</h4>
+                        {% for t in eu_data.overall.colors[:8] %}
+                        <div class="eu-trend-item">
+                            <span class="rank">#{{ loop.index }}</span>
+                            <span class="eu-term">{{ t.term|title }}</span>
+                            <span class="eu-score">{{ t.score }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Region Views -->
+            {% for region_key, region_info in eu_data.get('regions', {}).items() %}
+            <div class="eu-content" id="eu-region-{{ region_key }}">
+                <div class="eu-summary-bar">
+                    <span class="eu-stat">{{ region_info.label }}</span>
+                    <span class="eu-stat">{{ region_info.listing_count }} listings</span>
+                    <span class="eu-stat">Countries: {{ region_info.countries|join(', ') }}</span>
+                </div>
+                {% if region_info.top_trends %}
+                <div class="eu-trends-grid">
+                    <div class="eu-trend-col">
+                        <h4>Top Fabrics</h4>
+                        {% for t in region_info.fabric_types[:6] %}
+                        <div class="eu-trend-item">
+                            <span class="rank">#{{ loop.index }}</span>
+                            <span class="eu-term">{{ t.term|title }}</span>
+                            <span class="eu-score">{{ t.score }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="eu-trend-col">
+                        <h4>Top Patterns</h4>
+                        {% for t in region_info.patterns[:6] %}
+                        <div class="eu-trend-item">
+                            <span class="rank">#{{ loop.index }}</span>
+                            <span class="eu-term">{{ t.term|title }}</span>
+                            <span class="eu-score">{{ t.score }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="eu-trend-col">
+                        <h4>Top Colors</h4>
+                        {% for t in region_info.colors[:6] %}
+                        <div class="eu-trend-item">
+                            <span class="rank">#{{ loop.index }}</span>
+                            <span class="eu-term">{{ t.term|title }}</span>
+                            <span class="eu-score">{{ t.score }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+
+            <!-- Per-Country Views -->
+            {% for cc, country_info in eu_data.countries.items() %}
+            <div class="eu-content" id="eu-{{ cc }}">
+                <div class="eu-country-header">
+                    <span class="eu-flag-large">{{ country_info.flag }}</span>
+                    <div>
+                        <h3>{{ country_info.name }}</h3>
+                        <span class="eu-meta">{{ country_info.listing_count }} listings &middot; Currency: {{ country_info.currency }}</span>
+                    </div>
+                </div>
+                <div class="eu-marketplaces">
+                    <span class="eu-mp-label">Local marketplaces:</span>
+                    {% for mp in country_info.local_marketplaces %}
+                    <span class="eu-mp-tag">{{ mp }}</span>
+                    {% endfor %}
+                </div>
+                {% if country_info.top_trends %}
+                <div class="eu-trends-grid">
+                    <div class="eu-trend-col">
+                        <h4>Top Fabrics</h4>
+                        {% for t in country_info.fabric_types[:6] %}
+                        <div class="eu-trend-item">
+                            <span class="rank">#{{ loop.index }}</span>
+                            <span class="eu-term">{{ t.term|title }}</span>
+                            <span class="eu-score">{{ t.score }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="eu-trend-col">
+                        <h4>Top Patterns</h4>
+                        {% for t in country_info.patterns[:6] %}
+                        <div class="eu-trend-item">
+                            <span class="rank">#{{ loop.index }}</span>
+                            <span class="eu-term">{{ t.term|title }}</span>
+                            <span class="eu-score">{{ t.score }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="eu-trend-col">
+                        <h4>Top Colors</h4>
+                        {% for t in country_info.colors[:6] %}
+                        <div class="eu-trend-item">
+                            <span class="rank">#{{ loop.index }}</span>
+                            <span class="eu-term">{{ t.term|title }}</span>
+                            <span class="eu-score">{{ t.score }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+
+            {% else %}
+            <div class="empty-state">
+                <p>No European market data yet. Click <strong>Refresh Data</strong> to load trends from 10 European countries.</p>
+            </div>
+            {% endif %}
+        </section>
+
+        <!-- ========== SECTION 3: VISUAL GALLERY ========== -->
         <section id="gallery" class="section">
             <div class="section-header">
                 <h2>Visual Trend Gallery</h2>

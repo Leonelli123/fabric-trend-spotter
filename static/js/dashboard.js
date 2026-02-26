@@ -126,6 +126,17 @@ function switchTab(tabName) {
 }
 
 /* ==========================================
+   EUROPEAN MARKETS
+   ========================================== */
+
+function switchEU(key) {
+    document.querySelectorAll('.eu-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.eu-content').forEach(c => c.classList.remove('active'));
+    document.querySelector(`[data-eu="${key}"]`)?.classList.add('active');
+    document.getElementById(`eu-${key}`)?.classList.add('active');
+}
+
+/* ==========================================
    SEGMENTS
    ========================================== */
 

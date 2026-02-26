@@ -9,7 +9,7 @@ All trends pass through the quality layer:
 
 import logging
 from collections import defaultdict
-from config import FABRIC_TYPES, PATTERN_TYPES, COLOR_TERMS, SEGMENTS
+from config import FABRIC_TYPES, PATTERN_TYPES, COLOR_TERMS, SEGMENTS, EUROPEAN_COUNTRIES
 from database import save_trend_snapshot, save_trend_images
 from analysis.quality import (
     filter_listings, validate_trend, weighted_average,
@@ -506,3 +506,178 @@ def _generate_insights(fabric_stats, pattern_stats, color_stats, google_data):
 
     insights.sort(key=lambda x: x.get("score", 0), reverse=True)
     return insights
+
+
+# =========================================================================
+# European country-level analysis
+# =========================================================================
+
+def analyze_european_trends(eu_listings, eu_google_data=None):
+    """Analyze European listings per country and overall.
+
+    Args:
+        eu_listings: List of listings with 'country' field set
+        eu_google_data: Dict of {country_code: {keyword: trend_data}}
+
+    Returns:
+        {
+            "countries": {country_code: {trends data}},
+            "overall": {combined trends},
+            "regions": {region_key: {combined trends}},
+        }
+    """
+    if eu_google_data is None:
+        eu_google_data = {}
+
+    # Clean all listings through quality layer
+    clean_listings, removed_count, removal_reasons = filter_listings(eu_listings)
+    logger.info(
+        "EU quality filter: %d clean from %d total (removed %d)",
+        len(clean_listings), len(eu_listings), removed_count,
+    )
+
+    # Classify segments
+    _classify_segments(clean_listings)
+
+    # --- Per-country analysis ---
+    country_results = {}
+    by_country = defaultdict(list)
+    for l in clean_listings:
+        cc = l.get("country", "")
+        if cc:
+            by_country[cc].append(l)
+
+    for country_code, listings in by_country.items():
+        if len(listings) < 2:
+            continue
+        google_data = eu_google_data.get(country_code, {})
+        country_info = EUROPEAN_COUNTRIES.get(country_code, {})
+
+        fabric_stats = _count_term_occurrences(listings, FABRIC_TYPES, "fabric_type")
+        pattern_stats = _count_term_occurrences(listings, PATTERN_TYPES, "pattern")
+        color_stats = _count_term_occurrences(listings, COLOR_TERMS, "color")
+
+        _enrich_with_google(fabric_stats, google_data)
+        _enrich_with_google(pattern_stats, google_data)
+        _enrich_with_google(color_stats, google_data)
+
+        # Use segment-level thresholds (smaller pool per country)
+        fabric_stats = _validate_and_score(fabric_stats, is_segment=True)
+        pattern_stats = _validate_and_score(pattern_stats, is_segment=True)
+        color_stats = _validate_and_score(color_stats, is_segment=True)
+
+        fabric_stats.sort(key=lambda x: x["score"], reverse=True)
+        pattern_stats.sort(key=lambda x: x["score"], reverse=True)
+        color_stats.sort(key=lambda x: x["score"], reverse=True)
+
+        # Tag snapshots with country
+        all_snapshots = fabric_stats + pattern_stats + color_stats
+        for s in all_snapshots:
+            s["country"] = country_code
+        save_trend_snapshot(all_snapshots)
+
+        country_results[country_code] = {
+            "name": country_info.get("name", country_code),
+            "flag": country_info.get("flag", ""),
+            "currency": country_info.get("currency", "EUR"),
+            "listing_count": len(listings),
+            "fabric_types": fabric_stats[:10],
+            "patterns": pattern_stats[:10],
+            "colors": color_stats[:10],
+            "top_trends": sorted(
+                all_snapshots, key=lambda x: x["score"], reverse=True
+            )[:8],
+            "local_marketplaces": country_info.get("local_marketplaces", []),
+        }
+
+    # --- Overall European analysis (all countries combined) ---
+    if clean_listings:
+        all_google = {}
+        for cc_data in eu_google_data.values():
+            all_google.update(cc_data)
+
+        fabric_all = _count_term_occurrences(clean_listings, FABRIC_TYPES, "fabric_type")
+        pattern_all = _count_term_occurrences(clean_listings, PATTERN_TYPES, "pattern")
+        color_all = _count_term_occurrences(clean_listings, COLOR_TERMS, "color")
+
+        _enrich_with_google(fabric_all, all_google)
+        _enrich_with_google(pattern_all, all_google)
+        _enrich_with_google(color_all, all_google)
+
+        fabric_all = _validate_and_score(fabric_all)
+        pattern_all = _validate_and_score(pattern_all)
+        color_all = _validate_and_score(color_all)
+
+        fabric_all.sort(key=lambda x: x["score"], reverse=True)
+        pattern_all.sort(key=lambda x: x["score"], reverse=True)
+        color_all.sort(key=lambda x: x["score"], reverse=True)
+
+        # Tag as EU overall
+        for s in fabric_all + pattern_all + color_all:
+            s["country"] = "EU"
+        save_trend_snapshot(fabric_all + pattern_all + color_all)
+
+        overall = {
+            "listing_count": len(clean_listings),
+            "countries_with_data": len(country_results),
+            "fabric_types": fabric_all[:15],
+            "patterns": pattern_all[:15],
+            "colors": color_all[:15],
+        }
+    else:
+        overall = {
+            "listing_count": 0,
+            "countries_with_data": 0,
+            "fabric_types": [],
+            "patterns": [],
+            "colors": [],
+        }
+
+    # --- Region-level analysis ---
+    from config import EUROPEAN_REGIONS
+    region_results = {}
+    for region_key, region_info in EUROPEAN_REGIONS.items():
+        region_listings = [
+            l for l in clean_listings
+            if l.get("country") in region_info["countries"]
+        ]
+        if len(region_listings) < 3:
+            continue
+
+        region_google = {}
+        for cc in region_info["countries"]:
+            region_google.update(eu_google_data.get(cc, {}))
+
+        r_fabric = _count_term_occurrences(region_listings, FABRIC_TYPES, "fabric_type")
+        r_pattern = _count_term_occurrences(region_listings, PATTERN_TYPES, "pattern")
+        r_color = _count_term_occurrences(region_listings, COLOR_TERMS, "color")
+        _enrich_with_google(r_fabric, region_google)
+        _enrich_with_google(r_pattern, region_google)
+        _enrich_with_google(r_color, region_google)
+        r_fabric = _validate_and_score(r_fabric, is_segment=True)
+        r_pattern = _validate_and_score(r_pattern, is_segment=True)
+        r_color = _validate_and_score(r_color, is_segment=True)
+        r_fabric.sort(key=lambda x: x["score"], reverse=True)
+        r_pattern.sort(key=lambda x: x["score"], reverse=True)
+        r_color.sort(key=lambda x: x["score"], reverse=True)
+
+        region_results[region_key] = {
+            "label": region_info["label"],
+            "countries": region_info["countries"],
+            "listing_count": len(region_listings),
+            "fabric_types": r_fabric[:8],
+            "patterns": r_pattern[:8],
+            "colors": r_color[:8],
+            "top_trends": sorted(
+                r_fabric + r_pattern + r_color,
+                key=lambda x: x["score"], reverse=True,
+            )[:8],
+        }
+
+    return {
+        "countries": country_results,
+        "overall": overall,
+        "regions": region_results,
+        "total_listings": len(clean_listings),
+        "total_countries": len(country_results),
+    }

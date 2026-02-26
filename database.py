@@ -29,6 +29,7 @@ def init_db():
             image_url TEXT,
             tags TEXT,  -- JSON array
             segment TEXT DEFAULT 'general',
+            country TEXT DEFAULT '',
             scraped_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
@@ -44,7 +45,8 @@ def init_db():
             score REAL DEFAULT 0,
             velocity REAL DEFAULT 0,
             lifecycle TEXT DEFAULT 'unknown',
-            segment TEXT DEFAULT 'general'
+            segment TEXT DEFAULT 'general',
+            country TEXT DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS google_trends (
@@ -52,6 +54,7 @@ def init_db():
             keyword TEXT NOT NULL,
             interest INTEGER,
             date TEXT,
+            country TEXT DEFAULT '',
             scraped_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
@@ -66,6 +69,7 @@ def init_db():
             lifecycle TEXT DEFAULT 'emerging',
             confidence REAL DEFAULT 0,
             signals TEXT,  -- JSON: list of signal descriptions
+            country TEXT DEFAULT '',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
@@ -79,17 +83,21 @@ def init_db():
             listing_url TEXT,
             price REAL,
             segment TEXT DEFAULT 'general',
+            country TEXT DEFAULT '',
             added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
         CREATE INDEX IF NOT EXISTS idx_listings_source ON listings(source);
         CREATE INDEX IF NOT EXISTS idx_listings_scraped ON listings(scraped_at);
         CREATE INDEX IF NOT EXISTS idx_listings_segment ON listings(segment);
+        CREATE INDEX IF NOT EXISTS idx_listings_country ON listings(country);
         CREATE INDEX IF NOT EXISTS idx_snapshots_date ON trend_snapshots(snapshot_date);
         CREATE INDEX IF NOT EXISTS idx_snapshots_category ON trend_snapshots(category);
         CREATE INDEX IF NOT EXISTS idx_snapshots_segment ON trend_snapshots(segment);
+        CREATE INDEX IF NOT EXISTS idx_snapshots_country ON trend_snapshots(country);
         CREATE INDEX IF NOT EXISTS idx_forecasts_term ON forecasts(term);
         CREATE INDEX IF NOT EXISTS idx_forecasts_lifecycle ON forecasts(lifecycle);
+        CREATE INDEX IF NOT EXISTS idx_forecasts_country ON forecasts(country);
         CREATE INDEX IF NOT EXISTS idx_images_term ON trend_images(term);
         CREATE INDEX IF NOT EXISTS idx_images_category ON trend_images(category);
     """)
@@ -103,8 +111,8 @@ def save_listings(listings):
     for item in listings:
         conn.execute(
             """INSERT INTO listings (source, title, url, price, currency,
-               favorites, reviews, rating, image_url, tags, segment)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               favorites, reviews, rating, image_url, tags, segment, country)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 item.get("source", ""),
                 item.get("title", ""),
@@ -117,6 +125,7 @@ def save_listings(listings):
                 item.get("image_url", ""),
                 json.dumps(item.get("tags", [])),
                 item.get("segment", "general"),
+                item.get("country", ""),
             ),
         )
     conn.commit()
@@ -130,8 +139,8 @@ def save_trend_snapshot(snapshots):
         conn.execute(
             """INSERT INTO trend_snapshots
                (category, term, mention_count, avg_price, avg_favorites,
-                source, score, velocity, lifecycle, segment)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                source, score, velocity, lifecycle, segment, country)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 snap["category"],
                 snap["term"],
@@ -143,6 +152,7 @@ def save_trend_snapshot(snapshots):
                 snap.get("velocity", 0),
                 snap.get("lifecycle", "unknown"),
                 snap.get("segment", "general"),
+                snap.get("country", ""),
             ),
         )
     conn.commit()
@@ -205,7 +215,7 @@ def save_trend_images(images):
     conn.close()
 
 
-def get_latest_trends(category=None, segment=None, limit=20):
+def get_latest_trends(category=None, segment=None, country=None, limit=20):
     """Get the most recent trend snapshots."""
     conn = get_db()
     query = """
@@ -222,6 +232,9 @@ def get_latest_trends(category=None, segment=None, limit=20):
     if segment:
         query += " AND t.segment = ?"
         params.append(segment)
+    if country is not None:
+        query += " AND t.country = ?"
+        params.append(country)
     query += " ORDER BY t.score DESC LIMIT ?"
     params.append(limit)
     rows = conn.execute(query, params).fetchall()
@@ -304,7 +317,7 @@ def get_scrape_stats():
     """Get statistics about data collection."""
     conn = get_db()
     stats = {}
-    for source in ["etsy", "amazon", "spoonflower"]:
+    for source in ["etsy", "amazon", "spoonflower", "seed", "eu_seed"]:
         row = conn.execute(
             """SELECT COUNT(*) as count, MAX(scraped_at) as last_scrape
                FROM listings WHERE source = ?""",
@@ -317,5 +330,14 @@ def get_scrape_stats():
     stats["total_images"] = row["count"]
     row = conn.execute("SELECT COUNT(*) as count FROM forecasts").fetchone()
     stats["total_forecasts"] = row["count"]
+    # European country stats
+    eu_stats = {}
+    rows = conn.execute(
+        """SELECT country, COUNT(*) as count FROM listings
+           WHERE country != '' GROUP BY country"""
+    ).fetchall()
+    for row in rows:
+        eu_stats[row["country"]] = row["count"]
+    stats["eu_countries"] = eu_stats
     conn.close()
     return stats

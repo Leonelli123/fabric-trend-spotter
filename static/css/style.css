@@ -723,12 +723,131 @@ a.gallery-title:hover { color: var(--accent); }
 .ss-empty { background: rgba(234,179,8,0.15); color: var(--yellow); }
 .ss-error { background: rgba(239,68,68,0.15); color: var(--red); }
 
+/* ==========================================
+   European Markets Section
+   ========================================== */
+
+.eu-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 1.5rem;
+    padding: 0.5rem;
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+}
+.eu-tab {
+    padding: 0.5rem 1rem;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+.eu-tab:hover { background: var(--bg-card-hover); color: var(--text); }
+.eu-tab.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+.eu-tab-region {
+    border-left: 2px solid var(--border);
+    margin-left: 0.3rem;
+    padding-left: 1rem;
+}
+.eu-content { display: none; }
+.eu-content.active { display: block; }
+
+.eu-summary-bar {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 1.25rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-card);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+.eu-stat {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.eu-country-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+.eu-flag-large { font-size: 2rem; }
+.eu-country-header h3 { margin: 0; font-size: 1.2rem; }
+.eu-meta { color: var(--text-muted); font-size: 0.85rem; }
+
+.eu-marketplaces {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+}
+.eu-mp-label { color: var(--text-muted); font-size: 0.8rem; font-weight: 600; }
+.eu-mp-tag {
+    padding: 0.25rem 0.6rem;
+    background: rgba(108, 99, 255, 0.12);
+    color: var(--accent);
+    border-radius: 6px;
+    font-size: 0.8rem;
+}
+
+.eu-trends-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+}
+.eu-trend-col {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+}
+.eu-trend-col h4 {
+    margin-bottom: 0.75rem;
+    font-size: 0.95rem;
+    color: var(--text);
+}
+.eu-trend-item {
+    display: flex;
+    align-items: center;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid rgba(42, 46, 63, 0.3);
+}
+.eu-trend-item:last-child { border-bottom: none; }
+.eu-trend-item .rank {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    width: 2rem;
+    flex-shrink: 0;
+}
+.eu-term { flex: 1; font-size: 0.9rem; }
+.eu-score {
+    background: var(--accent);
+    color: white;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
 /* Responsive */
 @media (max-width: 1000px) {
     .charts-section { grid-template-columns: 1fr; }
     .segment-grid { grid-template-columns: 1fr; }
     .lifecycle-pipeline { flex-direction: column; }
     .pipeline-arrow { transform: rotate(90deg); align-self: center; }
+    .eu-trends-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 600px) {
@@ -736,4 +855,6 @@ a.gallery-title:hover { color: var(--accent); }
     .gallery-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
     header { padding: 1rem; }
     main { padding: 1rem; }
+    .eu-tabs { gap: 0.25rem; }
+    .eu-tab { font-size: 0.75rem; padding: 0.4rem 0.6rem; }
 }
