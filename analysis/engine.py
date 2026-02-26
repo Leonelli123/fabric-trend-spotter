@@ -3,8 +3,8 @@
 import logging
 import json
 from collections import Counter, defaultdict
-from config import FABRIC_TYPES, PATTERN_TYPES, COLOR_TERMS
-from database import save_trend_snapshot
+from config import FABRIC_TYPES, PATTERN_TYPES, COLOR_TERMS, SEGMENTS
+from database import save_trend_snapshot, save_trend_images
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +17,13 @@ def analyze_trends(listings, google_data=None):
     if google_data is None:
         google_data = {}
 
+    # Classify listings into segments
+    _classify_segments(listings)
+
+    # Extract images for visual gallery
+    _extract_trend_images(listings)
+
+    # Overall analysis
     fabric_stats = _count_term_occurrences(listings, FABRIC_TYPES, "fabric_type")
     pattern_stats = _count_term_occurrences(listings, PATTERN_TYPES, "pattern")
     color_stats = _count_term_occurrences(listings, COLOR_TERMS, "color")
@@ -40,6 +47,40 @@ def analyze_trends(listings, google_data=None):
     all_snapshots = fabric_stats + pattern_stats + color_stats
     save_trend_snapshot(all_snapshots)
 
+    # Per-segment analysis
+    segment_trends = {}
+    for seg_key, seg_config in SEGMENTS.items():
+        seg_listings = [l for l in listings if l.get("segment") == seg_key]
+        if not seg_listings:
+            continue
+        seg_fabric = _count_term_occurrences(
+            seg_listings, seg_config["priority_fabrics"], "fabric_type"
+        )
+        seg_pattern = _count_term_occurrences(
+            seg_listings, seg_config["priority_patterns"], "pattern"
+        )
+        seg_color = _count_term_occurrences(seg_listings, COLOR_TERMS, "color")
+        _calculate_scores(seg_fabric)
+        _calculate_scores(seg_pattern)
+        _calculate_scores(seg_color)
+        seg_fabric.sort(key=lambda x: x["score"], reverse=True)
+        seg_pattern.sort(key=lambda x: x["score"], reverse=True)
+        seg_color.sort(key=lambda x: x["score"], reverse=True)
+
+        # Tag with segment
+        for item in seg_fabric + seg_pattern + seg_color:
+            item["segment"] = seg_key
+        save_trend_snapshot(seg_fabric + seg_pattern + seg_color)
+
+        segment_trends[seg_key] = {
+            "label": seg_config["label"],
+            "icon": seg_config["icon"],
+            "fabric_types": seg_fabric[:10],
+            "patterns": seg_pattern[:10],
+            "colors": seg_color[:10],
+            "listing_count": len(seg_listings),
+        }
+
     # Generate actionable insights
     insights = _generate_insights(fabric_stats, pattern_stats, color_stats, google_data)
 
@@ -48,9 +89,81 @@ def analyze_trends(listings, google_data=None):
         "patterns": pattern_stats[:20],
         "colors": color_stats[:20],
         "insights": insights,
+        "segment_trends": segment_trends,
         "total_listings_analyzed": len(listings),
         "sources": list(set(l["source"] for l in listings)),
     }
+
+
+def _classify_segments(listings):
+    """Classify each listing into market segments based on keywords."""
+    for listing in listings:
+        title_lower = listing.get("title", "").lower()
+        tags_lower = " ".join(t.lower() for t in listing.get("tags", []))
+        combined = title_lower + " " + tags_lower
+
+        best_segment = "general"
+        best_score = 0
+
+        for seg_key, seg_config in SEGMENTS.items():
+            score = 0
+            for kw in seg_config["keywords"]:
+                if kw.lower() in combined:
+                    score += 2
+            for ft in seg_config.get("priority_fabrics", []):
+                if ft.lower() in combined:
+                    score += 1
+            for pt in seg_config.get("priority_patterns", []):
+                if pt.lower() in combined:
+                    score += 1
+
+            if score > best_score:
+                best_score = score
+                best_segment = seg_key
+
+        listing["segment"] = best_segment
+
+
+def _extract_trend_images(listings):
+    """Extract images from listings and associate them with trend terms."""
+    images = []
+    seen_urls = set()
+
+    for listing in listings:
+        img_url = listing.get("image_url", "")
+        if not img_url or img_url in seen_urls:
+            continue
+        if not img_url.startswith("http"):
+            continue
+
+        seen_urls.add(img_url)
+        tags = listing.get("tags", [])
+        title_lower = listing.get("title", "").lower()
+
+        # Associate image with matched terms
+        for term_list, category in [
+            (FABRIC_TYPES, "fabric_type"),
+            (PATTERN_TYPES, "pattern"),
+            (COLOR_TERMS, "color"),
+        ]:
+            for term in term_list:
+                if term.lower() in title_lower or term.lower() in [
+                    t.lower() for t in tags
+                ]:
+                    images.append({
+                        "term": term,
+                        "category": category,
+                        "image_url": img_url,
+                        "source": listing.get("source", ""),
+                        "listing_title": listing.get("title", ""),
+                        "listing_url": listing.get("url", ""),
+                        "price": listing.get("price"),
+                        "segment": listing.get("segment", "general"),
+                    })
+                    break  # One category per image is enough
+
+    if images:
+        save_trend_images(images)
 
 
 def _count_term_occurrences(listings, terms, category):
@@ -72,10 +185,22 @@ def _count_term_occurrences(listings, terms, category):
         favorites = [l["favorites"] for l in matching if l.get("favorites")]
         reviews = [l["reviews"] for l in matching if l.get("reviews")]
 
-        # Break down by source
         by_source = defaultdict(int)
         for l in matching:
             by_source[l["source"]] += 1
+
+        # Collect sample images for this term
+        sample_images = []
+        for l in matching:
+            if l.get("image_url") and l["image_url"].startswith("http"):
+                sample_images.append({
+                    "url": l["image_url"],
+                    "title": l.get("title", ""),
+                    "source": l.get("source", ""),
+                    "listing_url": l.get("url", ""),
+                })
+                if len(sample_images) >= 6:
+                    break
 
         stats.append({
             "category": category,
@@ -89,11 +214,16 @@ def _count_term_occurrences(listings, terms, category):
             "source": "all",
             "by_source": dict(by_source),
             "price_range": (
-                {"min": min(prices), "max": max(prices)} if prices else None
+                {"min": round(min(prices), 2), "max": round(max(prices), 2)}
+                if prices else None
             ),
             "google_interest": 0,
             "google_trending_up": False,
             "score": 0,
+            "velocity": 0,
+            "lifecycle": "unknown",
+            "segment": "general",
+            "sample_images": sample_images,
         })
 
     return stats
@@ -110,20 +240,10 @@ def _enrich_with_google(stats, google_data):
 
 
 def _calculate_scores(stats):
-    """
-    Calculate a composite trend score for each term.
-
-    Score factors:
-    - mention_count: How many listings mention it (market supply/demand)
-    - avg_favorites: Popularity signal from Etsy
-    - google_interest: Search interest signal
-    - google_trending_up: Bonus for upward trend
-    - source diversity: Appearing across multiple sources is a stronger signal
-    """
+    """Calculate a composite trend score for each term."""
     if not stats:
         return
 
-    # Normalize each factor to 0-100 range
     max_mentions = max(s["mention_count"] for s in stats) or 1
     max_favs = max(s["avg_favorites"] for s in stats) or 1
     max_google = max(s["google_interest"] for s in stats) or 1
@@ -145,7 +265,6 @@ def _generate_insights(fabric_stats, pattern_stats, color_stats, google_data):
     """Generate human-readable actionable insights."""
     insights = []
 
-    # Top rising trends
     for category, stats, label in [
         ("fabric_type", fabric_stats, "Fabric"),
         ("pattern", pattern_stats, "Pattern"),
@@ -154,25 +273,24 @@ def _generate_insights(fabric_stats, pattern_stats, color_stats, google_data):
         trending_up = [s for s in stats if s.get("google_trending_up")]
         if trending_up:
             top = trending_up[0]
+            detail = (
+                f"'{top['term'].title()}' is trending upward on Google with "
+                f"{top['mention_count']} marketplace listings."
+            )
+            if top.get("avg_price"):
+                detail += f" Average price: ${top['avg_price']:.2f}."
             insights.append({
                 "type": "rising",
                 "icon": "trending_up",
                 "title": f"Rising {label}: {top['term'].title()}",
-                "detail": (
-                    f"'{top['term'].title()}' is trending upward on Google with "
-                    f"{top['mention_count']} marketplace listings. "
-                    f"Average price: ${top['avg_price']:.2f}."
-                    if top.get("avg_price")
-                    else f"'{top['term'].title()}' is trending upward on Google with "
-                    f"{top['mention_count']} marketplace listings."
-                ),
+                "detail": detail,
                 "action": (
                     f"Consider stocking {top['term']} fabrics - demand is growing."
                 ),
                 "score": top["score"],
+                "images": top.get("sample_images", [])[:3],
             })
 
-    # High-demand items (most listings + highest favorites)
     all_stats = fabric_stats + pattern_stats + color_stats
     if all_stats:
         top_demand = sorted(all_stats, key=lambda x: x["mention_count"], reverse=True)
@@ -190,12 +308,11 @@ def _generate_insights(fabric_stats, pattern_stats, color_stats, google_data):
                 f"'{top['term']}' products."
             ),
             "score": top["score"],
+            "images": top.get("sample_images", [])[:3],
         })
 
-    # Niche opportunities (decent Google interest but low listing count)
     niche_candidates = [
-        s
-        for s in all_stats
+        s for s in all_stats
         if s["google_interest"] > 30 and s["mention_count"] < 5
     ]
     if niche_candidates:
@@ -214,9 +331,9 @@ def _generate_insights(fabric_stats, pattern_stats, color_stats, google_data):
                 f"Consider creating '{niche['term']}' products."
             ),
             "score": niche["google_interest"],
+            "images": niche.get("sample_images", [])[:3],
         })
 
-    # Price insights
     priced = [s for s in all_stats if s.get("avg_price")]
     if priced:
         highest_price = max(priced, key=lambda x: x["avg_price"])
@@ -232,6 +349,7 @@ def _generate_insights(fabric_stats, pattern_stats, color_stats, google_data):
                 f"Higher margins possible with '{highest_price['term']}' products."
             ),
             "score": highest_price["score"],
+            "images": highest_price.get("sample_images", [])[:3],
         })
 
     insights.sort(key=lambda x: x.get("score", 0), reverse=True)

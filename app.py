@@ -1,13 +1,18 @@
 """Flask web application for the Fabric Trend Spotter dashboard."""
 
 import logging
+import json
 import threading
 from datetime import datetime
 from flask import Flask, render_template, jsonify, request
-from database import init_db, get_latest_trends, get_trend_history, get_recent_listings, get_scrape_stats
+from database import (
+    init_db, get_latest_trends, get_trend_history, get_recent_listings,
+    get_scrape_stats, get_forecasts, get_trend_images,
+)
 from scrapers import scrape_etsy, scrape_amazon, scrape_spoonflower, fetch_google_trends
-from analysis import analyze_trends
+from analysis import analyze_trends, run_forecasts
 from database import save_listings
+from config import SEGMENTS
 import config
 
 logging.basicConfig(
@@ -35,16 +40,35 @@ scrape_status = {
 def dashboard():
     """Main dashboard page."""
     trends = {
-        "fabric_types": get_latest_trends("fabric_type", 15),
-        "patterns": get_latest_trends("pattern", 15),
-        "colors": get_latest_trends("color", 15),
+        "fabric_types": get_latest_trends("fabric_type", limit=15),
+        "patterns": get_latest_trends("pattern", limit=15),
+        "colors": get_latest_trends("color", limit=15),
     }
+    forecasts = get_forecasts(limit=20)
     stats = get_scrape_stats()
+
+    # Get images for visual gallery
+    images = get_trend_images(limit=40)
+
+    # Get segment data
+    segment_data = {}
+    for seg_key in SEGMENTS:
+        seg_trends = get_latest_trends(segment=seg_key, limit=10)
+        if seg_trends:
+            segment_data[seg_key] = {
+                "config": SEGMENTS[seg_key],
+                "trends": seg_trends,
+            }
+
     return render_template(
         "dashboard.html",
         trends=trends,
+        forecasts=forecasts,
+        images=images,
         stats=stats,
         scrape_status=scrape_status,
+        segments=SEGMENTS,
+        segment_data=segment_data,
     )
 
 
@@ -63,8 +87,9 @@ def trigger_scrape():
 def api_trends():
     """API endpoint for trend data."""
     category = request.args.get("category")
+    segment = request.args.get("segment")
     limit = int(request.args.get("limit", 20))
-    trends = get_latest_trends(category, limit)
+    trends = get_latest_trends(category, segment, limit)
     return jsonify(trends)
 
 
@@ -80,9 +105,31 @@ def api_trend_history(term):
 def api_listings():
     """API endpoint for recent listings."""
     source = request.args.get("source")
+    segment = request.args.get("segment")
     limit = int(request.args.get("limit", 50))
-    listings = get_recent_listings(source, limit)
+    listings = get_recent_listings(source, segment, limit)
     return jsonify(listings)
+
+
+@app.route("/api/forecasts")
+def api_forecasts():
+    """API endpoint for trend forecasts."""
+    category = request.args.get("category")
+    lifecycle = request.args.get("lifecycle")
+    limit = int(request.args.get("limit", 30))
+    forecasts = get_forecasts(category, lifecycle, limit)
+    return jsonify(forecasts)
+
+
+@app.route("/api/images")
+def api_images():
+    """API endpoint for trend images."""
+    term = request.args.get("term")
+    category = request.args.get("category")
+    segment = request.args.get("segment")
+    limit = int(request.args.get("limit", 40))
+    images = get_trend_images(term, category, segment, limit)
+    return jsonify(images)
 
 
 @app.route("/api/status")
@@ -131,6 +178,13 @@ def _run_scrape():
         logger.info("Analyzing %d listings...", len(all_listings))
         result = analyze_trends(all_listings, google_data)
 
+        # Run forecasting
+        logger.info("Running trend forecasts...")
+        forecasts = run_forecasts(result, google_data)
+
+        emerging = [f for f in forecasts if f["lifecycle"] == "emerging"]
+        rising = [f for f in forecasts if f["lifecycle"] == "rising"]
+
         scrape_status["last_run"] = datetime.now().isoformat()
         scrape_status["last_result"] = {
             "total_listings": result["total_listings_analyzed"],
@@ -145,8 +199,15 @@ def _run_scrape():
                 result["colors"][0]["term"] if result["colors"] else "N/A"
             ),
             "insights_count": len(result.get("insights", [])),
+            "emerging_count": len(emerging),
+            "rising_count": len(rising),
+            "segments_analyzed": len(result.get("segment_trends", {})),
         }
-        logger.info("Scrape complete! Analyzed %d listings.", len(all_listings))
+        logger.info(
+            "Scrape complete! %d listings, %d forecasts, %d segments.",
+            len(all_listings), len(forecasts),
+            len(result.get("segment_trends", {})),
+        )
 
     except Exception as e:
         logger.error("Scrape failed: %s", e)

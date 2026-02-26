@@ -59,4 +59,85 @@ COLOR_TERMS = [
     "ochre", "indigo", "seafoam", "champagne", "charcoal",
     "burnt orange", "forest green", "baby blue", "cream",
     "earth tone", "jewel tone", "pastel", "neutral", "muted",
+    "patina blue", "warm beige", "clay", "butter yellow",
 ]
+
+# Market segments - each has tailored search queries and relevance weights
+SEGMENTS = {
+    "quilting": {
+        "label": "Quilting",
+        "icon": "grid",
+        "keywords": [
+            "quilting cotton", "fat quarter", "jelly roll", "charm pack",
+            "quilt fabric", "patchwork", "quilting bundle", "precut fabric",
+        ],
+        "priority_patterns": [
+            "floral", "geometric", "ditsy", "batik", "modern", "vintage",
+        ],
+        "priority_fabrics": ["cotton", "flannel", "minky", "broadcloth"],
+    },
+    "apparel": {
+        "label": "Apparel Sewing",
+        "icon": "scissors",
+        "keywords": [
+            "apparel fabric", "dress fabric", "garment fabric",
+            "dressmaking", "fashion fabric", "sewing pattern fabric",
+        ],
+        "priority_patterns": [
+            "floral", "stripe", "plaid", "abstract", "polka dot", "liberty",
+        ],
+        "priority_fabrics": [
+            "linen", "cotton", "silk", "rayon", "jersey", "lawn", "voile",
+            "crepe", "double gauze", "chambray", "chiffon",
+        ],
+    },
+    "home_decor": {
+        "label": "Home Decor",
+        "icon": "home",
+        "keywords": [
+            "upholstery fabric", "curtain fabric", "home decor fabric",
+            "throw pillow fabric", "slipcover", "drapery fabric",
+        ],
+        "priority_patterns": [
+            "damask", "ikat", "toile", "geometric", "botanical", "stripe",
+        ],
+        "priority_fabrics": [
+            "linen", "velvet", "canvas", "twill", "jacquard", "brocade",
+        ],
+    },
+    "cosplay": {
+        "label": "Cosplay & Costume",
+        "icon": "sparkles",
+        "keywords": [
+            "cosplay fabric", "costume fabric", "spandex fabric",
+            "metallic fabric", "faux leather", "holographic fabric",
+        ],
+        "priority_patterns": [
+            "animal print", "abstract", "celestial", "geometric",
+        ],
+        "priority_fabrics": [
+            "satin", "organza", "tulle", "velvet", "chiffon", "taffeta",
+        ],
+    },
+    "craft": {
+        "label": "Craft & Mixed Media",
+        "icon": "palette",
+        "keywords": [
+            "craft fabric", "felt fabric", "embroidery fabric",
+            "cross stitch", "fabric bundle", "scrap fabric",
+        ],
+        "priority_patterns": [
+            "vintage", "retro", "cottagecore", "folk art", "bohemian",
+        ],
+        "priority_fabrics": ["cotton", "felt", "muslin", "canvas", "linen"],
+    },
+}
+
+# Trend lifecycle thresholds
+LIFECYCLE_THRESHOLDS = {
+    "emerging": {"min_velocity": 0.5, "max_score": 25},
+    "rising": {"min_velocity": 0.2, "min_score": 15, "max_score": 60},
+    "peak": {"min_score": 55, "max_velocity": 0.3},
+    "declining": {"max_velocity": -0.1},
+    "stable": {"min_score": 20, "max_velocity": 0.2, "min_velocity": -0.1},
+}
