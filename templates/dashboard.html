@@ -29,6 +29,7 @@
         <nav class="main-nav">
             <a href="#forecasts" class="nav-link active" onclick="scrollToSection('forecasts')">Forecasts</a>
             <a href="#european" class="nav-link" onclick="scrollToSection('european')">European Markets</a>
+            <a href="#instagram" class="nav-link" onclick="scrollToSection('instagram')">Instagram Trends</a>
             <a href="#gallery" class="nav-link" onclick="scrollToSection('gallery')">Visual Gallery</a>
             <a href="#segments" class="nav-link" onclick="scrollToSection('segments')">Market Segments</a>
             <a href="#trends" class="nav-link" onclick="scrollToSection('trends')">Trend Rankings</a>
@@ -363,7 +364,128 @@
             {% endif %}
         </section>
 
-        <!-- ========== SECTION 3: VISUAL GALLERY ========== -->
+        <!-- ========== SECTION 3: INSTAGRAM SOCIAL TRENDS ========== -->
+        <section id="instagram" class="section">
+            <div class="section-header">
+                <h2>Instagram Social Trends</h2>
+                <p class="section-subtitle">Fabric hashtag activity from Instagram &mdash; engagement, top posts &amp; trend signals</p>
+            </div>
+
+            {% if ig_data and ig_data.top_hashtags %}
+            <div class="ig-summary-bar">
+                <span class="ig-stat">{{ ig_data.total_hashtags_tracked }} hashtags tracked</span>
+                <span class="ig-stat">Last fetched: {{ ig_data.fetched_at[:16] if ig_data.fetched_at else 'N/A' }}</span>
+            </div>
+
+            <!-- Top Hashtags -->
+            <div class="ig-section">
+                <h3>Top Hashtags by Engagement</h3>
+                <div class="ig-hashtag-grid">
+                    {% for h in ig_data.top_hashtags %}
+                    <div class="ig-hashtag-card">
+                        <div class="ig-hashtag-name">{{ h.hashtag }}</div>
+                        <div class="ig-hashtag-stats">
+                            <div class="ig-stat-item">
+                                <span class="ig-stat-value">{{ h.engagement|round(1) }}</span>
+                                <span class="ig-stat-label">Engagement</span>
+                            </div>
+                            <div class="ig-stat-item">
+                                <span class="ig-stat-value">{{ h.recent_count }}</span>
+                                <span class="ig-stat-label">Recent</span>
+                            </div>
+                            <div class="ig-stat-item">
+                                <span class="ig-stat-value">{{ h.top_count }}</span>
+                                <span class="ig-stat-label">Top Posts</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Trend Signals from Instagram -->
+            <div class="ig-trends-grid">
+                {% if ig_data.fabric_signals %}
+                <div class="ig-trend-col">
+                    <h4>Fabric Signals from Instagram</h4>
+                    {% for s in ig_data.fabric_signals[:8] %}
+                    <div class="ig-signal-item">
+                        <span class="ig-signal-term">{{ s.term|title }}</span>
+                        <span class="ig-signal-score">{{ s.ig_score }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% if ig_data.pattern_signals %}
+                <div class="ig-trend-col">
+                    <h4>Pattern Signals from Instagram</h4>
+                    {% for s in ig_data.pattern_signals[:8] %}
+                    <div class="ig-signal-item">
+                        <span class="ig-signal-term">{{ s.term|title }}</span>
+                        <span class="ig-signal-score">{{ s.ig_score }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% if ig_data.color_signals %}
+                <div class="ig-trend-col">
+                    <h4>Color Signals from Instagram</h4>
+                    {% for s in ig_data.color_signals[:8] %}
+                    <div class="ig-signal-item">
+                        <span class="ig-signal-term">{{ s.term|title }}</span>
+                        <span class="ig-signal-score">{{ s.ig_score }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+
+            {% elif ig_configured %}
+            <div class="empty-state">
+                <p>Instagram API is configured. Click <strong>Refresh Data</strong> to fetch hashtag trends.</p>
+            </div>
+            {% else %}
+            <div class="ig-setup-guide">
+                <h3>Instagram Integration Setup</h3>
+                <p>Connect your Instagram Business account to track fabric hashtag trends in real-time.</p>
+                <div class="ig-setup-steps">
+                    <div class="ig-step">
+                        <span class="ig-step-num">1</span>
+                        <div>
+                            <strong>Create Meta Developer App</strong>
+                            <p>Go to <code>developers.facebook.com</code> and create a Business app</p>
+                        </div>
+                    </div>
+                    <div class="ig-step">
+                        <span class="ig-step-num">2</span>
+                        <div>
+                            <strong>Get App Approved</strong>
+                            <p>Submit for review with instagram_basic + pages_show_list permissions</p>
+                        </div>
+                    </div>
+                    <div class="ig-step">
+                        <span class="ig-step-num">3</span>
+                        <div>
+                            <strong>Set Environment Variables</strong>
+                            <p>Add <code>INSTAGRAM_ACCESS_TOKEN</code> and <code>INSTAGRAM_BUSINESS_ID</code> to your Render deployment</p>
+                        </div>
+                    </div>
+                    <div class="ig-step">
+                        <span class="ig-step-num">4</span>
+                        <div>
+                            <strong>Refresh Data</strong>
+                            <p>Click Refresh Data to start tracking 40+ fabric hashtags automatically</p>
+                        </div>
+                    </div>
+                </div>
+                <p class="ig-privacy-note">
+                    We only read public hashtag data. See our <a href="/privacy">Privacy Policy</a> for details.
+                </p>
+            </div>
+            {% endif %}
+        </section>
+
+        <!-- ========== SECTION 4: VISUAL GALLERY ========== -->
         <section id="gallery" class="section">
             <div class="section-header">
                 <h2>Visual Trend Gallery</h2>
@@ -629,6 +751,12 @@
                 </div>
             </div>
         </section>
+
+        <footer class="site-footer">
+            <a href="/privacy">Privacy Policy</a>
+            <span class="footer-sep">&middot;</span>
+            <a href="https://github.com/Leonelli123/fabric-trend-spotter" target="_blank" rel="noopener">GitHub</a>
+        </footer>
     </main>
 
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>

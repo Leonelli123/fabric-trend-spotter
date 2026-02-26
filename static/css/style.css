@@ -841,6 +841,195 @@ a.gallery-title:hover { color: var(--accent); }
     font-weight: 600;
 }
 
+/* ==========================================
+   Instagram Social Trends
+   ========================================== */
+
+.ig-summary-bar {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 1.25rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-card);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+.ig-stat {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.ig-section { margin-bottom: 2rem; }
+.ig-section h3 {
+    font-size: 1rem;
+    margin-bottom: 1rem;
+    color: var(--text);
+}
+
+.ig-hashtag-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.8rem;
+    margin-bottom: 2rem;
+}
+
+.ig-hashtag-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+    transition: all 0.2s;
+}
+.ig-hashtag-card:hover {
+    border-color: var(--pink);
+    box-shadow: 0 4px 15px rgba(236, 72, 153, 0.1);
+}
+
+.ig-hashtag-name {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--pink);
+    margin-bottom: 0.6rem;
+}
+
+.ig-hashtag-stats {
+    display: flex;
+    gap: 1rem;
+}
+.ig-stat-item { text-align: center; flex: 1; }
+.ig-stat-value {
+    display: block;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text);
+}
+.ig-stat-label {
+    display: block;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.ig-trends-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+}
+
+.ig-trend-col {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+}
+.ig-trend-col h4 {
+    margin-bottom: 0.75rem;
+    font-size: 0.95rem;
+    color: var(--text);
+}
+
+.ig-signal-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid rgba(42, 46, 63, 0.3);
+}
+.ig-signal-item:last-child { border-bottom: none; }
+.ig-signal-term { font-size: 0.9rem; }
+.ig-signal-score {
+    background: var(--pink);
+    color: white;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+/* Instagram Setup Guide */
+.ig-setup-guide {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 2rem;
+}
+.ig-setup-guide h3 {
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+}
+.ig-setup-guide > p {
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+}
+
+.ig-setup-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.ig-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+}
+
+.ig-step-num {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--pink);
+    color: white;
+    font-weight: 700;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+}
+
+.ig-step strong { display: block; margin-bottom: 0.2rem; }
+.ig-step p {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin: 0;
+}
+.ig-step code {
+    background: rgba(108, 99, 255, 0.15);
+    color: var(--accent);
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+.ig-privacy-note {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+.ig-privacy-note a { color: var(--accent); text-decoration: none; }
+.ig-privacy-note a:hover { text-decoration: underline; }
+
+/* Footer */
+.site-footer {
+    text-align: center;
+    padding: 2rem 0;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    border-top: 1px solid var(--border);
+    margin-top: 2rem;
+}
+.site-footer a {
+    color: var(--text-muted);
+    text-decoration: none;
+}
+.site-footer a:hover { color: var(--accent); }
+.footer-sep { margin: 0 0.5rem; }
+
 /* Responsive */
 @media (max-width: 1000px) {
     .charts-section { grid-template-columns: 1fr; }
@@ -848,6 +1037,7 @@ a.gallery-title:hover { color: var(--accent); }
     .lifecycle-pipeline { flex-direction: column; }
     .pipeline-arrow { transform: rotate(90deg); align-self: center; }
     .eu-trends-grid { grid-template-columns: 1fr; }
+    .ig-trends-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 600px) {

@@ -13,6 +13,7 @@ from scrapers import (
     scrape_etsy, scrape_amazon, scrape_spoonflower,
     fetch_google_trends, fetch_european_trends,
     get_seed_listings, get_european_seed_listings,
+    fetch_instagram_trends, analyze_instagram_data, ig_is_configured,
 )
 from analysis import analyze_trends, analyze_european_trends, run_forecasts
 from database import save_listings
@@ -67,6 +68,9 @@ def dashboard():
     # Get European market data from latest snapshots
     eu_data = scrape_status.get("eu_result", {})
 
+    # Instagram social data
+    ig_data = scrape_status.get("ig_result", {})
+
     return render_template(
         "dashboard.html",
         trends=trends,
@@ -79,6 +83,8 @@ def dashboard():
         eu_data=eu_data,
         eu_countries=EUROPEAN_COUNTRIES,
         eu_regions=EUROPEAN_REGIONS,
+        ig_data=ig_data,
+        ig_configured=ig_is_configured(),
     )
 
 
@@ -161,6 +167,26 @@ def api_european_trends():
         return jsonify(summary)
     except Exception:
         return jsonify({"error": "EU data not yet available"})
+
+
+@app.route("/privacy")
+def privacy_policy():
+    """Privacy policy page (required for Meta app review)."""
+    return render_template("privacy.html", current_date=datetime.now().strftime("%B %d, %Y"))
+
+
+@app.route("/api/instagram-trends")
+def api_instagram_trends():
+    """API endpoint for Instagram hashtag trend data."""
+    ig_data = scrape_status.get("ig_result", {})
+    if not ig_data:
+        return jsonify({
+            "configured": ig_is_configured(),
+            "message": "No Instagram data yet. Run a scrape to fetch hashtag trends."
+            if ig_is_configured()
+            else "Instagram API not configured. Set INSTAGRAM_ACCESS_TOKEN and INSTAGRAM_BUSINESS_ID.",
+        })
+    return jsonify(ig_data)
 
 
 @app.route("/api/status")
@@ -267,7 +293,45 @@ def _run_scrape():
         emerging = [f for f in forecasts if f["lifecycle"] == "emerging"]
         rising = [f for f in forecasts if f["lifecycle"] == "rising"]
 
-        # Step 6: European Markets
+        # Step 6: Instagram Social Trends (optional - requires Meta app approval)
+        ig_result = {}
+        try:
+            if ig_is_configured():
+                logger.info("Fetching Instagram hashtag trends...")
+                raw_ig = fetch_instagram_trends()
+                if raw_ig:
+                    ig_result = analyze_instagram_data(raw_ig)
+                    scrape_status["ig_result"] = ig_result
+                    source_status["Instagram"] = {
+                        "status": "ok",
+                        "count": ig_result.get("total_hashtags_tracked", 0),
+                        "note": f"{ig_result.get('total_hashtags_tracked', 0)} hashtags",
+                    }
+                    logger.info(
+                        "Instagram: %d hashtags analyzed",
+                        ig_result.get("total_hashtags_tracked", 0),
+                    )
+                else:
+                    source_status["Instagram"] = {
+                        "status": "empty",
+                        "count": 0,
+                        "note": "No data returned (rate limited?)",
+                    }
+            else:
+                source_status["Instagram"] = {
+                    "status": "empty",
+                    "count": 0,
+                    "note": "Not configured (set INSTAGRAM_ACCESS_TOKEN)",
+                }
+        except Exception as e:
+            source_status["Instagram"] = {
+                "status": "error",
+                "count": 0,
+                "note": str(e)[:100],
+            }
+            logger.warning("Instagram failed: %s", e)
+
+        # Step 7: European Markets
         logger.info("Loading European market data...")
         eu_listings = get_european_seed_listings()
         if eu_listings:
@@ -324,6 +388,7 @@ def _run_scrape():
             "emerging_count": len(emerging),
             "rising_count": len(rising),
             "segments_analyzed": len(result.get("segment_trends", {})),
+            "ig_hashtags": ig_result.get("total_hashtags_tracked", 0),
             "source_status": source_status,
             "ok_sources": ok_sources,
             "failed_sources": failed_sources,
