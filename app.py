@@ -2,6 +2,9 @@
 
 import logging
 import json
+import hashlib
+import hmac
+import base64
 import threading
 from datetime import datetime
 from flask import Flask, render_template, jsonify, request
@@ -173,6 +176,56 @@ def api_european_trends():
 def privacy_policy():
     """Privacy policy page (required for Meta app review)."""
     return render_template("privacy.html", current_date=datetime.now().strftime("%B %d, %Y"))
+
+
+@app.route("/terms")
+def terms_of_service():
+    """Terms of Service page (required for Meta app review)."""
+    return render_template("terms.html", current_date=datetime.now().strftime("%B %d, %Y"))
+
+
+@app.route("/deauthorize", methods=["POST"])
+def deauthorize_callback():
+    """Meta deauthorize callback - called when a user removes the app.
+
+    Meta sends a signed_request POST parameter. We don't store user data,
+    so we just acknowledge the request and return a confirmation.
+    """
+    signed_request = request.form.get("signed_request", "")
+    if signed_request:
+        logger.info("Received deauthorize callback from Meta")
+    return jsonify({"status": "ok", "message": "No user data to remove"})
+
+
+@app.route("/data-deletion", methods=["POST", "GET"])
+def data_deletion():
+    """Meta data deletion callback / status page.
+
+    POST: Meta sends a signed_request when user requests data deletion.
+          We return a confirmation_code and a status URL.
+    GET:  Status check page - shows deletion was completed (we store no user data).
+    """
+    if request.method == "GET":
+        code = request.args.get("code", "none")
+        return render_template(
+            "data_deletion_status.html",
+            confirmation_code=code,
+            current_date=datetime.now().strftime("%B %d, %Y"),
+        )
+
+    # POST from Meta
+    signed_request = request.form.get("signed_request", "")
+    confirmation_code = "FTS-DEL-" + hashlib.sha256(
+        (signed_request + datetime.now().isoformat()).encode()
+    ).hexdigest()[:12].upper()
+
+    logger.info("Data deletion request received, code: %s", confirmation_code)
+
+    # Return the response Meta expects
+    return jsonify({
+        "url": request.url_root.rstrip("/") + f"/data-deletion?code={confirmation_code}",
+        "confirmation_code": confirmation_code,
+    })
 
 
 @app.route("/api/instagram-trends")

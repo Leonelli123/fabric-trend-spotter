@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terms of Service - Fabric Trend Spotter</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .terms-container {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+        }
+        .terms-container h1 {
+            background: none;
+            -webkit-text-fill-color: var(--text);
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        .terms-container h2 {
+            font-size: 1.3rem;
+            margin-top: 2rem;
+            margin-bottom: 0.8rem;
+            color: var(--accent);
+        }
+        .terms-container p, .terms-container li {
+            color: var(--text-muted);
+            line-height: 1.8;
+            margin-bottom: 0.8rem;
+        }
+        .terms-container ul {
+            margin-left: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .terms-container li { margin-bottom: 0.4rem; }
+        .terms-date {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            margin-bottom: 2rem;
+        }
+        .terms-back {
+            display: inline-block;
+            margin-bottom: 2rem;
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        .terms-back:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="terms-container">
+        <a href="/" class="terms-back">&larr; Back to Dashboard</a>
+
+        <h1>Terms of Service</h1>
+        <p class="terms-date">Last updated: {{ current_date }}</p>
+
+        <p>
+            Welcome to Fabric Trend Spotter. By accessing or using our application, you agree
+            to be bound by these Terms of Service. If you do not agree, please do not use the app.
+        </p>
+
+        <h2>1. Description of Service</h2>
+        <p>
+            Fabric Trend Spotter is a free trend analysis tool that aggregates publicly available
+            data from online fabric marketplaces, Google Trends, and social media platforms
+            (including Instagram) to display fabric, pattern, and color trends. The service
+            is provided for informational and research purposes.
+        </p>
+
+        <h2>2. Acceptable Use</h2>
+        <p>You agree to use the service only for lawful purposes. You may not:</p>
+        <ul>
+            <li>Use the service to scrape, redistribute, or resell the aggregated data</li>
+            <li>Attempt to interfere with or disrupt the service</li>
+            <li>Use the service to violate any applicable laws or regulations</li>
+            <li>Misrepresent your affiliation with Fabric Trend Spotter</li>
+        </ul>
+
+        <h2>3. Data and Content</h2>
+        <p>
+            Trend data displayed on the dashboard is aggregated from publicly available sources
+            and is provided "as is" without warranty of accuracy, completeness, or timeliness.
+            Marketplace listings, prices, and trend scores may change at any time.
+        </p>
+        <ul>
+            <li>We do not guarantee that trend predictions or forecasts will be accurate</li>
+            <li>Data should not be used as the sole basis for business decisions</li>
+            <li>We are not affiliated with any marketplace or platform whose data we aggregate</li>
+        </ul>
+
+        <h2>4. Instagram and Social Media Data</h2>
+        <p>
+            Our application uses the Instagram Graph API to track public hashtag data related
+            to fabric trends. By using our service:
+        </p>
+        <ul>
+            <li>You acknowledge that Instagram data is sourced through Meta's official API</li>
+            <li>You agree not to use displayed Instagram data to identify or target individuals</li>
+            <li>Social media trend data is subject to Meta's Platform Terms</li>
+        </ul>
+
+        <h2>5. Intellectual Property</h2>
+        <p>
+            The Fabric Trend Spotter application, including its code, design, and analysis
+            algorithms, is open source and available on GitHub. Third-party data (marketplace
+            listings, Google Trends, Instagram content) remains the property of their
+            respective owners.
+        </p>
+
+        <h2>6. Limitation of Liability</h2>
+        <p>
+            Fabric Trend Spotter is provided "as is" and "as available" without warranties
+            of any kind, either express or implied. We shall not be liable for any damages
+            arising from the use or inability to use the service, including but not limited to:
+        </p>
+        <ul>
+            <li>Inaccurate or incomplete trend data</li>
+            <li>Service interruptions or downtime</li>
+            <li>Decisions made based on displayed trends or forecasts</li>
+        </ul>
+
+        <h2>7. Service Availability</h2>
+        <p>
+            We do not guarantee uninterrupted access to the service. The service may be
+            temporarily unavailable due to maintenance, updates, or factors beyond our control.
+            We reserve the right to modify or discontinue the service at any time.
+        </p>
+
+        <h2>8. Changes to Terms</h2>
+        <p>
+            We may update these Terms of Service at any time. Changes take effect immediately
+            upon posting. Continued use of the service after changes constitutes acceptance
+            of the updated terms.
+        </p>
+
+        <h2>9. Contact</h2>
+        <p>
+            For questions about these terms, please reach out via our
+            <a href="https://github.com/Leonelli123/fabric-trend-spotter/issues" style="color: var(--accent);">
+                GitHub repository
+            </a>.
+        </p>
+
+        <p style="margin-top: 2rem;">
+            See also: <a href="/privacy" style="color: var(--accent);">Privacy Policy</a>
+        </p>
+    </div>
+</body>
+</html>

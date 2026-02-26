@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Deletion Status - Fabric Trend Spotter</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .deletion-container {
+            max-width: 600px;
+            margin: 4rem auto;
+            padding: 2rem;
+            text-align: center;
+        }
+        .deletion-container h1 {
+            background: none;
+            -webkit-text-fill-color: var(--text);
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+        }
+        .deletion-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+        .status-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        .status-text {
+            font-size: 1.1rem;
+            color: var(--green);
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        .conf-code {
+            font-family: monospace;
+            background: rgba(108, 99, 255, 0.15);
+            color: var(--accent);
+            padding: 0.3rem 0.8rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            display: inline-block;
+            margin-top: 0.5rem;
+        }
+        .deletion-info {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            line-height: 1.7;
+        }
+        .deletion-back {
+            display: inline-block;
+            margin-top: 2rem;
+            color: var(--accent);
+            text-decoration: none;
+        }
+        .deletion-back:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="deletion-container">
+        <h1>Data Deletion Status</h1>
+
+        <div class="deletion-card">
+            <div class="status-icon">&#10003;</div>
+            <div class="status-text">Deletion Complete</div>
+            <p class="deletion-info">
+                Fabric Trend Spotter does not store any personal user data from Instagram
+                or Facebook. There is no user-specific data to delete.
+            </p>
+            {% if confirmation_code and confirmation_code != 'none' %}
+            <p class="deletion-info" style="margin-top: 1rem;">
+                Confirmation code: <span class="conf-code">{{ confirmation_code }}</span>
+            </p>
+            {% endif %}
+            <p class="deletion-info" style="margin-top: 1rem;">
+                Processed on: {{ current_date }}
+            </p>
+        </div>
+
+        <p class="deletion-info">
+            If you have questions, visit our
+            <a href="/privacy" style="color: var(--accent);">Privacy Policy</a>
+            or contact us via
+            <a href="https://github.com/Leonelli123/fabric-trend-spotter/issues" style="color: var(--accent);">GitHub</a>.
+        </p>
+
+        <a href="/" class="deletion-back">&larr; Back to Dashboard</a>
+    </div>
+</body>
+</html>
