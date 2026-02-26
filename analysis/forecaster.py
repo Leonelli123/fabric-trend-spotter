@@ -285,25 +285,48 @@ def _predict_score(current_score, velocity, acceleration, signals, lifecycle):
 def _calculate_confidence(history, signals, item):
     """
     Calculate confidence level (0-100%) in the forecast.
-    More data + more signals = higher confidence.
+    Integrates data quality, history depth, signal count, and source diversity.
     """
-    confidence = 30  # Base confidence
+    confidence = 15  # Lower base - must be earned
 
-    # More historical data points = more confidence
+    # Historical data depth
     data_points = len(history)
     confidence += min(data_points * 5, 20)
 
-    # More signals = more confidence
+    # Signal count
     strong_signals = sum(1 for s in signals if s["strength"] == "strong")
     mod_signals = sum(1 for s in signals if s["strength"] == "moderate")
-    confidence += strong_signals * 10 + mod_signals * 5
+    confidence += strong_signals * 8 + mod_signals * 4
 
-    # More sources = more confidence
+    # Source diversity (multi-platform = much more reliable)
     sources = len(item.get("by_source", {}))
-    confidence += sources * 5
+    confidence += min(sources * 7, 21)
 
-    # Google data available = more confidence
+    # Google data available
     if item.get("google_interest", 0) > 0:
-        confidence += 10
+        confidence += 8
 
-    return min(95, confidence)
+    # Data quality from the analysis layer
+    tier = item.get("confidence_tier", "moderate")
+    tier_bonus = {
+        "verified": 15,
+        "strong": 10,
+        "moderate": 5,
+        "weak": -10,
+    }.get(tier, 0)
+    confidence += tier_bonus
+
+    # Seller diversity (not just one shop)
+    sellers = item.get("unique_sellers", 1)
+    if sellers >= 5:
+        confidence += 8
+    elif sellers >= 3:
+        confidence += 5
+    elif sellers <= 1:
+        confidence -= 5
+
+    # Quality of underlying listings
+    avg_quality = item.get("avg_quality", 0)
+    confidence += int(avg_quality * 10)  # 0-10 bonus
+
+    return max(5, min(95, confidence))

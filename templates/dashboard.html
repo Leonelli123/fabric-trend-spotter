@@ -41,6 +41,17 @@
             <span id="status-text"></span>
         </div>
 
+        <!-- Data Quality Legend -->
+        {% if trends.fabric_types or trends.patterns or trends.colors %}
+        <div class="quality-legend">
+            <span class="ql-title">Confidence tiers:</span>
+            <span class="tier-badge tier-verified">Verified</span> 3+ sources, 8+ listings
+            <span class="tier-badge tier-strong">Strong</span> 2+ sources or 8+ quality listings
+            <span class="tier-badge tier-moderate">Moderate</span> Meets minimum, some corroboration
+            <span class="tier-badge tier-weak">Weak</span> Limited evidence (treat with caution)
+        </div>
+        {% endif %}
+
         <!-- ========== SECTION 1: TREND FORECASTS ========== -->
         <section id="forecasts" class="section">
             <div class="section-header">
@@ -125,7 +136,10 @@
                 <div class="forecast-card {{ f.lifecycle }}">
                     <div class="fc-top">
                         <span class="fc-lifecycle {{ f.lifecycle }}">{{ f.lifecycle|title }}</span>
-                        <span class="fc-confidence">{{ f.confidence }}% confident</span>
+                        <span class="fc-confidence conf-{{ 'high' if f.confidence >= 60 else ('mid' if f.confidence >= 35 else 'low') }}">
+                            {% if f.confidence >= 60 %}&#9679;&#9679;&#9679;{% elif f.confidence >= 35 %}&#9679;&#9679;&#9675;{% else %}&#9679;&#9675;&#9675;{% endif %}
+                            {{ f.confidence }}%
+                        </span>
                     </div>
                     <h4 class="fc-term">{{ f.term|title }}</h4>
                     <div class="fc-category">{{ f.category|replace('_', ' ')|title }}</div>
@@ -317,7 +331,7 @@
                         <thead>
                             <tr>
                                 <th>#</th><th>Fabric Type</th><th>Score</th>
-                                <th>Listings</th><th>Avg Price</th><th>Favorites</th><th>Lifecycle</th>
+                                <th>Confidence</th><th>Listings</th><th>Sources</th><th>Avg Price</th><th>Lifecycle</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -326,9 +340,10 @@
                                 <td>{{ loop.index }}</td>
                                 <td class="term-name">{{ t.term|title }}</td>
                                 <td><span class="score-badge">{{ t.score }}</span></td>
+                                <td><span class="tier-badge tier-{{ t.confidence_tier|default('moderate') }}">{{ t.confidence_tier|default('moderate')|title }}</span></td>
                                 <td>{{ t.mention_count }}</td>
+                                <td>{{ t.source_count|default(1) }}</td>
                                 <td>{{ "$%.2f"|format(t.avg_price) if t.avg_price else "N/A" }}</td>
-                                <td>{{ t.avg_favorites }}</td>
                                 <td><span class="lifecycle-badge {{ t.lifecycle }}">{{ t.lifecycle|title }}</span></td>
                             </tr>
                             {% endfor %}
@@ -341,7 +356,7 @@
                         <thead>
                             <tr>
                                 <th>#</th><th>Pattern</th><th>Score</th>
-                                <th>Listings</th><th>Avg Price</th><th>Favorites</th><th>Lifecycle</th>
+                                <th>Confidence</th><th>Listings</th><th>Sources</th><th>Avg Price</th><th>Lifecycle</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -350,9 +365,10 @@
                                 <td>{{ loop.index }}</td>
                                 <td class="term-name">{{ t.term|title }}</td>
                                 <td><span class="score-badge">{{ t.score }}</span></td>
+                                <td><span class="tier-badge tier-{{ t.confidence_tier|default('moderate') }}">{{ t.confidence_tier|default('moderate')|title }}</span></td>
                                 <td>{{ t.mention_count }}</td>
+                                <td>{{ t.source_count|default(1) }}</td>
                                 <td>{{ "$%.2f"|format(t.avg_price) if t.avg_price else "N/A" }}</td>
-                                <td>{{ t.avg_favorites }}</td>
                                 <td><span class="lifecycle-badge {{ t.lifecycle }}">{{ t.lifecycle|title }}</span></td>
                             </tr>
                             {% endfor %}
@@ -365,7 +381,7 @@
                         <thead>
                             <tr>
                                 <th>#</th><th>Color</th><th>Score</th>
-                                <th>Listings</th><th>Avg Price</th><th>Favorites</th><th>Lifecycle</th>
+                                <th>Confidence</th><th>Listings</th><th>Sources</th><th>Avg Price</th><th>Lifecycle</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -374,9 +390,10 @@
                                 <td>{{ loop.index }}</td>
                                 <td class="term-name">{{ t.term|title }}</td>
                                 <td><span class="score-badge">{{ t.score }}</span></td>
+                                <td><span class="tier-badge tier-{{ t.confidence_tier|default('moderate') }}">{{ t.confidence_tier|default('moderate')|title }}</span></td>
                                 <td>{{ t.mention_count }}</td>
+                                <td>{{ t.source_count|default(1) }}</td>
                                 <td>{{ "$%.2f"|format(t.avg_price) if t.avg_price else "N/A" }}</td>
-                                <td>{{ t.avg_favorites }}</td>
                                 <td><span class="lifecycle-badge {{ t.lifecycle }}">{{ t.lifecycle|title }}</span></td>
                             </tr>
                             {% endfor %}
