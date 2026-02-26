@@ -52,9 +52,9 @@ async function triggerScrape() {
     const statusText = document.getElementById('status-text');
 
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> Scraping...';
+    btn.innerHTML = '<span class="spinner"></span> Collecting Data...';
     banner.className = 'status-banner info';
-    statusText.textContent = 'Scraping Etsy, Amazon & Spoonflower + running forecasts... This may take a few minutes.';
+    statusText.textContent = 'Loading baseline data, checking live sources & Google Trends, running forecasts... This may take a few minutes.';
 
     try {
         const resp = await fetch('/api/scrape', { method: 'POST' });
@@ -83,6 +83,17 @@ async function pollStatus() {
         if (data.error) {
             banner.className = 'status-banner error';
             statusText.textContent = 'Error: ' + data.error;
+        } else if (data.last_result) {
+            banner.className = 'status-banner success';
+            const r = data.last_result;
+            const parts = [`${r.total_listings} listings analyzed`];
+            if (r.google_keywords > 0) parts.push(`${r.google_keywords} Google keywords`);
+            if (r.live_listings > 0) parts.push(`${r.live_listings} live`);
+            if (r.failed_sources && r.failed_sources.length > 0) {
+                parts.push(`${r.failed_sources.join(', ')} unavailable`);
+            }
+            statusText.textContent = parts.join(' · ') + ' — Reloading...';
+            setTimeout(() => window.location.reload(), 2500);
         } else {
             banner.className = 'status-banner success';
             statusText.textContent = 'Data refreshed! Reloading...';

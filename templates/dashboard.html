@@ -41,6 +41,19 @@
             <span id="status-text"></span>
         </div>
 
+        <!-- Source Status -->
+        {% if scrape_status.last_result and scrape_status.last_result.source_status %}
+        <div class="source-status-bar">
+            <span class="ss-label">Data sources:</span>
+            {% for name, info in scrape_status.last_result.source_status.items() %}
+            <span class="ss-source ss-{{ info.status }}">
+                {% if info.status == 'ok' %}&#10003;{% elif info.status == 'empty' %}&#9888;{% else %}&#10007;{% endif %}
+                {{ name }} ({{ info.count }})
+            </span>
+            {% endfor %}
+        </div>
+        {% endif %}
+
         <!-- Data Quality Legend -->
         {% if trends.fabric_types or trends.patterns or trends.colors %}
         <div class="quality-legend">
@@ -411,6 +424,7 @@
             </div>
             <div class="listing-filters">
                 <button class="filter-btn active" onclick="filterListings('all')">All Sources</button>
+                <button class="filter-btn" onclick="filterListings('seed')">Baseline Data</button>
                 <button class="filter-btn" onclick="filterListings('etsy')">Etsy</button>
                 <button class="filter-btn" onclick="filterListings('amazon')">Amazon</button>
                 <button class="filter-btn" onclick="filterListings('spoonflower')">Spoonflower</button>

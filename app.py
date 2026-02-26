@@ -9,7 +9,10 @@ from database import (
     init_db, get_latest_trends, get_trend_history, get_recent_listings,
     get_scrape_stats, get_forecasts, get_trend_images,
 )
-from scrapers import scrape_etsy, scrape_amazon, scrape_spoonflower, fetch_google_trends
+from scrapers import (
+    scrape_etsy, scrape_amazon, scrape_spoonflower,
+    fetch_google_trends, get_seed_listings,
+)
 from analysis import analyze_trends, run_forecasts
 from database import save_listings
 from config import SEGMENTS
@@ -139,56 +142,116 @@ def api_status():
 
 
 def _run_scrape():
-    """Run all scrapers and analyze the results."""
+    """Run all scrapers and analyze the results.
+
+    Strategy:
+    1. Always load seed data as a baseline (so the dashboard is never empty)
+    2. Attempt live scrapers - treat failures gracefully
+    3. Fetch Google Trends with backoff
+    4. Run analysis and forecasting on combined data
+    5. Report clearly which sources succeeded/failed
+    """
     global scrape_status
     scrape_status["running"] = True
     scrape_status["error"] = None
 
+    source_status = {}
+
     try:
-        logger.info("Starting data scrape...")
+        logger.info("Starting data collection...")
         all_listings = []
 
-        # Run scrapers
+        # Step 1: Seed data - always available baseline
+        seed_listings = get_seed_listings()
+        all_listings.extend(seed_listings)
+        source_status["Seed Data"] = {
+            "status": "ok",
+            "count": len(seed_listings),
+            "note": "Curated baseline trends",
+        }
+        logger.info("Loaded %d seed listings as baseline", len(seed_listings))
+
+        # Step 2: Attempt live scrapers (failures are expected from cloud IPs)
+        live_count = 0
         for name, scraper in [
             ("Etsy", scrape_etsy),
             ("Amazon", scrape_amazon),
             ("Spoonflower", scrape_spoonflower),
         ]:
             try:
-                logger.info("Scraping %s...", name)
+                logger.info("Attempting %s...", name)
                 listings = scraper()
-                all_listings.extend(listings)
-                logger.info("Got %d listings from %s", len(listings), name)
+                if listings:
+                    all_listings.extend(listings)
+                    live_count += len(listings)
+                    source_status[name] = {
+                        "status": "ok",
+                        "count": len(listings),
+                    }
+                    logger.info("Got %d listings from %s", len(listings), name)
+                else:
+                    source_status[name] = {
+                        "status": "empty",
+                        "count": 0,
+                        "note": "No listings returned (likely blocked)",
+                    }
+                    logger.warning("%s returned no listings", name)
             except Exception as e:
-                logger.error("Error scraping %s: %s", name, e)
+                source_status[name] = {
+                    "status": "error",
+                    "count": 0,
+                    "note": str(e)[:100],
+                }
+                logger.warning("%s failed: %s", name, e)
 
-        # Save listings
-        if all_listings:
-            save_listings(all_listings)
-
-        # Fetch Google Trends
+        # Step 3: Google Trends (works with backoff)
         google_data = {}
         try:
             logger.info("Fetching Google Trends...")
             google_data = fetch_google_trends()
+            source_status["Google Trends"] = {
+                "status": "ok" if google_data else "empty",
+                "count": len(google_data),
+                "note": f"{len(google_data)} keywords" if google_data else "Rate limited",
+            }
         except Exception as e:
-            logger.error("Error fetching Google Trends: %s", e)
+            source_status["Google Trends"] = {
+                "status": "error",
+                "count": 0,
+                "note": str(e)[:100],
+            }
+            logger.warning("Google Trends failed: %s", e)
 
-        # Analyze
-        logger.info("Analyzing %d listings...", len(all_listings))
+        # Step 4: Save and analyze
+        if all_listings:
+            save_listings(all_listings)
+
+        logger.info(
+            "Analyzing %d listings (%d seed + %d live)...",
+            len(all_listings), len(seed_listings), live_count,
+        )
         result = analyze_trends(all_listings, google_data)
 
-        # Run forecasting
+        # Step 5: Run forecasting
         logger.info("Running trend forecasts...")
         forecasts = run_forecasts(result, google_data)
 
         emerging = [f for f in forecasts if f["lifecycle"] == "emerging"]
         rising = [f for f in forecasts if f["lifecycle"] == "rising"]
 
+        # Build status report
+        ok_sources = [k for k, v in source_status.items() if v["status"] == "ok"]
+        failed_sources = [
+            k for k, v in source_status.items() if v["status"] in ("error", "empty")
+        ]
+
         scrape_status["last_run"] = datetime.now().isoformat()
         scrape_status["last_result"] = {
             "total_listings": result["total_listings_analyzed"],
             "sources": result["sources"],
+            "live_listings": live_count,
+            "seed_listings": len(seed_listings),
+            "google_keywords": len(google_data),
             "top_fabric": (
                 result["fabric_types"][0]["term"] if result["fabric_types"] else "N/A"
             ),
@@ -202,15 +265,19 @@ def _run_scrape():
             "emerging_count": len(emerging),
             "rising_count": len(rising),
             "segments_analyzed": len(result.get("segment_trends", {})),
+            "source_status": source_status,
+            "ok_sources": ok_sources,
+            "failed_sources": failed_sources,
         }
         logger.info(
-            "Scrape complete! %d listings, %d forecasts, %d segments.",
-            len(all_listings), len(forecasts),
-            len(result.get("segment_trends", {})),
+            "Collection complete! %d listings (%d live), %d forecasts, "
+            "%d Google keywords. Sources OK: %s. Failed: %s",
+            len(all_listings), live_count, len(forecasts),
+            len(google_data), ok_sources, failed_sources,
         )
 
     except Exception as e:
-        logger.error("Scrape failed: %s", e)
+        logger.error("Scrape failed: %s", e, exc_info=True)
         scrape_status["error"] = str(e)
     finally:
         scrape_status["running"] = False
