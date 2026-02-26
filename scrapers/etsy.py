@@ -84,7 +84,7 @@ def _scrape_via_web():
         if not resp:
             continue
 
-        soup = BeautifulSoup(resp.text, "lxml")
+        soup = BeautifulSoup(resp.text, "html.parser")
 
         # Etsy uses data-listing-id on result cards
         result_cards = soup.select("[data-listing-id]")

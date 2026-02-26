@@ -52,7 +52,7 @@ def scrape_spoonflower():
 
 def _parse_spoonflower_page(html):
     """Parse a Spoonflower page for fabric listings."""
-    soup = BeautifulSoup(html, "lxml")
+    soup = BeautifulSoup(html, "html.parser")
     listings = []
 
     # Spoonflower design cards

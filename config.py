@@ -16,8 +16,19 @@ REQUEST_TIMEOUT = 15
 # Data refresh interval (hours)
 REFRESH_INTERVAL_HOURS = 6
 
-# Database
-DB_PATH = os.path.join(os.path.dirname(__file__), "data", "trends.db")
+# Database - try local data/ dir, fall back to /tmp for cloud deployments
+_data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+try:
+    os.makedirs(_data_dir, exist_ok=True)
+    # Verify we can actually write there
+    _test_path = os.path.join(_data_dir, ".write_test")
+    with open(_test_path, "w") as _f:
+        _f.write("ok")
+    os.remove(_test_path)
+except OSError:
+    _data_dir = "/tmp/fabric-trend-spotter"
+    os.makedirs(_data_dir, exist_ok=True)
+DB_PATH = os.path.join(_data_dir, "trends.db")
 
 # Flask
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-fabric-spotter-key")

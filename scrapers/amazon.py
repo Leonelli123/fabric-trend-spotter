@@ -31,7 +31,7 @@ def scrape_amazon():
         if not resp:
             continue
 
-        soup = BeautifulSoup(resp.text, "lxml")
+        soup = BeautifulSoup(resp.text, "html.parser")
 
         # Amazon search result cards
         cards = soup.select(

@@ -3,7 +3,8 @@ services:
     name: fabric-trend-spotter
     runtime: python
     plan: free
-    buildCommand: pip install -r requirements.txt && pip install gunicorn
+    pythonVersion: "3.11.0"
+    buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app -c gunicorn_config.py
     envVars:
       - key: FLASK_DEBUG
@@ -12,3 +13,5 @@ services:
         generateValue: true
       - key: ETSY_API_KEY
         sync: false
+      - key: PYTHON_VERSION
+        value: "3.11.0"
