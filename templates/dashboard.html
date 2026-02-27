@@ -720,22 +720,127 @@
 
         <!-- ========== SECTION 6: OPPORTUNITY GAPS ========== -->
         {% if action_board and action_board.opportunity_gaps %}
+        {% set ogaps = action_board.opportunity_gaps %}
         <section id="gaps" class="section" data-channel="both">
             <div class="section-header">
                 <h2>Opportunity Gaps</h2>
-                <p class="section-subtitle">High demand + low supply &mdash; undersupplied trends you can fill</p>
+                <p class="section-subtitle">Trending but undersupplied &mdash; <code>gap = demand / supply</code> &mdash; higher means more opportunity</p>
             </div>
-            <div class="gaps-list">
-                {% for gap in action_board.opportunity_gaps %}
-                <div class="gap-card">
-                    <div class="gap-strength">{{ gap.gap_strength }}</div>
-                    <div class="gap-body">
-                        <h4>{{ gap.term|title }} <span class="action-cat">{{ gap.category|replace('_', ' ')|title }}</span></h4>
-                        <p>{{ gap.reason }}</p>
+
+            <!-- Gap tabs -->
+            <div class="eu-tabs">
+                <button class="eu-tab active" data-eu="gap-supply" onclick="switchEU('gap-supply')">Supply/Demand
+                    {% if ogaps.supply_demand %}<span class="tab-count">{{ ogaps.supply_demand|length }}</span>{% endif %}
+                </button>
+                <button class="eu-tab" data-eu="gap-market" onclick="switchEU('gap-market')">Cross-Market
+                    {% if ogaps.cross_market %}<span class="tab-count">{{ ogaps.cross_market|length }}</span>{% endif %}
+                </button>
+                <button class="eu-tab" data-eu="gap-channel" onclick="switchEU('gap-channel')">Cross-Channel
+                    {% if ogaps.cross_channel %}<span class="tab-count">{{ ogaps.cross_channel|length }}</span>{% endif %}
+                </button>
+            </div>
+
+            <!-- TAB 1: Supply/Demand Gaps -->
+            <div id="eu-gap-supply" class="eu-content active">
+                {% if ogaps.supply_demand %}
+                <div class="gaps-grid">
+                    {% for gap in ogaps.supply_demand %}
+                    <div class="gap-card-v2">
+                        <div class="gap-header">
+                            <div class="gap-score-badge{% if gap.gap_score >= 5 %} gap-hot{% elif gap.gap_score >= 2 %} gap-warm{% endif %}">
+                                {{ gap.gap_score }}x
+                            </div>
+                            <div class="gap-title">
+                                <h4>{{ gap.term|title }}</h4>
+                                <span class="action-cat">{{ gap.category|replace('_', ' ')|title }}</span>
+                                <span class="lifecycle-badge {{ gap.lifecycle }}">{{ gap.lifecycle|title }}</span>
+                            </div>
+                        </div>
+                        <div class="gap-meter">
+                            <div class="gap-meter-label">
+                                <span>Demand {{ gap.demand_score }}</span>
+                                <span>Supply {{ gap.supply_score }}</span>
+                            </div>
+                            <div class="gap-meter-bar">
+                                <div class="gap-meter-fill demand" style="width: {{ [gap.demand_score / ([gap.demand_score, gap.supply_score]|max) * 100, 100]|min }}%"></div>
+                            </div>
+                            <div class="gap-meter-bar">
+                                <div class="gap-meter-fill supply" style="width: {{ [gap.supply_score / ([gap.demand_score, gap.supply_score]|max) * 100, 100]|min }}%"></div>
+                            </div>
+                        </div>
+                        <div class="gap-signals">
+                            {% for sig in gap.demand_signals %}
+                            <span class="gap-signal{% if 'Pinterest' in sig %} pinterest{% elif 'Google' in sig %} google{% endif %}">{{ sig }}</span>
+                            {% endfor %}
+                        </div>
                     </div>
-                    <span class="lifecycle-badge {{ gap.lifecycle }}">{{ gap.lifecycle|title }}</span>
+                    {% endfor %}
                 </div>
-                {% endfor %}
+                {% else %}
+                <p class="empty-state">No supply/demand gaps detected yet. Run a data refresh to analyze.</p>
+                {% endif %}
+            </div>
+
+            <!-- TAB 2: Cross-Market Flow -->
+            <div id="eu-gap-market" class="eu-content">
+                {% if ogaps.cross_market %}
+                <p class="tab-intro">Trends hot in the US but absent or weak in EU markets &mdash; first-mover opportunities.</p>
+                <div class="gaps-list">
+                    {% for gap in ogaps.cross_market %}
+                    <div class="gap-card gap-flow-card">
+                        <div class="gap-flow-score">{{ gap.gap_score }}x</div>
+                        <div class="gap-body">
+                            <h4>{{ gap.term|title }}
+                                <span class="action-cat">{{ gap.category|replace('_', ' ')|title }}</span>
+                                <span class="lifecycle-badge {{ gap.lifecycle }}">{{ gap.lifecycle|title }}</span>
+                            </h4>
+                            <p class="gap-flow-label">{{ gap.flow_label }}</p>
+                            <div class="gap-flow-markets">
+                                {% if gap.present_in %}
+                                <span class="flow-present">&#10003; {{ gap.present_in|join(', ') }}</span>
+                                {% endif %}
+                                <span class="flow-absent">&#10007; {{ gap.absent_from|join(', ') }}</span>
+                            </div>
+                            <p class="gap-action">&#8594; {{ gap.action }}</p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="empty-state">No cross-market gaps detected. Run a data refresh for EU market comparison.</p>
+                {% endif %}
+            </div>
+
+            <!-- TAB 3: Cross-Channel Gaps -->
+            <div id="eu-gap-channel" class="eu-content">
+                {% if ogaps.cross_channel %}
+                <p class="tab-intro">Trends strong in one channel but weak in the other &mdash; arbitrage opportunities.</p>
+                <div class="gaps-list">
+                    {% for gap in ogaps.cross_channel %}
+                    <div class="gap-card gap-channel-card {% if gap.direction == 'b2c_to_b2b' %}gap-dir-b2b{% else %}gap-dir-b2c{% endif %}">
+                        <div class="gap-flow-score">{{ gap.gap_score }}x</div>
+                        <div class="gap-body">
+                            <h4>{{ gap.term|title }}
+                                {% if gap.direction == 'b2c_to_b2b' %}
+                                <span class="gap-dir-badge b2b">Etsy &#8594; Wholesale</span>
+                                {% else %}
+                                <span class="gap-dir-badge b2c">Wholesale &#8594; Etsy</span>
+                                {% endif %}
+                                <span class="lifecycle-badge {{ gap.lifecycle }}">{{ gap.lifecycle|title }}</span>
+                            </h4>
+                            <div class="gap-channel-scores">
+                                <span class="ch-score b2c">B2C: {{ gap.b2c_score }}</span>
+                                <span class="ch-vs">vs</span>
+                                <span class="ch-score b2b">B2B: {{ gap.b2b_score }}</span>
+                            </div>
+                            <p class="gap-action">&#8594; {{ gap.action }}</p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="empty-state">No cross-channel gaps detected. Run a data refresh with EU market data.</p>
+                {% endif %}
             </div>
         </section>
         {% endif %}

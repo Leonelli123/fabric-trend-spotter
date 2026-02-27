@@ -638,7 +638,7 @@ def _build_action_board(result, forecasts, google_data, eu_data=None):
         colors, patterns, styles, fabrics, forecasts, google_data
     )
     market_signals = _build_market_signals(colors, patterns, styles, forecasts)
-    opportunity_gaps = _build_opportunity_gaps(all_trends, forecasts, google_data)
+    opportunity_gaps = _build_opportunity_gaps(all_trends, forecasts, google_data, eu_data)
     seasonal_calendar = _build_seasonal_calendar()
     etsy_intel = _build_etsy_intel(result, forecasts, google_data, eu_data)
     cross_channel = _build_cross_channel_intel(result, forecasts, google_data, eu_data)
@@ -899,8 +899,9 @@ def _build_weekly_actions(design_briefs, design_now, phase_out, evergreen,
         })
 
     # === 7. RESEARCH — investigate opportunity gap ===
+    gap_list = opportunity_gaps.get("_legacy", opportunity_gaps) if isinstance(opportunity_gaps, dict) else opportunity_gaps
     unused_gaps = [
-        g for g in opportunity_gaps
+        g for g in gap_list
         if g["term"].lower() not in used_terms
     ]
     if unused_gaps:
@@ -965,52 +966,259 @@ def _build_market_signals(colors, patterns, styles, forecasts):
     return signals
 
 
-def _build_opportunity_gaps(all_trends, forecasts, google_data):
-    """Find trends with high search demand but low marketplace supply."""
-    gaps = []
+def _build_opportunity_gaps(all_trends, forecasts, google_data, eu_data=None):
+    """Find trends with high demand but low supply using gap_score = demand / supply.
+
+    Returns a dict with three sections:
+      supply_demand — gap_score ranked gaps (Google demand vs listing supply)
+      cross_market  — trends hot in one geography but absent in another
+      cross_channel — trends strong in one channel (B2B/B2C) but weak in the other
+    """
     fc_lookup = {f["term"].lower(): f for f in forecasts}
+    eu_countries = eu_data.get("countries", {}) if eu_data else {}
 
+    # --- Pinterest signal lookup ---
+    pinterest_terms = set()
+    pinterest_data = scrape_status.get("pinterest_result", {})
+    for sig_list in [
+        pinterest_data.get("fabric_signals", []),
+        pinterest_data.get("pattern_signals", []),
+        pinterest_data.get("color_signals", []),
+    ]:
+        for sig in sig_list:
+            term = sig.get("term", "").lower()
+            if term:
+                pinterest_terms.add(term)
+
+    # --- Google interest lookup ---
+    def _google_val(term):
+        for key, val in google_data.items():
+            if key.startswith("_"):
+                continue
+            if isinstance(val, dict) and term.lower().split()[0] in key.lower():
+                return val.get("interest", 0), val.get("trending_up", False)
+        return 0, False
+
+    # --- EU score lookups ---
+    b2b_markets = ["DK", "FI", "DE"]
+    b2c_markets = ["DE", "NL"]
+    us_scores = {t["term"].lower(): t for t in all_trends}
+    b2b_scores = {}
+    for cc in b2b_markets:
+        ci = eu_countries.get(cc, {})
+        for t in ci.get("top_trends", [])[:15]:
+            b2b_scores.setdefault(t["term"].lower(), {})[cc] = t.get("score", 0)
+    b2c_eu_scores = {}
+    for cc in b2c_markets:
+        ci = eu_countries.get(cc, {})
+        for t in ci.get("top_trends", [])[:15]:
+            b2c_eu_scores.setdefault(t["term"].lower(), {})[cc] = t.get("score", 0)
+
+    # ================================================================
+    # 1. SUPPLY/DEMAND GAPS — gap_score = demand_score / supply_score
+    # ================================================================
+    supply_demand = []
     for t in all_trends:
-        google_interest = t.get("google_interest", 0)
-        mention_count = t.get("mention_count", 0)
+        term_lower = t["term"].lower()
         score = t.get("score", 0)
-        fc = fc_lookup.get(t["term"].lower(), {})
+        mention_count = t.get("mention_count", 0)
+        gi, gi_up = _google_val(t["term"])
 
-        # Gap = high search interest relative to listing count
-        if google_interest > 0 and mention_count > 0:
-            supply_ratio = mention_count / max(google_interest, 1)
-            gap_strength = google_interest - (mention_count * 3)
-        elif score > 15 and mention_count < 5:
-            # High trend score but very few listings
-            supply_ratio = 0.1
-            gap_strength = score * 2
-        else:
-            continue
-
-        if gap_strength <= 0 and supply_ratio > 0.5:
-            continue
-
+        fc = fc_lookup.get(term_lower, {})
         lifecycle = fc.get("lifecycle", t.get("lifecycle", "unknown"))
         if lifecycle == "declining":
-            continue  # don't flag declining trends as gaps
+            continue
 
-        gaps.append({
+        # Demand signals: Google interest + trend score + Pinterest presence
+        demand_score = 0
+        demand_signals = []
+        if gi > 0:
+            demand_score += gi
+            demand_signals.append(f"Google {gi}/100" + (" ↑" if gi_up else ""))
+        demand_score += score * 0.8
+        if score > 20:
+            demand_signals.append(f"trend score {score}")
+        if term_lower in pinterest_terms:
+            demand_score += 20
+            demand_signals.append("Pinterest trending")
+        if gi_up:
+            demand_score += 15  # bonus for rising search
+
+        # Supply signals: listing count (low = undersupplied)
+        supply_score = max(mention_count * 5, 1)  # scale mentions to comparable range
+        if mention_count > 0:
+            demand_signals.append(f"{mention_count} listings")
+
+        # gap_score = demand / supply — higher means more undersupplied
+        gap_score = round(demand_score / supply_score, 2) if supply_score > 0 else 0
+
+        if gap_score < 1.0 and demand_score < 30:
+            continue  # not a meaningful gap
+
+        supply_demand.append({
             "term": t["term"],
             "category": t.get("category", ""),
             "score": score,
-            "google_interest": google_interest,
+            "gap_score": gap_score,
+            "demand_score": round(demand_score, 1),
+            "supply_score": round(supply_score, 1),
+            "google_interest": gi,
+            "google_rising": gi_up,
+            "pinterest": term_lower in pinterest_terms,
             "mention_count": mention_count,
-            "gap_strength": round(max(gap_strength, score * 0.5), 1),
             "lifecycle": lifecycle,
+            "demand_signals": demand_signals,
             "reason": (
-                f"Score {score} with only {mention_count} listings"
-                + (f" vs. Google interest {google_interest}" if google_interest else "")
-                + " — undersupplied opportunity."
+                f"Demand {round(demand_score)} vs supply {round(supply_score)}"
+                + (f" — Google {gi}" if gi else "")
+                + (f", Pinterest active" if term_lower in pinterest_terms else "")
+                + f" — only {mention_count} listings."
             ),
         })
 
-    gaps.sort(key=lambda g: g["gap_strength"], reverse=True)
-    return gaps[:10]
+    supply_demand.sort(key=lambda g: g["gap_score"], reverse=True)
+    supply_demand = supply_demand[:12]
+
+    # ================================================================
+    # 2. CROSS-MARKET GAPS — trending in US but absent/weak in EU
+    # ================================================================
+    cross_market = []
+    seen_cm = set()
+    for t in all_trends[:25]:
+        term_lower = t["term"].lower()
+        if term_lower in seen_cm:
+            continue
+        seen_cm.add(term_lower)
+
+        us_score = t.get("score", 0)
+        if us_score < 25:
+            continue
+        fc = fc_lookup.get(term_lower, {})
+        lifecycle = fc.get("lifecycle", "unknown")
+        if lifecycle == "declining":
+            continue
+
+        gi, gi_up = _google_val(t["term"])
+
+        # Check where this trend IS and ISN'T present in EU
+        present_in = []
+        absent_from = []
+        all_eu_codes = list(set(b2b_markets + b2c_markets))
+        for cc in all_eu_codes:
+            ci = eu_countries.get(cc, {})
+            found = False
+            for eu_t in ci.get("top_trends", [])[:15]:
+                if term_lower in eu_t.get("term", "").lower():
+                    present_in.append(cc)
+                    found = True
+                    break
+            if not found:
+                absent_from.append(cc)
+
+        if not absent_from or us_score < 30:
+            continue
+
+        # Flow direction detection
+        if not present_in:
+            flow = "us_only"
+            flow_label = f"Hot in US (score {us_score}) but not yet in any EU market"
+        elif len(absent_from) > len(present_in):
+            flow = "early_eu"
+            flow_label = (
+                f"In {', '.join(present_in)} but not "
+                f"{', '.join(absent_from)} — expanding"
+            )
+        else:
+            flow = "partial"
+            flow_label = f"Missing from {', '.join(absent_from)}"
+
+        cross_market.append({
+            "term": t["term"],
+            "category": t.get("category", ""),
+            "us_score": us_score,
+            "lifecycle": lifecycle,
+            "flow": flow,
+            "flow_label": flow_label,
+            "present_in": present_in,
+            "absent_from": absent_from,
+            "google_interest": gi,
+            "google_rising": gi_up,
+            "gap_score": round(us_score / max(len(present_in) * 15, 1), 1),
+            "action": (
+                f"List {t['term'].title()} on Etsy {', '.join(absent_from[:2])}"
+                if any(c in absent_from for c in b2c_markets)
+                else f"Pitch {t['term'].title()} to {', '.join(absent_from[:2])} wholesale"
+            ),
+        })
+
+    cross_market.sort(key=lambda g: g["gap_score"], reverse=True)
+    cross_market = cross_market[:8]
+
+    # ================================================================
+    # 3. CROSS-CHANNEL GAPS — strong in B2B but weak in B2C or vice versa
+    # ================================================================
+    cross_channel = []
+    all_terms = set(list(us_scores.keys()) + list(b2b_scores.keys()))
+    for term in all_terms:
+        fc = fc_lookup.get(term, {})
+        lifecycle = fc.get("lifecycle", "unknown")
+        if lifecycle == "declining":
+            continue
+
+        us_t = us_scores.get(term, {})
+        etsy_score = us_t.get("score", 0) if us_t else 0
+        b2b_max = max(b2b_scores.get(term, {}).values()) if term in b2b_scores else 0
+        b2b_mkts = list(b2b_scores.get(term, {}).keys()) if term in b2b_scores else []
+
+        # B2C strong, B2B weak
+        if etsy_score >= 35 and b2b_max < etsy_score * 0.5:
+            cross_channel.append({
+                "term": term,
+                "category": us_t.get("category", "") if us_t else "",
+                "lifecycle": lifecycle,
+                "direction": "b2c_to_b2b",
+                "b2c_score": etsy_score,
+                "b2b_score": b2b_max,
+                "gap_score": round(etsy_score / max(b2b_max, 1), 1),
+                "action": f"Pitch {term.title()} to DK/FI wholesale — Etsy score {etsy_score} vs B2B {b2b_max}",
+            })
+        # B2B strong, B2C weak
+        elif b2b_max >= 30 and etsy_score < b2b_max * 0.5:
+            cross_channel.append({
+                "term": term,
+                "category": us_t.get("category", "") if us_t else "",
+                "lifecycle": lifecycle,
+                "direction": "b2b_to_b2c",
+                "b2c_score": etsy_score,
+                "b2b_score": b2b_max,
+                "gap_score": round(b2b_max / max(etsy_score, 1), 1),
+                "b2b_markets": b2b_mkts,
+                "action": f"List {term.title()} on Etsy — wholesale score {b2b_max} in {', '.join(b2b_mkts)} but Etsy only {etsy_score}",
+            })
+
+    cross_channel.sort(key=lambda g: g["gap_score"], reverse=True)
+    cross_channel = cross_channel[:8]
+
+    # Legacy flat list for backward-compat (weekly actions still reads it)
+    legacy_gaps = []
+    for g in supply_demand[:10]:
+        legacy_gaps.append({
+            "term": g["term"],
+            "category": g["category"],
+            "score": g["score"],
+            "google_interest": g["google_interest"],
+            "mention_count": g["mention_count"],
+            "gap_strength": g["gap_score"],
+            "lifecycle": g["lifecycle"],
+            "reason": g["reason"],
+        })
+
+    return {
+        "supply_demand": supply_demand,
+        "cross_market": cross_market,
+        "cross_channel": cross_channel,
+        "_legacy": legacy_gaps,
+    }
 
 
 def _build_cross_channel_intel(result, forecasts, google_data, eu_data=None):
