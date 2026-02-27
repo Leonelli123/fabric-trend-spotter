@@ -7,6 +7,8 @@ from flask import Flask, render_template, jsonify, request
 from database import (
     init_db, get_latest_trends, get_trend_history, get_recent_listings,
     get_scrape_stats, get_forecasts, get_trend_images,
+    get_price_history, get_price_stats_by_country,
+    get_trend_deltas,
 )
 from scrapers import (
     scrape_etsy, scrape_amazon, scrape_spoonflower,
@@ -664,6 +666,9 @@ def _build_action_board(result, forecasts, google_data, eu_data=None):
     seasonal_calendar = _build_seasonal_calendar()
     etsy_intel = _build_etsy_intel(result, forecasts, google_data, eu_data)
     cross_channel = _build_cross_channel_intel(result, forecasts, google_data, eu_data)
+    price_intel = _build_price_intel(result, forecasts, eu_data)
+    competitor_watch = _build_competitor_watch(result, forecasts, eu_data)
+    trend_deltas = _build_trend_deltas(result, forecasts)
 
     # --- Weekly actions: concrete tasks citing specific data ---
     weekly_actions = _build_weekly_actions(
@@ -680,6 +685,9 @@ def _build_action_board(result, forecasts, google_data, eu_data=None):
         "market_signals": market_signals,
         "etsy_intel": etsy_intel,
         "cross_channel": cross_channel,
+        "price_intel": price_intel,
+        "competitor_watch": competitor_watch,
+        "trend_deltas": trend_deltas,
         "opportunity_gaps": opportunity_gaps,
         "seasonal_calendar": seasonal_calendar,
         "buckets": {
@@ -1638,6 +1646,370 @@ def _build_etsy_intel(result, forecasts, google_data, eu_data=None):
         "timing": timing,
         "pricing": pricing,
         "entry_signals": entry_signals[:6],
+    }
+
+
+def _build_price_intel(result, forecasts, eu_data=None):
+    """Build price intelligence: per-trend pricing, cross-market comparison, margin map.
+
+    Returns a dict with:
+      per_trend    — top trends with pricing breakdown (avg, range, sample count)
+      cross_market — same trend priced across multiple countries
+      margin_map   — B2B wholesale vs B2C Etsy price gaps per trend
+      tiers        — premium / mid / budget tier categorization
+    """
+    fc_lookup = {f["term"].lower(): f for f in forecasts}
+    eu_countries = eu_data.get("countries", {}) if eu_data else {}
+
+    colors = result.get("colors", [])
+    patterns = result.get("patterns", [])
+    styles = result.get("styles", [])
+    fabrics = result.get("fabric_types", [])
+    all_trends = colors + patterns + styles + fabrics
+
+    # --- PER-TREND PRICING: top trends with price data ---
+    per_trend = []
+    for t in all_trends:
+        price = t.get("avg_price")
+        if not price or price <= 0:
+            continue
+        fc = fc_lookup.get(t["term"].lower(), {})
+        pr = t.get("price_range", {})
+        per_trend.append({
+            "term": t["term"],
+            "category": t.get("category", ""),
+            "avg_price": round(price, 2),
+            "price_low": round(pr["min"], 2) if pr else None,
+            "price_high": round(pr["max"], 2) if pr else None,
+            "mention_count": t.get("mention_count", 0),
+            "score": t.get("score", 0),
+            "lifecycle": fc.get("lifecycle", "unknown"),
+        })
+    per_trend.sort(key=lambda x: x["avg_price"], reverse=True)
+    per_trend = per_trend[:15]
+
+    # --- CROSS-MARKET PRICING: same trend across countries ---
+    # Gather per-country trend data with prices
+    country_prices = {}  # {term_lower: {country: {avg_price, currency, score}}}
+    # US/global trends
+    for t in all_trends:
+        if t.get("avg_price") and t["avg_price"] > 0:
+            key = t["term"].lower()
+            country_prices.setdefault(key, {})
+            country_prices[key]["US"] = {
+                "avg_price": round(t["avg_price"], 2),
+                "currency": "USD",
+                "score": t.get("score", 0),
+            }
+
+    # EU country trends
+    for cc, ci in eu_countries.items():
+        currency = ci.get("currency", "EUR")
+        for cat_key in ["fabric_types", "patterns", "colors"]:
+            for t in ci.get(cat_key, []):
+                if t.get("avg_price") and t["avg_price"] > 0:
+                    key = t["term"].lower()
+                    country_prices.setdefault(key, {})
+                    country_prices[key][cc] = {
+                        "avg_price": round(t["avg_price"], 2),
+                        "currency": currency,
+                        "score": t.get("score", 0),
+                    }
+
+    # Only keep terms present in 2+ markets
+    cross_market = []
+    for term, markets in country_prices.items():
+        if len(markets) < 2:
+            continue
+        fc = fc_lookup.get(term, {})
+        prices_list = sorted(
+            [{"market": m, **d} for m, d in markets.items()],
+            key=lambda x: x["avg_price"],
+            reverse=True,
+        )
+        highest = prices_list[0]
+        lowest = prices_list[-1]
+        spread_pct = round(
+            ((highest["avg_price"] - lowest["avg_price"]) / lowest["avg_price"]) * 100
+        ) if lowest["avg_price"] > 0 else 0
+
+        cross_market.append({
+            "term": term,
+            "market_count": len(markets),
+            "prices": prices_list,
+            "highest_market": highest["market"],
+            "lowest_market": lowest["market"],
+            "spread_pct": spread_pct,
+            "lifecycle": fc.get("lifecycle", "unknown"),
+        })
+    cross_market.sort(key=lambda x: x["spread_pct"], reverse=True)
+    cross_market = cross_market[:10]
+
+    # --- MARGIN MAP: B2B wholesale vs B2C Etsy pricing ---
+    margin_map = []
+    b2b_markets = ["DK", "FI", "DE"]
+    for term, markets in country_prices.items():
+        us_data = markets.get("US")
+        if not us_data:
+            continue
+        b2c_price = us_data["avg_price"]
+
+        # Check if this term has pricing in any B2B market
+        b2b_prices = []
+        for cc in b2b_markets:
+            if cc in markets:
+                b2b_prices.append({
+                    "market": cc,
+                    "avg_price": markets[cc]["avg_price"],
+                    "currency": markets[cc]["currency"],
+                })
+
+        if not b2b_prices:
+            continue
+
+        avg_b2b = sum(p["avg_price"] for p in b2b_prices) / len(b2b_prices)
+        fc = fc_lookup.get(term, {})
+        margin_map.append({
+            "term": term,
+            "b2c_price": b2c_price,
+            "b2c_currency": "USD",
+            "b2b_avg_price": round(avg_b2b, 2),
+            "b2b_prices": b2b_prices,
+            "spread": round(b2c_price - avg_b2b, 2),
+            "spread_pct": round(((b2c_price - avg_b2b) / avg_b2b) * 100) if avg_b2b > 0 else 0,
+            "lifecycle": fc.get("lifecycle", "unknown"),
+        })
+    margin_map.sort(key=lambda x: abs(x["spread_pct"]), reverse=True)
+    margin_map = margin_map[:8]
+
+    # --- PRICE TIERS: premium / mid / budget ---
+    tiers = {"premium": [], "mid": [], "budget": []}
+    if per_trend:
+        prices = [t["avg_price"] for t in per_trend]
+        p33 = sorted(prices)[len(prices) // 3] if len(prices) >= 3 else (min(prices) + max(prices)) / 2
+        p66 = sorted(prices)[2 * len(prices) // 3] if len(prices) >= 3 else (min(prices) + max(prices)) / 2
+
+        for t in per_trend:
+            entry = {
+                "term": t["term"],
+                "category": t["category"],
+                "avg_price": t["avg_price"],
+                "lifecycle": t["lifecycle"],
+            }
+            if t["avg_price"] >= p66:
+                tiers["premium"].append(entry)
+            elif t["avg_price"] >= p33:
+                tiers["mid"].append(entry)
+            else:
+                tiers["budget"].append(entry)
+
+    return {
+        "per_trend": per_trend,
+        "cross_market": cross_market,
+        "margin_map": margin_map,
+        "tiers": tiers,
+    }
+
+
+def _build_trend_deltas(result, forecasts):
+    """Build week-over-week trend delta data for the dashboard.
+
+    Returns a dict with:
+      movers    — top 10 biggest movers (both up and down)
+      risers    — trends with biggest positive delta
+      fallers   — trends with biggest negative delta
+      new_entries — trends that appeared for the first time
+      summary   — aggregate stats (avg delta, total risers/fallers)
+    """
+    fc_lookup = {f["term"].lower(): f for f in forecasts}
+    raw_deltas = get_trend_deltas(days_back=7)
+
+    # Filter to trends with meaningful data
+    meaningful = [d for d in raw_deltas if d["current_score"] > 0]
+
+    risers = [d for d in meaningful if d["delta"] > 0 and d["has_previous"]]
+    risers.sort(key=lambda d: d["delta"], reverse=True)
+
+    fallers = [d for d in meaningful if d["delta"] < 0 and d["has_previous"]]
+    fallers.sort(key=lambda d: d["delta"])
+
+    new_entries = [d for d in meaningful if not d["has_previous"] and d["current_score"] >= 15]
+    new_entries.sort(key=lambda d: d["current_score"], reverse=True)
+
+    # Top movers = biggest absolute change
+    movers = [d for d in meaningful if d["has_previous"] and abs(d["delta"]) >= 2]
+    movers.sort(key=lambda d: abs(d["delta"]), reverse=True)
+
+    # Enrich with lifecycle data
+    for d in movers + risers + fallers + new_entries:
+        fc = fc_lookup.get(d["term"].lower(), {})
+        d["lifecycle"] = fc.get("lifecycle", d.get("lifecycle", "unknown"))
+
+    # Summary stats
+    all_deltas = [d["delta"] for d in meaningful if d["has_previous"]]
+    summary = {
+        "total_tracked": len(meaningful),
+        "total_risers": len(risers),
+        "total_fallers": len(fallers),
+        "total_new": len(new_entries),
+        "avg_delta": round(sum(all_deltas) / len(all_deltas), 1) if all_deltas else 0,
+    }
+
+    return {
+        "movers": movers[:12],
+        "risers": risers[:8],
+        "fallers": fallers[:8],
+        "new_entries": new_entries[:6],
+        "summary": summary,
+    }
+
+
+def _build_competitor_watch(result, forecasts, eu_data=None):
+    """Build competitor intelligence: what are competitors selling & where do we overlap/differ?
+
+    Returns a dict with:
+      brands        — per-brand summary (products scraped, top patterns/colors)
+      overlap       — trends we share with competitors (red ocean)
+      whitespace    — trends competitors have but we don't track (opportunities)
+      our_strengths — trends strong in our data but weak/absent from competitors
+    """
+    fc_lookup = {f["term"].lower(): f for f in forecasts}
+    comp_stats = scrape_status.get("competitor_stats", {})
+
+    # Our top trends
+    our_trends = set()
+    our_trend_data = {}
+    for cat_list in [result.get("colors", []), result.get("patterns", []),
+                     result.get("styles", [])]:
+        for t in cat_list[:10]:
+            our_trends.add(t["term"].lower())
+            our_trend_data[t["term"].lower()] = t
+
+    # Analyze competitor listings from the database
+    # Competitor listings were saved with source=brand_key
+    from database import get_recent_listings
+    comp_listings = {}
+    comp_trend_counts = {}  # {term_lower: {brand: count}}
+
+    for brand_key, info in comp_stats.items():
+        if info.get("status") != "ok" or info.get("count", 0) == 0:
+            continue
+        listings = get_recent_listings(source=brand_key, limit=100)
+        comp_listings[brand_key] = listings
+
+        # Extract what trends each competitor carries
+        brand_terms = {}
+        for listing in listings:
+            tags = listing.get("tags", [])
+            if isinstance(tags, str):
+                import json
+                try:
+                    tags = json.loads(tags)
+                except (json.JSONDecodeError, TypeError):
+                    tags = []
+            title_lower = listing.get("title", "").lower()
+            tag_lower = " ".join(t.lower() for t in tags)
+            combined = title_lower + " " + tag_lower
+
+            from config import PATTERN_TYPES, COLOR_TERMS, STYLE_TERMS
+            for term_list, category in [
+                (PATTERN_TYPES, "pattern"),
+                (COLOR_TERMS, "color"),
+                (STYLE_TERMS, "style"),
+            ]:
+                for term in term_list:
+                    if term.lower() in combined:
+                        brand_terms.setdefault(term.lower(), {
+                            "term": term, "category": category, "count": 0,
+                        })
+                        brand_terms[term.lower()]["count"] += 1
+                        comp_trend_counts.setdefault(term.lower(), {})
+                        comp_trend_counts[term.lower()].setdefault(brand_key, 0)
+                        comp_trend_counts[term.lower()][brand_key] += 1
+
+        info["top_terms"] = sorted(
+            brand_terms.values(),
+            key=lambda x: x["count"],
+            reverse=True,
+        )[:8]
+
+    # --- PER-BRAND SUMMARIES ---
+    brands = []
+    for brand_key, info in comp_stats.items():
+        from config import COMPETITOR_BRANDS
+        brand_cfg = COMPETITOR_BRANDS.get(brand_key, {})
+        brands.append({
+            "key": brand_key,
+            "name": info.get("name", brand_key),
+            "country": info.get("country", brand_cfg.get("country", "")),
+            "tier": brand_cfg.get("tier", "unknown"),
+            "note": brand_cfg.get("note", ""),
+            "status": info.get("status", "unknown"),
+            "product_count": info.get("count", 0),
+            "top_terms": info.get("top_terms", []),
+        })
+    brands.sort(key=lambda b: b["product_count"], reverse=True)
+
+    # --- OVERLAP: trends we share (red ocean — compete on quality/price) ---
+    overlap = []
+    for term_lower, brand_counts in comp_trend_counts.items():
+        if term_lower in our_trends:
+            our_data = our_trend_data.get(term_lower, {})
+            fc = fc_lookup.get(term_lower, {})
+            overlap.append({
+                "term": term_lower,
+                "category": our_data.get("category", ""),
+                "our_score": our_data.get("score", 0),
+                "competitor_brands": list(brand_counts.keys()),
+                "competitor_count": len(brand_counts),
+                "total_competitor_listings": sum(brand_counts.values()),
+                "lifecycle": fc.get("lifecycle", "unknown"),
+            })
+    overlap.sort(key=lambda x: x["competitor_count"], reverse=True)
+
+    # --- WHITESPACE: competitors have it, we don't track strongly ---
+    whitespace = []
+    for term_lower, brand_counts in comp_trend_counts.items():
+        if term_lower not in our_trends and sum(brand_counts.values()) >= 2:
+            fc = fc_lookup.get(term_lower, {})
+            # Find the category from any entry
+            cat = ""
+            for info in comp_stats.values():
+                for tt in info.get("top_terms", []):
+                    if tt["term"].lower() == term_lower:
+                        cat = tt.get("category", "")
+                        break
+                if cat:
+                    break
+            whitespace.append({
+                "term": term_lower,
+                "category": cat,
+                "competitor_brands": list(brand_counts.keys()),
+                "competitor_count": len(brand_counts),
+                "total_listings": sum(brand_counts.values()),
+                "lifecycle": fc.get("lifecycle", "unknown"),
+            })
+    whitespace.sort(key=lambda x: x["total_listings"], reverse=True)
+
+    # --- OUR STRENGTHS: strong in our data, weak in competitors ---
+    our_strengths = []
+    for term_lower, our_data in our_trend_data.items():
+        comp_count = len(comp_trend_counts.get(term_lower, {}))
+        if comp_count == 0 and our_data.get("score", 0) >= 25:
+            fc = fc_lookup.get(term_lower, {})
+            our_strengths.append({
+                "term": term_lower,
+                "category": our_data.get("category", ""),
+                "our_score": our_data.get("score", 0),
+                "lifecycle": fc.get("lifecycle", "unknown"),
+            })
+    our_strengths.sort(key=lambda x: x["our_score"], reverse=True)
+
+    return {
+        "brands": brands,
+        "overlap": overlap[:10],
+        "whitespace": whitespace[:8],
+        "our_strengths": our_strengths[:8],
     }
 
 

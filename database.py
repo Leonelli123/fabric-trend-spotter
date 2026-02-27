@@ -313,6 +313,134 @@ def get_trend_images(term=None, category=None, segment=None, limit=30):
     return [dict(r) for r in rows]
 
 
+def get_price_history(term=None, days=90):
+    """Get historical avg_price data from trend_snapshots.
+
+    If term is given, return price history for that term.
+    If term is None, return latest avg prices for all terms that have price data.
+    """
+    conn = get_db()
+    if term:
+        rows = conn.execute(
+            """SELECT term, category, avg_price, score, snapshot_date, country
+               FROM trend_snapshots
+               WHERE term = ? AND avg_price IS NOT NULL AND avg_price > 0
+               AND snapshot_date >= datetime('now', ?)
+               ORDER BY snapshot_date""",
+            (term, f"-{days} days"),
+        ).fetchall()
+    else:
+        # Latest snapshot prices for all terms
+        rows = conn.execute(
+            """SELECT t.term, t.category, t.avg_price, t.score, t.snapshot_date,
+                      t.country, t.mention_count
+               FROM trend_snapshots t
+               INNER JOIN (
+                   SELECT MAX(snapshot_date) as max_date FROM trend_snapshots
+               ) latest ON DATE(t.snapshot_date) = DATE(latest.max_date)
+               WHERE t.avg_price IS NOT NULL AND t.avg_price > 0
+               ORDER BY t.score DESC""",
+        ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_price_stats_by_country():
+    """Get per-country average pricing from the latest snapshot."""
+    conn = get_db()
+    rows = conn.execute(
+        """SELECT t.country, t.term, t.category, t.avg_price, t.score,
+                  t.mention_count
+           FROM trend_snapshots t
+           INNER JOIN (
+               SELECT MAX(snapshot_date) as max_date FROM trend_snapshots
+           ) latest ON DATE(t.snapshot_date) = DATE(latest.max_date)
+           WHERE t.avg_price IS NOT NULL AND t.avg_price > 0
+           AND t.country != ''
+           ORDER BY t.country, t.score DESC""",
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_trend_deltas(days_back=7):
+    """Compare latest snapshot scores with a previous snapshot to compute deltas.
+
+    Returns a list of {term, category, current_score, previous_score, delta,
+    delta_pct, current_price, previous_price, price_delta} dicts.
+    """
+    conn = get_db()
+
+    # Get latest snapshot date
+    latest = conn.execute(
+        "SELECT MAX(snapshot_date) as d FROM trend_snapshots"
+    ).fetchone()
+    if not latest or not latest["d"]:
+        conn.close()
+        return []
+
+    latest_date = latest["d"]
+
+    # Get current scores
+    current = conn.execute(
+        """SELECT term, category, score, avg_price, mention_count, velocity, lifecycle
+           FROM trend_snapshots
+           WHERE DATE(snapshot_date) = DATE(?) AND country = ''""",
+        (latest_date,),
+    ).fetchall()
+
+    # Get previous snapshot (closest to days_back ago)
+    previous = conn.execute(
+        """SELECT term, category, score, avg_price, mention_count
+           FROM trend_snapshots
+           WHERE snapshot_date < datetime(?, ?) AND country = ''
+           ORDER BY snapshot_date DESC""",
+        (latest_date, f"-{days_back} days"),
+    ).fetchall()
+
+    prev_lookup = {}
+    for row in previous:
+        key = (row["term"], row["category"])
+        if key not in prev_lookup:
+            prev_lookup[key] = dict(row)
+
+    deltas = []
+    for row in current:
+        row = dict(row)
+        key = (row["term"], row["category"])
+        prev = prev_lookup.get(key)
+
+        current_score = row.get("score", 0) or 0
+        prev_score = prev.get("score", 0) if prev else 0
+        delta = round(current_score - prev_score, 1)
+        delta_pct = round((delta / prev_score) * 100) if prev_score > 0 else 0
+
+        current_price = row.get("avg_price")
+        prev_price = prev.get("avg_price") if prev else None
+        price_delta = None
+        if current_price and prev_price and prev_price > 0:
+            price_delta = round(((current_price - prev_price) / prev_price) * 100, 1)
+
+        deltas.append({
+            "term": row["term"],
+            "category": row["category"],
+            "current_score": current_score,
+            "previous_score": prev_score,
+            "delta": delta,
+            "delta_pct": delta_pct,
+            "current_price": round(current_price, 2) if current_price else None,
+            "price_delta_pct": price_delta,
+            "mention_count": row.get("mention_count", 0),
+            "velocity": row.get("velocity", 0),
+            "lifecycle": row.get("lifecycle", "unknown"),
+            "has_previous": prev is not None,
+        })
+
+    deltas.sort(key=lambda d: abs(d["delta"]), reverse=True)
+    conn.close()
+    return deltas
+
+
 def get_scrape_stats():
     """Get statistics about data collection."""
     conn = get_db()

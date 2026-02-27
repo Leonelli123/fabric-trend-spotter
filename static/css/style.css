@@ -1746,11 +1746,542 @@ a.pt-pin-title:hover { color: var(--red); }
     color: var(--text-muted);
 }
 
+/* ==========================================
+   TREND DELTAS
+   ========================================== */
+
+.delta-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.delta-card {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.7rem 1rem;
+}
+.delta-card.delta-up { border-left: 3px solid var(--green); }
+.delta-card.delta-down { border-left: 3px solid var(--red); }
+.delta-card.delta-new { border-left: 3px solid var(--blue); }
+
+.delta-arrow-col {
+    min-width: 2rem;
+    text-align: center;
+}
+.delta-arrow {
+    font-size: 1.1rem;
+}
+.delta-arrow.up { color: var(--green); }
+.delta-arrow.down { color: var(--red); }
+
+.delta-new-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 0.15rem 0.4rem;
+    border-radius: 3px;
+    background: rgba(59,130,246,0.2);
+    color: var(--blue);
+    letter-spacing: 0.5px;
+}
+
+.delta-body { flex: 1; }
+.delta-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.2rem;
+}
+.delta-term {
+    font-weight: 700;
+    font-size: 0.95rem;
+}
+.delta-scores {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+.delta-prev { opacity: 0.6; }
+.delta-arrow-inline { font-size: 0.7rem; }
+.delta-curr { font-weight: 600; color: var(--text); }
+.delta-price {
+    margin-left: 0.5rem;
+    color: var(--green);
+    font-weight: 600;
+}
+.delta-price-up { color: var(--green); }
+.delta-price-down { color: var(--red); }
+.delta-mentions {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.delta-change {
+    text-align: right;
+    min-width: 60px;
+}
+.delta-num {
+    display: block;
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+.delta-num.up { color: var(--green); }
+.delta-num.down { color: var(--red); }
+.delta-pct {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+/* ==========================================
+   PRICE INTELLIGENCE
+   ========================================== */
+
+.price-cell {
+    font-weight: 700;
+    color: var(--green);
+    font-size: 0.95rem;
+}
+.price-range-cell {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* Cross-Market Pricing */
+.price-market-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+.price-market-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+}
+.price-market-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.8rem;
+    flex-wrap: wrap;
+}
+.price-market-header h4 {
+    font-size: 1rem;
+    font-weight: 700;
+}
+.price-spread {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    background: rgba(139,143,163,0.15);
+    color: var(--text-muted);
+    margin-left: auto;
+}
+.price-spread.spread-high {
+    background: rgba(239,68,68,0.15);
+    color: var(--red);
+}
+.price-spread.spread-mid {
+    background: rgba(234,179,8,0.15);
+    color: var(--yellow);
+}
+
+.price-market-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+.price-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+.price-bar-market {
+    font-size: 0.8rem;
+    font-weight: 700;
+    min-width: 2rem;
+    text-align: right;
+    color: var(--text-muted);
+}
+.price-bar-track {
+    flex: 1;
+    height: 18px;
+    background: rgba(42, 46, 63, 0.5);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.price-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: var(--accent);
+    transition: width 0.3s;
+}
+.price-bar-fill.bar-highest { background: var(--green); }
+.price-bar-fill.bar-lowest { background: var(--orange); }
+.price-bar-val {
+    font-size: 0.8rem;
+    font-weight: 600;
+    min-width: 70px;
+}
+
+.price-market-footer {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.6rem;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+/* Margin Map */
+.margin-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+.margin-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+}
+.margin-card.margin-positive {
+    border-left: 3px solid var(--green);
+}
+.margin-card.margin-negative {
+    border-left: 3px solid var(--red);
+}
+.margin-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.8rem;
+}
+.margin-header h4 { font-size: 1rem; font-weight: 700; }
+
+.margin-prices {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+}
+.margin-side {
+    text-align: center;
+    flex: 1;
+}
+.margin-label {
+    display: block;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.2rem;
+}
+.margin-price {
+    display: block;
+    font-size: 1.4rem;
+    font-weight: 700;
+}
+.b2c-side .margin-price { color: var(--blue); }
+.b2b-side .margin-price { color: var(--teal); }
+
+.margin-vs {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.margin-spread {
+    font-size: 0.85rem;
+    font-weight: 700;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+}
+.margin-spread.spread-up {
+    background: rgba(34,197,94,0.15);
+    color: var(--green);
+}
+.margin-spread.spread-down {
+    background: rgba(239,68,68,0.15);
+    color: var(--red);
+}
+
+.margin-breakdown {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.6rem;
+    flex-wrap: wrap;
+}
+.margin-market {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    padding: 0.15rem 0.4rem;
+    background: rgba(42,46,63,0.5);
+    border-radius: 3px;
+}
+
+/* Price Tiers */
+.price-tiers-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+.price-tier-col {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+}
+.tier-premium { border-top: 3px solid var(--purple); }
+.tier-mid { border-top: 3px solid var(--blue); }
+.tier-budget { border-top: 3px solid var(--teal); }
+
+.tier-header {
+    margin-bottom: 0.8rem;
+}
+.tier-header h4 {
+    font-size: 1rem;
+    font-weight: 700;
+}
+.tier-desc {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+.tier-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid rgba(42,46,63,0.3);
+}
+.tier-item:last-child { border-bottom: none; }
+.tier-term {
+    flex: 1;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+.tier-price {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--green);
+}
+.tier-empty {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* ==========================================
+   COMPETITOR WATCH
+   ========================================== */
+
+.comp-brand-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+.comp-brand-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+}
+.comp-brand-card.comp-error {
+    opacity: 0.5;
+}
+.comp-brand-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.5rem;
+}
+.comp-brand-name {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.comp-brand-name h4 {
+    font-size: 1rem;
+    font-weight: 700;
+}
+.comp-country {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--accent);
+}
+.comp-tier {
+    font-size: 0.65rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 700;
+}
+.comp-tier.tier-direct {
+    background: rgba(239,68,68,0.15);
+    color: var(--red);
+}
+.comp-tier.tier-close {
+    background: rgba(234,179,8,0.15);
+    color: var(--yellow);
+}
+.comp-tier.tier-reference {
+    background: rgba(139,143,163,0.15);
+    color: var(--text-muted);
+}
+.comp-brand-count {
+    text-align: right;
+}
+.comp-count-num {
+    display: block;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--accent);
+}
+.comp-count-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+.comp-note {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+    margin-bottom: 0.5rem;
+}
+.comp-terms {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin-top: 0.4rem;
+}
+.comp-term-chip {
+    font-size: 0.72rem;
+    padding: 0.15rem 0.5rem;
+    background: rgba(108,99,255,0.12);
+    border-radius: 4px;
+    color: var(--text);
+}
+.comp-term-chip small {
+    color: var(--text-muted);
+    font-size: 0.65rem;
+}
+
+/* Overlap & Whitespace */
+.comp-overlap-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+.comp-overlap-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.8rem 1rem;
+    border-left: 3px solid var(--red);
+}
+.comp-overlap-card.comp-whitespace {
+    border-left-color: var(--green);
+}
+.comp-overlap-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.3rem;
+}
+.comp-overlap-term {
+    font-weight: 700;
+    font-size: 0.95rem;
+}
+.comp-overlap-meta {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 0.4rem;
+}
+.comp-our-score strong { color: var(--accent); }
+.comp-overlap-brands {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+}
+.comp-brand-tag {
+    font-size: 0.68rem;
+    padding: 0.1rem 0.4rem;
+    background: rgba(42,46,63,0.5);
+    border-radius: 3px;
+    color: var(--text-muted);
+}
+
+/* Strengths */
+.comp-strengths-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.8rem;
+}
+.comp-strength-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.8rem 1rem;
+    border-left: 3px solid var(--green);
+}
+.comp-strength-term {
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 0.3rem;
+}
+.comp-strength-meta {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.4rem;
+}
+.comp-strength-score {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-bottom: 0.3rem;
+}
+.comp-score-num {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--green);
+}
+.comp-score-label {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+.comp-strength-note {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* Forecast chip styles (missing from UX audit) */
+.chip-term {
+    font-weight: 600;
+    font-size: 0.82rem;
+}
+.chip-arrow {
+    font-size: 0.6rem;
+    margin: 0 0.15rem;
+}
+
 /* Responsive */
 @media (max-width: 1200px) {
     .charts-section.charts-4col { grid-template-columns: repeat(2, 1fr); }
     .signals-grid { grid-template-columns: repeat(2, 1fr); }
     .calendar-grid { grid-template-columns: repeat(2, 1fr); }
+    .price-market-grid { grid-template-columns: 1fr; }
+    .margin-grid { grid-template-columns: 1fr; }
+    .comp-brand-grid { grid-template-columns: 1fr; }
+    .comp-strengths-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 1000px) {
     .charts-section, .charts-section.charts-4col { grid-template-columns: 1fr; }
@@ -1779,6 +2310,7 @@ a.pt-pin-title:hover { color: var(--red); }
     .intel-timing-grid { grid-template-columns: 1fr; }
     .report-export-bar { flex-direction: column; align-items: flex-start; }
     .xc-card { flex-wrap: wrap; }
+    .price-tiers-grid { grid-template-columns: 1fr; }
     .xc-scores { width: 100%; justify-content: flex-start; margin-top: 0.5rem; }
     .channel-toggle { width: 100%; }
     .channel-btn { flex: 1; }

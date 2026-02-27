@@ -40,8 +40,11 @@
             <a href="#weekly" class="nav-link active" data-nav-channel="both" onclick="scrollToSection('weekly')">This Week</a>
             <a href="#pipeline" class="nav-link" data-nav-channel="both" onclick="scrollToSection('pipeline')">Design Pipeline</a>
             <a href="#signals" class="nav-link" data-nav-channel="both" onclick="scrollToSection('signals')">Market Signals</a>
+            <a href="#deltas" class="nav-link" data-nav-channel="both" onclick="scrollToSection('deltas')">Deltas</a>
             <a href="#crosschannel" class="nav-link" data-nav-channel="both" onclick="scrollToSection('crosschannel')">Cross-Channel</a>
             <a href="#etsy" class="nav-link" data-nav-channel="b2c" onclick="scrollToSection('etsy')">Etsy Intel</a>
+            <a href="#pricing" class="nav-link" data-nav-channel="both" onclick="scrollToSection('pricing')">Pricing</a>
+            <a href="#competitors" class="nav-link" data-nav-channel="both" onclick="scrollToSection('competitors')">Competitors</a>
             <a href="#wholesale" class="nav-link" data-nav-channel="b2b" onclick="scrollToSection('wholesale')">Wholesale</a>
             <a href="#gaps" class="nav-link" data-nav-channel="both" onclick="scrollToSection('gaps')">Gaps</a>
             <a href="#calendar" class="nav-link" data-nav-channel="both" onclick="scrollToSection('calendar')">Seasonal</a>
@@ -225,6 +228,201 @@
             <div class="empty-state"><p>No market signal data yet. Click <strong>Refresh Data</strong> to start.</p></div>
             {% endif %}
         </section>
+
+        <!-- ========== SECTION 3B: TREND DELTAS (Week-over-Week) ========== -->
+        {% set td = action_board.trend_deltas if action_board and action_board.trend_deltas else {} %}
+        {% if td.movers or td.new_entries %}
+        <section id="deltas" class="section" data-channel="both">
+            <div class="section-header">
+                <h2>Trend Deltas</h2>
+                <p class="section-subtitle">Week-over-week changes &mdash; what's moving and what's new</p>
+            </div>
+
+            {% if td.summary %}
+            <div class="action-summary-bar">
+                <div class="summary-stat">
+                    <span class="stat-value">{{ td.summary.total_tracked }}</span>
+                    <span class="stat-label">Tracked</span>
+                </div>
+                <div class="summary-stat">
+                    <span class="stat-value" style="color:var(--green)">{{ td.summary.total_risers }}</span>
+                    <span class="stat-label">Rising</span>
+                </div>
+                <div class="summary-stat">
+                    <span class="stat-value" style="color:var(--red)">{{ td.summary.total_fallers }}</span>
+                    <span class="stat-label">Falling</span>
+                </div>
+                <div class="summary-stat">
+                    <span class="stat-value" style="color:var(--blue)">{{ td.summary.total_new }}</span>
+                    <span class="stat-label">New</span>
+                </div>
+                <div class="summary-stat">
+                    <span class="stat-value">{{ td.summary.avg_delta }}</span>
+                    <span class="stat-label">Avg Delta</span>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="eu-tabs">
+                <button class="eu-tab active" data-eu="td-movers" onclick="switchEU('td-movers')">Top Movers
+                    {% if td.movers %}<span class="tab-count">{{ td.movers|length }}</span>{% endif %}
+                </button>
+                <button class="eu-tab" data-eu="td-risers" onclick="switchEU('td-risers')">Risers
+                    {% if td.risers %}<span class="tab-count">{{ td.risers|length }}</span>{% endif %}
+                </button>
+                <button class="eu-tab" data-eu="td-fallers" onclick="switchEU('td-fallers')">Fallers
+                    {% if td.fallers %}<span class="tab-count">{{ td.fallers|length }}</span>{% endif %}
+                </button>
+                <button class="eu-tab" data-eu="td-new" onclick="switchEU('td-new')">New Entries
+                    {% if td.new_entries %}<span class="tab-count">{{ td.new_entries|length }}</span>{% endif %}
+                </button>
+            </div>
+
+            <!-- Top Movers Tab -->
+            <div class="eu-content active" id="eu-td-movers">
+                {% if td.movers %}
+                <div class="delta-list">
+                    {% for d in td.movers %}
+                    <div class="delta-card {% if d.delta > 0 %}delta-up{% else %}delta-down{% endif %}">
+                        <div class="delta-arrow-col">
+                            {% if d.delta > 0 %}
+                            <span class="delta-arrow up">&#9650;</span>
+                            {% else %}
+                            <span class="delta-arrow down">&#9660;</span>
+                            {% endif %}
+                        </div>
+                        <div class="delta-body">
+                            <div class="delta-header">
+                                <span class="delta-term">{{ d.term|title }}</span>
+                                <span class="action-cat">{{ d.category|replace('_', ' ')|title }}</span>
+                                <span class="lifecycle-badge {{ d.lifecycle }}">{{ d.lifecycle|title }}</span>
+                            </div>
+                            <div class="delta-scores">
+                                <span class="delta-prev">{{ d.previous_score }}</span>
+                                <span class="delta-arrow-inline">&#8594;</span>
+                                <span class="delta-curr">{{ d.current_score }}</span>
+                                {% if d.current_price %}
+                                <span class="delta-price">${{ "%.2f"|format(d.current_price) }}
+                                    {% if d.price_delta_pct %}
+                                    <small class="{% if d.price_delta_pct > 0 %}delta-price-up{% else %}delta-price-down{% endif %}">
+                                        {% if d.price_delta_pct > 0 %}+{% endif %}{{ d.price_delta_pct }}%
+                                    </small>
+                                    {% endif %}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="delta-change">
+                            <span class="delta-num {% if d.delta > 0 %}up{% else %}down{% endif %}">
+                                {% if d.delta > 0 %}+{% endif %}{{ d.delta }}
+                            </span>
+                            {% if d.delta_pct %}
+                            <span class="delta-pct">{{ d.delta_pct }}%</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state"><p>No movement data yet. Need 2+ data refreshes to compare.</p></div>
+                {% endif %}
+            </div>
+
+            <!-- Risers Tab -->
+            <div class="eu-content" id="eu-td-risers">
+                {% if td.risers %}
+                <div class="delta-list">
+                    {% for d in td.risers %}
+                    <div class="delta-card delta-up">
+                        <div class="delta-arrow-col">
+                            <span class="delta-arrow up">&#9650;</span>
+                        </div>
+                        <div class="delta-body">
+                            <div class="delta-header">
+                                <span class="delta-term">{{ d.term|title }}</span>
+                                <span class="action-cat">{{ d.category|replace('_', ' ')|title }}</span>
+                                <span class="lifecycle-badge {{ d.lifecycle }}">{{ d.lifecycle|title }}</span>
+                            </div>
+                            <div class="delta-scores">
+                                <span class="delta-prev">{{ d.previous_score }}</span>
+                                <span class="delta-arrow-inline">&#8594;</span>
+                                <span class="delta-curr">{{ d.current_score }}</span>
+                            </div>
+                        </div>
+                        <div class="delta-change">
+                            <span class="delta-num up">+{{ d.delta }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state"><p>No rising trends detected yet.</p></div>
+                {% endif %}
+            </div>
+
+            <!-- Fallers Tab -->
+            <div class="eu-content" id="eu-td-fallers">
+                {% if td.fallers %}
+                <div class="delta-list">
+                    {% for d in td.fallers %}
+                    <div class="delta-card delta-down">
+                        <div class="delta-arrow-col">
+                            <span class="delta-arrow down">&#9660;</span>
+                        </div>
+                        <div class="delta-body">
+                            <div class="delta-header">
+                                <span class="delta-term">{{ d.term|title }}</span>
+                                <span class="action-cat">{{ d.category|replace('_', ' ')|title }}</span>
+                                <span class="lifecycle-badge {{ d.lifecycle }}">{{ d.lifecycle|title }}</span>
+                            </div>
+                            <div class="delta-scores">
+                                <span class="delta-prev">{{ d.previous_score }}</span>
+                                <span class="delta-arrow-inline">&#8594;</span>
+                                <span class="delta-curr">{{ d.current_score }}</span>
+                            </div>
+                        </div>
+                        <div class="delta-change">
+                            <span class="delta-num down">{{ d.delta }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state"><p>No falling trends detected yet.</p></div>
+                {% endif %}
+            </div>
+
+            <!-- New Entries Tab -->
+            <div class="eu-content" id="eu-td-new">
+                {% if td.new_entries %}
+                <div class="delta-list">
+                    {% for d in td.new_entries %}
+                    <div class="delta-card delta-new">
+                        <div class="delta-arrow-col">
+                            <span class="delta-new-badge">NEW</span>
+                        </div>
+                        <div class="delta-body">
+                            <div class="delta-header">
+                                <span class="delta-term">{{ d.term|title }}</span>
+                                <span class="action-cat">{{ d.category|replace('_', ' ')|title }}</span>
+                                <span class="lifecycle-badge {{ d.lifecycle }}">{{ d.lifecycle|title }}</span>
+                            </div>
+                            <div class="delta-scores">
+                                <span class="delta-curr">Score: {{ d.current_score }}</span>
+                                {% if d.mention_count %}
+                                <span class="delta-mentions">{{ d.mention_count }} listings</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state"><p>No new trend entries this week.</p></div>
+                {% endif %}
+            </div>
+        </section>
+        {% endif %}
 
         <!-- ========== SECTION 4: ETSY INTELLIGENCE (B2C) ========== -->
         <section id="etsy" class="section" data-channel="b2c">
@@ -622,6 +820,379 @@
                 </div>
                 {% else %}
                 <div class="empty-state"><p>No Etsy performance data yet.</p></div>
+                {% endif %}
+            </div>
+        </section>
+        {% endif %}
+
+        <!-- ========== SECTION 4C: PRICE INTELLIGENCE ========== -->
+        {% set pi = action_board.price_intel if action_board and action_board.price_intel else {} %}
+        {% if pi.per_trend or pi.cross_market or pi.margin_map %}
+        <section id="pricing" class="section" data-channel="both">
+            <div class="section-header">
+                <h2>Price Intelligence</h2>
+                <p class="section-subtitle">Per-trend pricing, cross-market comparison &amp; margin analysis</p>
+            </div>
+
+            <div class="eu-tabs">
+                <button class="eu-tab active" data-eu="pi-trends" onclick="switchEU('pi-trends')">Per-Trend Pricing
+                    {% if pi.per_trend %}<span class="tab-count">{{ pi.per_trend|length }}</span>{% endif %}
+                </button>
+                <button class="eu-tab" data-eu="pi-markets" onclick="switchEU('pi-markets')">Cross-Market
+                    {% if pi.cross_market %}<span class="tab-count">{{ pi.cross_market|length }}</span>{% endif %}
+                </button>
+                <button class="eu-tab" data-eu="pi-margins" onclick="switchEU('pi-margins')">B2B vs B2C Margins
+                    {% if pi.margin_map %}<span class="tab-count">{{ pi.margin_map|length }}</span>{% endif %}
+                </button>
+                <button class="eu-tab" data-eu="pi-tiers" onclick="switchEU('pi-tiers')">Price Tiers</button>
+            </div>
+
+            <!-- Per-Trend Pricing Tab -->
+            <div class="eu-content active" id="eu-pi-trends">
+                <div class="eu-summary-bar">
+                    <span class="eu-stat">Average prices per trend &mdash; quality-weighted with outlier removal</span>
+                </div>
+                {% if pi.per_trend %}
+                <div class="etsy-perf-table-wrap">
+                    <table class="etsy-perf-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Trend</th>
+                                <th>Category</th>
+                                <th>Avg Price</th>
+                                <th>Range</th>
+                                <th>Samples</th>
+                                <th>Score</th>
+                                <th>Phase</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for t in pi.per_trend %}
+                            <tr>
+                                <td class="perf-rank">{{ loop.index }}</td>
+                                <td class="perf-term">{{ t.term|title }}</td>
+                                <td><span class="action-cat">{{ t.category|replace('_', ' ')|title }}</span></td>
+                                <td class="price-cell">${{ "%.2f"|format(t.avg_price) }}</td>
+                                <td class="price-range-cell">
+                                    {% if t.price_low and t.price_high %}
+                                    ${{ "%.2f"|format(t.price_low) }} &mdash; ${{ "%.2f"|format(t.price_high) }}
+                                    {% else %}&mdash;{% endif %}
+                                </td>
+                                <td>{{ t.mention_count }}</td>
+                                <td class="perf-score">{{ t.score }}</td>
+                                <td><span class="lifecycle-badge {{ t.lifecycle }}">{{ t.lifecycle|title }}</span></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state"><p>No per-trend pricing data yet. Run <strong>Refresh Data</strong>.</p></div>
+                {% endif %}
+            </div>
+
+            <!-- Cross-Market Pricing Tab -->
+            <div class="eu-content" id="eu-pi-markets">
+                <div class="eu-summary-bar">
+                    <span class="eu-stat">Same trend, different markets &mdash; spot pricing arbitrage</span>
+                </div>
+                {% if pi.cross_market %}
+                <div class="price-market-grid">
+                    {% for cm in pi.cross_market %}
+                    <div class="price-market-card">
+                        <div class="price-market-header">
+                            <h4>{{ cm.term|title }}</h4>
+                            <span class="lifecycle-badge {{ cm.lifecycle }}">{{ cm.lifecycle|title }}</span>
+                            <span class="price-spread {% if cm.spread_pct > 30 %}spread-high{% elif cm.spread_pct > 15 %}spread-mid{% endif %}">
+                                {{ cm.spread_pct }}% spread
+                            </span>
+                        </div>
+                        <div class="price-market-bars">
+                            {% for p in cm.prices %}
+                            <div class="price-bar-row">
+                                <span class="price-bar-market">{{ p.market }}</span>
+                                <div class="price-bar-track">
+                                    {% set max_price = cm.prices[0].avg_price %}
+                                    <div class="price-bar-fill {% if loop.first %}bar-highest{% elif loop.last %}bar-lowest{% endif %}"
+                                         style="width: {{ (p.avg_price / max_price * 100)|int }}%">
+                                    </div>
+                                </div>
+                                <span class="price-bar-val">{{ p.currency }} {{ "%.2f"|format(p.avg_price) }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="price-market-footer">
+                            <span>{{ cm.market_count }} markets</span>
+                            <span>Highest: {{ cm.highest_market }} &middot; Lowest: {{ cm.lowest_market }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state"><p>Need data from 2+ markets. Run <strong>Refresh Data</strong> to compare.</p></div>
+                {% endif %}
+            </div>
+
+            <!-- B2B vs B2C Margins Tab -->
+            <div class="eu-content" id="eu-pi-margins">
+                <div class="eu-summary-bar">
+                    <span class="eu-stat">Etsy (B2C) vs Wholesale (B2B) pricing &mdash; where are the margins?</span>
+                </div>
+                {% if pi.margin_map %}
+                <div class="margin-grid">
+                    {% for m in pi.margin_map %}
+                    <div class="margin-card {% if m.spread_pct > 20 %}margin-positive{% elif m.spread_pct < -10 %}margin-negative{% endif %}">
+                        <div class="margin-header">
+                            <h4>{{ m.term|title }}</h4>
+                            <span class="lifecycle-badge {{ m.lifecycle }}">{{ m.lifecycle|title }}</span>
+                        </div>
+                        <div class="margin-prices">
+                            <div class="margin-side b2c-side">
+                                <span class="margin-label">B2C (Etsy)</span>
+                                <span class="margin-price">${{ "%.2f"|format(m.b2c_price) }}</span>
+                            </div>
+                            <div class="margin-vs">
+                                <span class="margin-spread {% if m.spread_pct > 0 %}spread-up{% else %}spread-down{% endif %}">
+                                    {% if m.spread_pct > 0 %}+{% endif %}{{ m.spread_pct }}%
+                                </span>
+                            </div>
+                            <div class="margin-side b2b-side">
+                                <span class="margin-label">B2B Avg</span>
+                                <span class="margin-price">&euro;{{ "%.2f"|format(m.b2b_avg_price) }}</span>
+                            </div>
+                        </div>
+                        {% if m.b2b_prices %}
+                        <div class="margin-breakdown">
+                            {% for bp in m.b2b_prices %}
+                            <span class="margin-market">{{ bp.market }}: {{ bp.currency }} {{ "%.2f"|format(bp.avg_price) }}</span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state"><p>Need both B2B and B2C price data. Run <strong>Refresh Data</strong>.</p></div>
+                {% endif %}
+            </div>
+
+            <!-- Price Tiers Tab -->
+            <div class="eu-content" id="eu-pi-tiers">
+                <div class="eu-summary-bar">
+                    <span class="eu-stat">Where does each trend sit &mdash; premium, mid-range, or budget?</span>
+                </div>
+                {% if pi.tiers and (pi.tiers.premium or pi.tiers.mid or pi.tiers.budget) %}
+                <div class="price-tiers-grid">
+                    <div class="price-tier-col tier-premium">
+                        <div class="tier-header">
+                            <h4>Premium</h4>
+                            <span class="tier-desc">Higher margins, niche buyers</span>
+                        </div>
+                        {% for t in pi.tiers.premium %}
+                        <div class="tier-item">
+                            <span class="tier-term">{{ t.term|title }}</span>
+                            <span class="tier-price">${{ "%.2f"|format(t.avg_price) }}</span>
+                            <span class="lifecycle-badge {{ t.lifecycle }}">{{ t.lifecycle|title }}</span>
+                        </div>
+                        {% endfor %}
+                        {% if not pi.tiers.premium %}
+                        <p class="tier-empty">No premium trends detected</p>
+                        {% endif %}
+                    </div>
+                    <div class="price-tier-col tier-mid">
+                        <div class="tier-header">
+                            <h4>Mid-Range</h4>
+                            <span class="tier-desc">Volume sweet spot</span>
+                        </div>
+                        {% for t in pi.tiers.mid %}
+                        <div class="tier-item">
+                            <span class="tier-term">{{ t.term|title }}</span>
+                            <span class="tier-price">${{ "%.2f"|format(t.avg_price) }}</span>
+                            <span class="lifecycle-badge {{ t.lifecycle }}">{{ t.lifecycle|title }}</span>
+                        </div>
+                        {% endfor %}
+                        {% if not pi.tiers.mid %}
+                        <p class="tier-empty">No mid-range trends detected</p>
+                        {% endif %}
+                    </div>
+                    <div class="price-tier-col tier-budget">
+                        <div class="tier-header">
+                            <h4>Budget</h4>
+                            <span class="tier-desc">High volume, price-sensitive</span>
+                        </div>
+                        {% for t in pi.tiers.budget %}
+                        <div class="tier-item">
+                            <span class="tier-term">{{ t.term|title }}</span>
+                            <span class="tier-price">${{ "%.2f"|format(t.avg_price) }}</span>
+                            <span class="lifecycle-badge {{ t.lifecycle }}">{{ t.lifecycle|title }}</span>
+                        </div>
+                        {% endfor %}
+                        {% if not pi.tiers.budget %}
+                        <p class="tier-empty">No budget trends detected</p>
+                        {% endif %}
+                    </div>
+                </div>
+                {% else %}
+                <div class="empty-state"><p>No pricing tier data available yet.</p></div>
+                {% endif %}
+            </div>
+        </section>
+        {% endif %}
+
+        <!-- ========== SECTION 4D: COMPETITOR WATCH ========== -->
+        {% set cw = action_board.competitor_watch if action_board and action_board.competitor_watch else {} %}
+        {% if cw.brands or cw.overlap or cw.whitespace %}
+        <section id="competitors" class="section" data-channel="both">
+            <div class="section-header">
+                <h2>Competitor Watch</h2>
+                <p class="section-subtitle">What direct competitors are selling &mdash; overlap, whitespace &amp; your advantages</p>
+            </div>
+
+            <div class="eu-tabs">
+                <button class="eu-tab active" data-eu="cw-brands" onclick="switchEU('cw-brands')">Brand Overview
+                    {% if cw.brands %}<span class="tab-count">{{ cw.brands|length }}</span>{% endif %}
+                </button>
+                <button class="eu-tab" data-eu="cw-overlap" onclick="switchEU('cw-overlap')">Overlap (Red Ocean)
+                    {% if cw.overlap %}<span class="tab-count">{{ cw.overlap|length }}</span>{% endif %}
+                </button>
+                <button class="eu-tab" data-eu="cw-whitespace" onclick="switchEU('cw-whitespace')">Whitespace
+                    {% if cw.whitespace %}<span class="tab-count">{{ cw.whitespace|length }}</span>{% endif %}
+                </button>
+                <button class="eu-tab" data-eu="cw-strengths" onclick="switchEU('cw-strengths')">Our Strengths
+                    {% if cw.our_strengths %}<span class="tab-count">{{ cw.our_strengths|length }}</span>{% endif %}
+                </button>
+            </div>
+
+            <!-- Brand Overview Tab -->
+            <div class="eu-content active" id="eu-cw-brands">
+                <div class="eu-summary-bar">
+                    <span class="eu-stat">Direct competitor brands &mdash; what they carry and their top trends</span>
+                </div>
+                {% if cw.brands %}
+                <div class="comp-brand-grid">
+                    {% for b in cw.brands %}
+                    <div class="comp-brand-card comp-{{ b.status }}">
+                        <div class="comp-brand-header">
+                            <div class="comp-brand-name">
+                                <h4>{{ b.name }}</h4>
+                                <span class="comp-country">{{ b.country }}</span>
+                                <span class="comp-tier tier-{{ b.tier }}">{{ b.tier|title }}</span>
+                            </div>
+                            <div class="comp-brand-count">
+                                {% if b.status == 'ok' %}
+                                <span class="comp-count-num">{{ b.product_count }}</span>
+                                <span class="comp-count-label">products</span>
+                                {% elif b.status == 'empty' %}
+                                <span class="comp-count-label">No data</span>
+                                {% else %}
+                                <span class="comp-count-label">Error</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% if b.note %}
+                        <p class="comp-note">{{ b.note }}</p>
+                        {% endif %}
+                        {% if b.top_terms %}
+                        <div class="comp-terms">
+                            {% for tt in b.top_terms %}
+                            <span class="comp-term-chip">{{ tt.term|title }} <small>({{ tt.count }})</small></span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state"><p>No competitor data yet. Run <strong>Refresh Data</strong> to scan competitor brands.</p></div>
+                {% endif %}
+            </div>
+
+            <!-- Overlap Tab -->
+            <div class="eu-content" id="eu-cw-overlap">
+                <div class="eu-summary-bar">
+                    <span class="eu-stat">Trends you share with competitors &mdash; compete on quality, price &amp; SEO</span>
+                </div>
+                {% if cw.overlap %}
+                <div class="comp-overlap-list">
+                    {% for o in cw.overlap %}
+                    <div class="comp-overlap-card">
+                        <div class="comp-overlap-header">
+                            <span class="comp-overlap-term">{{ o.term|title }}</span>
+                            <span class="action-cat">{{ o.category|replace('_', ' ')|title }}</span>
+                            <span class="lifecycle-badge {{ o.lifecycle }}">{{ o.lifecycle|title }}</span>
+                        </div>
+                        <div class="comp-overlap-meta">
+                            <span class="comp-our-score">Your score: <strong>{{ o.our_score }}</strong></span>
+                            <span class="comp-vs-count">{{ o.competitor_count }} competitor{{ 's' if o.competitor_count > 1 else '' }} ({{ o.total_competitor_listings }} listings)</span>
+                        </div>
+                        <div class="comp-overlap-brands">
+                            {% for b in o.competitor_brands %}
+                            <span class="comp-brand-tag">{{ b }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state"><p>No overlap data yet.</p></div>
+                {% endif %}
+            </div>
+
+            <!-- Whitespace Tab -->
+            <div class="eu-content" id="eu-cw-whitespace">
+                <div class="eu-summary-bar">
+                    <span class="eu-stat">Trends competitors carry that you don't &mdash; potential opportunities</span>
+                </div>
+                {% if cw.whitespace %}
+                <div class="comp-overlap-list">
+                    {% for w in cw.whitespace %}
+                    <div class="comp-overlap-card comp-whitespace">
+                        <div class="comp-overlap-header">
+                            <span class="comp-overlap-term">{{ w.term|title }}</span>
+                            <span class="action-cat">{{ w.category|replace('_', ' ')|title }}</span>
+                            <span class="lifecycle-badge {{ w.lifecycle }}">{{ w.lifecycle|title }}</span>
+                        </div>
+                        <div class="comp-overlap-meta">
+                            <span class="comp-vs-count">{{ w.competitor_count }} competitor{{ 's' if w.competitor_count > 1 else '' }} carry this ({{ w.total_listings }} listings)</span>
+                        </div>
+                        <div class="comp-overlap-brands">
+                            {% for b in w.competitor_brands %}
+                            <span class="comp-brand-tag">{{ b }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state"><p>No whitespace detected yet.</p></div>
+                {% endif %}
+            </div>
+
+            <!-- Our Strengths Tab -->
+            <div class="eu-content" id="eu-cw-strengths">
+                <div class="eu-summary-bar">
+                    <span class="eu-stat">Trends where you lead and competitors are absent &mdash; your competitive moat</span>
+                </div>
+                {% if cw.our_strengths %}
+                <div class="comp-strengths-grid">
+                    {% for s in cw.our_strengths %}
+                    <div class="comp-strength-card">
+                        <div class="comp-strength-term">{{ s.term|title }}</div>
+                        <div class="comp-strength-meta">
+                            <span class="action-cat">{{ s.category|replace('_', ' ')|title }}</span>
+                            <span class="lifecycle-badge {{ s.lifecycle }}">{{ s.lifecycle|title }}</span>
+                        </div>
+                        <div class="comp-strength-score">
+                            <span class="comp-score-num">{{ s.our_score }}</span>
+                            <span class="comp-score-label">Your score</span>
+                        </div>
+                        <p class="comp-strength-note">No competitor presence detected &mdash; differentiate here</p>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state"><p>No unique strengths detected yet.</p></div>
                 {% endif %}
             </div>
         </section>
