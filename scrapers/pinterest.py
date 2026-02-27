@@ -15,29 +15,45 @@ import json
 import time
 import requests
 from datetime import datetime
-from config import FABRIC_TYPES, PATTERN_TYPES, COLOR_TERMS
+from config import FABRIC_TYPES, PATTERN_TYPES, COLOR_TERMS, STYLE_TERMS
 
 logger = logging.getLogger(__name__)
 
 PINTEREST_SEARCH_API = "https://www.pinterest.com/resource/BaseSearchResource/get/"
 
-# Fabric-focused search queries for Pinterest
+# Fabric-focused search queries for Pinterest — organized by signal value.
+# First queries are highest-value trend indicators.
 PINTEREST_QUERIES = [
-    "fabric trends",
-    "trending fabric 2026",
-    "quilting fabric popular",
+    # Trend-setting searches (what people aspire to make/buy)
+    "fabric trends 2026",
+    "trending fabric sewing",
+    "fabric inspiration",
+    # By fabric type (market demand signals)
     "linen fabric aesthetic",
     "cotton fabric prints",
     "velvet fabric decor",
+    "organic fabric sustainable",
+    "quilting fabric ideas",
+    # By pattern (design trend signals)
     "floral fabric pattern",
+    "striped fabric design",
     "botanical print fabric",
+    "geometric fabric modern",
+    "plaid fabric",
+    # By aesthetic (style movement signals)
     "cottagecore fabric sewing",
-    "modern quilting fabric",
+    "minimalist fabric Scandinavian",
+    "bohemian fabric textile",
+    "bold colorful fabric",
+    # By use case
     "upholstery fabric trending",
     "dress fabric ideas",
-    "sustainable fabric",
-    "designer fabric prints",
-    "fabric by the yard",
+    "home decor fabric",
+    "curtain fabric trends",
+    # By color (color trend signals)
+    "sage green fabric",
+    "dusty rose fabric",
+    "earth tone fabric natural",
 ]
 
 
@@ -258,7 +274,7 @@ def _extract_fabric_tags(text):
         return []
     text_lower = text.lower()
     tags = []
-    for term in FABRIC_TYPES + PATTERN_TYPES + COLOR_TERMS:
+    for term in FABRIC_TYPES + PATTERN_TYPES + COLOR_TERMS + STYLE_TERMS:
         if term.lower() in text_lower:
             tags.append(term)
     return tags
@@ -281,6 +297,7 @@ def analyze_pinterest_data(listings):
     fabric_signals = {}
     pattern_signals = {}
     color_signals = {}
+    style_signals = {}
 
     for listing in listings:
         title_lower = listing.get("title", "").lower()
@@ -302,6 +319,10 @@ def analyze_pinterest_data(listings):
         for term in COLOR_TERMS:
             if term.lower() in combined:
                 color_signals[term] = color_signals.get(term, 0) + signal_strength
+
+        for term in STYLE_TERMS:
+            if term.lower() in combined:
+                style_signals[term] = style_signals.get(term, 0) + signal_strength
 
     def sorted_signals(signals):
         return sorted(
@@ -331,6 +352,7 @@ def analyze_pinterest_data(listings):
         "fabric_signals": sorted_signals(fabric_signals),
         "pattern_signals": sorted_signals(pattern_signals),
         "color_signals": sorted_signals(color_signals),
+        "style_signals": sorted_signals(style_signals),
         "top_pins": top_pins[:20],
         "total_pins_analyzed": len(listings),
         "fetched_at": datetime.now().isoformat(),

@@ -16,22 +16,44 @@ logger = logging.getLogger(__name__)
 
 # Prioritized keywords - most important ones first so if we hit rate
 # limits we at least have the most valuable data
+# Keywords are ordered by priority — if rate limited, we get the most
+# valuable data first. These cover the major purchasing categories.
 PRIORITY_FABRIC_KEYWORDS = [
-    "linen fabric", "cotton fabric", "double gauze fabric", "velvet fabric",
-    "silk fabric", "jersey fabric", "denim fabric", "flannel fabric",
-    "rayon fabric", "chiffon fabric", "canvas fabric", "satin fabric",
+    # Top sellers / most searched
+    "cotton fabric", "linen fabric", "velvet fabric", "silk fabric",
+    "jersey fabric", "quilting fabric", "upholstery fabric",
+    # Growing demand
+    "organic cotton fabric", "double gauze fabric", "bamboo fabric",
+    "tencel fabric", "corduroy fabric", "lace fabric",
+    # Segment-specific
+    "apparel fabric", "home decor fabric", "denim fabric",
+    "flannel fabric", "canvas fabric", "satin fabric",
 ]
 
 PRIORITY_PATTERN_KEYWORDS = [
-    "floral fabric", "geometric fabric", "botanical fabric", "cottagecore fabric",
-    "watercolor fabric", "batik fabric", "ditsy fabric", "abstract fabric",
-    "vintage fabric", "toile fabric", "mushroom fabric", "celestial fabric",
+    # Most searched patterns
+    "floral fabric", "striped fabric", "plaid fabric", "geometric fabric",
+    "botanical fabric", "polka dot fabric", "gingham fabric",
+    # Trending patterns
+    "cottagecore fabric", "liberty fabric", "toile fabric",
+    "abstract fabric", "watercolor fabric", "animal print fabric",
+    "damask fabric", "ikat fabric", "ditsy fabric",
 ]
 
 PRIORITY_COLOR_KEYWORDS = [
+    # Most searched color+fabric combos
     "sage green fabric", "dusty rose fabric", "terracotta fabric",
     "navy fabric", "emerald fabric", "lavender fabric",
-    "mustard fabric", "olive fabric", "rust fabric",
+    "mustard fabric", "rust fabric", "cream fabric",
+    "blush pink fabric", "forest green fabric", "burgundy fabric",
+    "teal fabric", "ivory fabric", "charcoal fabric",
+]
+
+# Style/aesthetic keywords — leading indicators for what people want to make
+PRIORITY_STYLE_KEYWORDS = [
+    "cottagecore sewing", "minimalist fabric", "bohemian fabric",
+    "sustainable fabric", "organic fabric", "Scandinavian textile",
+    "quiet luxury fabric", "bold print fabric", "vintage fabric",
 ]
 
 
@@ -51,7 +73,8 @@ def fetch_google_trends():
     all_keywords = (
         PRIORITY_FABRIC_KEYWORDS +
         PRIORITY_PATTERN_KEYWORDS +
-        PRIORITY_COLOR_KEYWORDS
+        PRIORITY_COLOR_KEYWORDS +
+        PRIORITY_STYLE_KEYWORDS
     )
 
     # Process in batches of 5 (Google Trends API limit)

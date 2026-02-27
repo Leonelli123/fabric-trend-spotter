@@ -41,6 +41,10 @@ FABRIC_TYPES = [
     "fleece", "jersey", "knit", "canvas", "twill", "chambray",
     "double gauze", "lawn", "voile", "crepe", "taffeta", "brocade",
     "jacquard", "charmeuse", "poplin", "broadcloth", "minky",
+    # Added: commonly searched/stocked fabrics
+    "bamboo", "hemp", "tencel", "viscose", "spandex", "lycra",
+    "nylon", "lace", "terry", "corduroy", "chenille", "burlap",
+    "faux leather", "organic cotton", "cotton linen",
 ]
 
 PATTERN_TYPES = [
@@ -60,6 +64,26 @@ COLOR_TERMS = [
     "burnt orange", "forest green", "baby blue", "cream",
     "earth tone", "jewel tone", "pastel", "neutral", "muted",
     "patina blue", "warm beige", "clay", "butter yellow",
+]
+
+# Style/aesthetic movements - these drive 30-50% of purchasing decisions
+# and are the strongest leading indicators for what fabrics to stock.
+STYLE_TERMS = [
+    # Current major aesthetics (2024-2026)
+    "cottagecore", "quiet luxury", "minimalist", "maximalist",
+    "bohemian", "scandinavian", "coastal", "farmhouse",
+    # Rising aesthetics
+    "dopamine dressing", "dark academia", "grandmillennial",
+    "y2k", "retro", "mod", "art deco",
+    # Sustainability movement (huge in Scandinavia)
+    "organic", "sustainable", "eco", "natural",
+    "deadstock", "upcycled", "recycled",
+    # Craft-specific aesthetics
+    "handmade", "artisan", "folk", "heritage",
+    "japandi", "wabi sabi",
+    # Visual mood
+    "bold", "vivid", "muted", "earthy", "romantic",
+    "whimsical", "elegant", "rustic", "modern",
 ]
 
 # Market segments - each has tailored search queries and relevance weights
@@ -133,13 +157,14 @@ SEGMENTS = {
     },
 }
 
-# Trend lifecycle thresholds
+# Trend lifecycle thresholds - used by forecaster.py _classify_lifecycle()
+# These are the SINGLE SOURCE OF TRUTH for lifecycle classification.
 LIFECYCLE_THRESHOLDS = {
-    "emerging": {"min_velocity": 0.5, "max_score": 25},
-    "rising": {"min_velocity": 0.2, "min_score": 15, "max_score": 60},
-    "peak": {"min_score": 55, "max_velocity": 0.3},
-    "declining": {"max_velocity": -0.1},
-    "stable": {"min_score": 20, "max_velocity": 0.2, "min_velocity": -0.1},
+    "emerging": {"min_velocity": 0.15, "max_score": 35},
+    "rising": {"min_velocity": 0.08, "min_score": 10, "max_score": 65},
+    "peak": {"min_score": 50, "max_velocity": 0.08},
+    "declining": {"max_velocity": -0.05},
+    "stable": {"min_score": 15, "max_velocity": 0.08, "min_velocity": -0.05},
 }
 
 # --------------------------------------------------------------------------

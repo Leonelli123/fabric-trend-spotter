@@ -444,6 +444,17 @@
                     {% endfor %}
                 </div>
                 {% endif %}
+                {% if pinterest_data.style_signals %}
+                <div class="pt-trend-col">
+                    <h4>Style Signals from Pinterest</h4>
+                    {% for s in pinterest_data.style_signals[:8] %}
+                    <div class="pt-signal-item">
+                        <span class="pt-signal-term">{{ s.term|title }}</span>
+                        <span class="pt-signal-score">{{ s.pinterest_score }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
             </div>
 
             {% else %}
@@ -466,6 +477,7 @@
                 <button class="filter-btn" onclick="filterGallery('fabric_type')">Fabrics</button>
                 <button class="filter-btn" onclick="filterGallery('pattern')">Patterns</button>
                 <button class="filter-btn" onclick="filterGallery('color')">Colors</button>
+                <button class="filter-btn" onclick="filterGallery('style')">Styles</button>
             </div>
 
             <div id="gallery-grid" class="gallery-grid">
@@ -580,7 +592,7 @@
             </div>
 
             <!-- Charts Row -->
-            <div class="charts-section">
+            <div class="charts-section charts-4col">
                 <div class="chart-card">
                     <h3>Top Fabric Types</h3>
                     <canvas id="fabric-chart"></canvas>
@@ -593,6 +605,10 @@
                     <h3>Top Colors</h3>
                     <canvas id="color-chart"></canvas>
                 </div>
+                <div class="chart-card">
+                    <h3>Top Styles</h3>
+                    <canvas id="style-chart"></canvas>
+                </div>
             </div>
 
             <!-- Trend Tables -->
@@ -601,6 +617,7 @@
                     <button class="tab active" data-tab="fabrics" onclick="switchTab('fabrics')">Fabric Types</button>
                     <button class="tab" data-tab="patterns" onclick="switchTab('patterns')">Patterns</button>
                     <button class="tab" data-tab="colors" onclick="switchTab('colors')">Colors</button>
+                    <button class="tab" data-tab="styles" onclick="switchTab('styles')">Styles</button>
                 </div>
 
                 <div id="tab-fabrics" class="tab-content active">
@@ -677,6 +694,31 @@
                         </tbody>
                     </table>
                 </div>
+
+                <div id="tab-styles" class="tab-content">
+                    <table class="trend-table">
+                        <thead>
+                            <tr>
+                                <th>#</th><th>Style / Aesthetic</th><th>Score</th>
+                                <th>Confidence</th><th>Listings</th><th>Sources</th><th>Avg Price</th><th>Lifecycle</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for t in trends.styles %}
+                            <tr>
+                                <td>{{ loop.index }}</td>
+                                <td class="term-name">{{ t.term|title }}</td>
+                                <td><span class="score-badge">{{ t.score }}</span></td>
+                                <td><span class="tier-badge tier-{{ t.confidence_tier|default('moderate') }}">{{ t.confidence_tier|default('moderate')|title }}</span></td>
+                                <td>{{ t.mention_count }}</td>
+                                <td>{{ t.source_count|default(1) }}</td>
+                                <td>{{ "$%.2f"|format(t.avg_price) if t.avg_price else "N/A" }}</td>
+                                <td><span class="lifecycle-badge {{ t.lifecycle }}">{{ t.lifecycle|title }}</span></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </section>
 
@@ -736,7 +778,8 @@
         const fabricData = {{ trends.fabric_types|tojson }};
         const patternData = {{ trends.patterns|tojson }};
         const colorData = {{ trends.colors|tojson }};
-        initCharts(fabricData, patternData, colorData);
+        const styleData = {{ trends.styles|tojson }};
+        initCharts(fabricData, patternData, colorData, styleData);
     </script>
 </body>
 </html>

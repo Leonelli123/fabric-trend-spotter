@@ -13,6 +13,7 @@ from scrapers import (
     fetch_google_trends, fetch_european_trends,
     get_seed_listings, get_european_seed_listings,
     scrape_pinterest, analyze_pinterest_data,
+    fetch_trend_reports,
 )
 from analysis import analyze_trends, analyze_european_trends, run_forecasts
 from database import save_listings
@@ -47,6 +48,7 @@ def dashboard():
         "fabric_types": get_latest_trends("fabric_type", limit=15),
         "patterns": get_latest_trends("pattern", limit=15),
         "colors": get_latest_trends("color", limit=15),
+        "styles": get_latest_trends("style", limit=15),
     }
     forecasts = get_forecasts(limit=20)
     stats = get_scrape_stats()
@@ -277,6 +279,35 @@ def _run_scrape():
                 "note": str(e)[:100],
             }
             logger.warning("Google Trends failed: %s", e)
+
+        # Step 3b: Industry trend reports (authoritative sources)
+        trend_report = {}
+        try:
+            logger.info("Fetching industry trend reports...")
+            trend_report = fetch_trend_reports()
+            signals = trend_report.get("signals", [])
+            if signals:
+                # Pass trend report signals through google_data dict for the analysis engine
+                google_data["_trend_report_signals"] = signals
+                source_status["Trend Reports"] = {
+                    "status": "ok",
+                    "count": len(signals),
+                    "note": f"{len(signals)} signals from {trend_report.get('sources_scraped', 0)} sources",
+                }
+                logger.info("Trend reports: %d signals extracted", len(signals))
+            else:
+                source_status["Trend Reports"] = {
+                    "status": "empty",
+                    "count": 0,
+                    "note": "No signals extracted",
+                }
+        except Exception as e:
+            source_status["Trend Reports"] = {
+                "status": "error",
+                "count": 0,
+                "note": str(e)[:100],
+            }
+            logger.warning("Trend reports failed: %s", e)
 
         # Step 4: Save and analyze
         if all_listings:

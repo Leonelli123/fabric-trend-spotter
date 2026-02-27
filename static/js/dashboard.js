@@ -9,7 +9,7 @@ const CHART_COLORS = [
    CHARTS
    ========================================== */
 
-function initCharts(fabricData, patternData, colorData) {
+function initCharts(fabricData, patternData, colorData, styleData) {
     const opts = {
         responsive: true,
         maintainAspectRatio: true,
@@ -22,6 +22,7 @@ function initCharts(fabricData, patternData, colorData) {
     createBarChart('fabric-chart', fabricData, opts);
     createBarChart('pattern-chart', patternData, opts);
     createBarChart('color-chart', colorData, opts);
+    if (styleData) createBarChart('style-chart', styleData, opts);
 }
 
 function createBarChart(id, data, options) {

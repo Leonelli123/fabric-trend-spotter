@@ -441,6 +441,7 @@ a.gallery-title:hover { color: var(--accent); }
 .badge-fabric_type { background: rgba(108,99,255,0.15); color: var(--accent); }
 .badge-pattern { background: rgba(236,72,153,0.15); color: var(--pink); }
 .badge-color { background: rgba(20,184,166,0.15); color: var(--teal); }
+.badge-style { background: rgba(168,85,247,0.15); color: var(--purple); }
 
 .st-score { font-weight: 700; color: var(--accent); }
 
@@ -467,6 +468,9 @@ a.gallery-title:hover { color: var(--accent); }
     grid-template-columns: repeat(3, 1fr);
     gap: 1.5rem;
     margin-bottom: 2rem;
+}
+.charts-section.charts-4col {
+    grid-template-columns: repeat(4, 1fr);
 }
 
 .chart-card {
@@ -994,8 +998,12 @@ a.pt-pin-title:hover { color: var(--red); }
 .footer-sep { margin: 0 0.5rem; }
 
 /* Responsive */
+@media (max-width: 1200px) {
+    .charts-section.charts-4col { grid-template-columns: repeat(2, 1fr); }
+    .pt-trends-grid { grid-template-columns: repeat(2, 1fr); }
+}
 @media (max-width: 1000px) {
-    .charts-section { grid-template-columns: 1fr; }
+    .charts-section, .charts-section.charts-4col { grid-template-columns: 1fr; }
     .segment-grid { grid-template-columns: 1fr; }
     .lifecycle-pipeline { flex-direction: column; }
     .pipeline-arrow { transform: rotate(90deg); align-self: center; }

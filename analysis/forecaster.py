@@ -29,9 +29,12 @@ def run_forecasts(current_trends, google_data=None):
         google_data = {}
 
     forecasts = []
-    all_terms = current_trends.get("fabric_types", []) + \
-                current_trends.get("patterns", []) + \
-                current_trends.get("colors", [])
+    all_terms = (
+        current_trends.get("fabric_types", []) +
+        current_trends.get("patterns", []) +
+        current_trends.get("colors", []) +
+        current_trends.get("styles", [])
+    )
 
     for item in all_terms:
         term = item["term"]
@@ -83,17 +86,30 @@ def _calculate_velocity(history, current_score):
     Calculate the rate of change in trend score.
     Positive = growing, Negative = declining.
     Returns normalized velocity (-1 to +1 range).
+
+    Uses weighted average of recent changes for smoothing — prevents
+    single-day noise from causing lifecycle oscillation.
     """
     if len(history) < 2:
-        return 0.0
+        # No history: conservative estimate, not an inflated 0.5
+        return 0.05 if current_score > 10 else 0.0
 
-    # Use last vs first score in window
-    old_score = history[0]["score"]
-    if old_score == 0:
-        return 0.5 if current_score > 0 else 0.0
+    scores = [h["score"] for h in history] + [current_score]
 
-    # Percentage change, clamped
-    velocity = (current_score - old_score) / max(old_score, 1)
+    if len(scores) >= 4:
+        # Weighted velocity: recent changes matter more
+        # Compare last quarter vs first quarter of history
+        quarter = max(len(scores) // 4, 1)
+        old_avg = sum(scores[:quarter]) / quarter
+        new_avg = sum(scores[-quarter:]) / quarter
+    else:
+        old_avg = scores[0]
+        new_avg = current_score
+
+    if old_avg <= 0:
+        return 0.1 if new_avg > 5 else 0.0
+
+    velocity = (new_avg - old_avg) / max(old_avg, 1)
     return max(-1.0, min(1.0, velocity))
 
 
@@ -249,6 +265,9 @@ def _classify_lifecycle(score, velocity, acceleration):
     """
     Classify where a trend sits in its lifecycle.
 
+    Uses thresholds from config.LIFECYCLE_THRESHOLDS as the single source
+    of truth. Classification order matters — first match wins.
+
     Stages:
     - emerging:  Low score but positive velocity. The trend is just starting.
     - rising:    Growing score and positive velocity. Get in now.
@@ -256,18 +275,37 @@ def _classify_lifecycle(score, velocity, acceleration):
     - declining: Score dropping. Time to move on.
     - stable:    Consistent score, low velocity. Evergreen demand.
     """
-    if velocity > 0.3 and score < 30:
-        return "emerging"
-    if velocity > 0.15 and score < 65:
-        return "rising"
-    if score >= 55 and velocity < 0.15:
-        return "peak"
-    if velocity < -0.1:
+    t = LIFECYCLE_THRESHOLDS
+
+    # Declining: score is dropping meaningfully
+    if velocity < t["declining"]["max_velocity"]:
         return "declining"
-    if score >= 20 and abs(velocity) < 0.15:
-        return "stable"
-    if velocity > 0:
+
+    # Emerging: new trend with growth momentum but still small
+    if velocity >= t["emerging"]["min_velocity"] and score <= t["emerging"]["max_score"]:
         return "emerging"
+
+    # Rising: growing and has room to grow more
+    if (velocity >= t["rising"]["min_velocity"]
+            and score >= t["rising"]["min_score"]
+            and score <= t["rising"]["max_score"]):
+        return "rising"
+
+    # Peak: high score but growth stalled
+    if score >= t["peak"]["min_score"] and velocity <= t["peak"]["max_velocity"]:
+        return "peak"
+
+    # Stable: consistent demand, not moving much
+    if (score >= t["stable"]["min_score"]
+            and velocity <= t["stable"]["max_velocity"]
+            and velocity >= t["stable"]["min_velocity"]):
+        return "stable"
+
+    # Fallbacks
+    if velocity > 0 and score < 20:
+        return "emerging"
+    if velocity > 0:
+        return "rising"
     return "stable"
 
 

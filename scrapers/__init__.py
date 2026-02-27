@@ -5,3 +5,4 @@ from scrapers.google_trends import fetch_google_trends, fetch_european_trends
 from scrapers.seed_data import get_seed_listings
 from scrapers.european_seed_data import get_european_seed_listings
 from scrapers.pinterest import scrape_pinterest, analyze_pinterest_data
+from scrapers.trend_reports import fetch_trend_reports
