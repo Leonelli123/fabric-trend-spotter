@@ -178,9 +178,9 @@ EUROPEAN_COUNTRIES = {
         "geo": "NL",
         "region": "western",
         "local_marketplaces": [
-            "Stof&Stil NL", "Stoffenwinkel", "Textielstad", "Etsy NL",
-            "De Stoffenkamer", "Mooie Stof", "Driessen Stoffen",
-            "Bel'Etoile Fabrics", "De Naaihoek", "Stoff4you",
+            "Textielstad", "De Stoffenkraam", "Hoofs Stoffen",
+            "De Stoffenkoning", "Royal Look", "Stoffenland",
+            "De Lappenkraam", "Bottger", "Selfmade NL",
         ],
         "local_terms": [
             "stof per meter", "katoen stof", "linnen stof", "quiltstof",
@@ -198,10 +198,9 @@ EUROPEAN_COUNTRIES = {
         "geo": "DE",
         "region": "western",
         "local_marketplaces": [
-            "Stoffe.de", "Stoffkontor", "Stoff&Stil DE", "Amazon.de",
-            "Stoffwelten", "Nähwelt Flach", "myfabrics.co.uk (DE)",
-            "Snaply", "Alles für Selbermacher", "Zierstoff",
-            "Swafing", "Buttinette", "HEMMERS Itex",
+            "Stoffe.de", "Snaply", "Stoffe Hemmers", "Buttinette",
+            "Stoffkontor", "Stoffmonster", "Schnuckidu",
+            "Selfmade DE", "Swafing", "Stofferia",
         ],
         "local_terms": [
             "stoff meterware", "baumwollstoff", "leinenstoff", "patchworkstoff",
@@ -218,7 +217,10 @@ EUROPEAN_COUNTRIES = {
         "currency": "SEK",
         "geo": "SE",
         "region": "nordic",
-        "local_marketplaces": ["Stoff&Stil SE", "Tyg.se", "Textilgallerian"],
+        "local_marketplaces": [
+            "Ernst Textil", "Tyg.se", "Skapamer", "Selfmade SE",
+            "Tygverket", "Nordisk Textil",
+        ],
         "local_terms": [
             "tyg metervara", "bomullstyg", "linnetyg", "quilttyg",
             "jerseytyg", "möbeltyg",
@@ -234,7 +236,10 @@ EUROPEAN_COUNTRIES = {
         "currency": "EUR",
         "geo": "FI",
         "region": "nordic",
-        "local_marketplaces": ["Eurokangas", "Kankaita", "Stoff&Stil FI"],
+        "local_marketplaces": [
+            "Eurokangas", "Kankaita.com", "Selfmade FI",
+            "Ottobre", "FabriKing",
+        ],
         "local_terms": [
             "kangas metrittäin", "puuvillakangas", "pellavakangas",
             "trikookangas", "tilkkutyökangas",
@@ -250,7 +255,10 @@ EUROPEAN_COUNTRIES = {
         "currency": "DKK",
         "geo": "DK",
         "region": "nordic",
-        "local_marketplaces": ["Stof&Stil DK", "Stofdepotet", "SySiden"],
+        "local_marketplaces": [
+            "Selfmade DK", "Stofdepotet", "SySiden", "Stof2000",
+            "G&M Textiles", "Jydsk Stoflager",
+        ],
         "local_terms": [
             "stof metervare", "bomuldsstof", "hørrestof", "quiltestof",
             "jerseystof", "møbelstof",
@@ -266,7 +274,10 @@ EUROPEAN_COUNTRIES = {
         "currency": "PLN",
         "geo": "PL",
         "region": "eastern",
-        "local_marketplaces": ["Dresówka", "TkaninySklep", "Allegro", "Tkaniny.net"],
+        "local_marketplaces": [
+            "Dresowka.pl", "Textilmar", "Popcouture",
+            "CottonStories", "Cottye", "Ultramaszyna", "SuperTkaniny",
+        ],
         "local_terms": [
             "tkanina bawełniana", "tkanina na metry", "dresówka",
             "dzianina", "tkanina tapicerska", "tkanina lniana",
@@ -282,7 +293,10 @@ EUROPEAN_COUNTRIES = {
         "currency": "CZK",
         "geo": "CZ",
         "region": "eastern",
-        "local_marketplaces": ["Textilní galerie", "Metrax", "Stoklasa"],
+        "local_marketplaces": [
+            "Stoklasa", "Textilni Galerie", "Metrax",
+            "Latky-eshop", "Dumlatek",
+        ],
         "local_terms": [
             "látka metráž", "bavlněná látka", "lněná látka",
             "úplet", "dekorační látka", "čalounická látka",
@@ -298,7 +312,10 @@ EUROPEAN_COUNTRIES = {
         "currency": "NOK",
         "geo": "NO",
         "region": "nordic",
-        "local_marketplaces": ["Stoff&Stil NO", "Stoffbutikken", "Sy-Spansen"],
+        "local_marketplaces": [
+            "Selfmade NO", "Stoffbutikken", "Sy-Spansen",
+            "Panduro NO", "Stoff og Stil",
+        ],
         "local_terms": [
             "stoff metervare", "bomullsstoff", "linstoff", "quiltestoff",
             "jerseystoff", "møbelstoff",
@@ -314,7 +331,10 @@ EUROPEAN_COUNTRIES = {
         "currency": "EUR",
         "geo": "BE",
         "region": "western",
-        "local_marketplaces": ["Stoffen.net", "Stof&Stil BE", "Textielstad"],
+        "local_marketplaces": [
+            "Stragier", "Stoffen.net", "Selfmade BE",
+            "Tissus du Chien Vert",
+        ],
         "local_terms": [
             "stof per meter", "katoenen stof", "linnen stof",
             "tissu au mètre", "tissu coton", "tissu lin",
@@ -331,10 +351,9 @@ EUROPEAN_COUNTRIES = {
         "geo": "FR",
         "region": "western",
         "local_marketplaces": [
-            "Mondial Tissus", "Les Coupons de Saint-Pierre", "Tissus.net",
-            "Ma Petite Mercerie", "Tissus Price", "Pretty Mercerie",
-            "Bennytex", "Motif Personnel", "Atelier de la Création",
-            "Driessen Stoffen FR", "Toto Tissus", "Sacrés Coupons",
+            "Mondial Tissus", "Tissus des Ursules", "Ma Petite Mercerie",
+            "Mercerine", "Tissus.net", "Made in Tissus",
+            "Stragier", "Tissus Ellen",
         ],
         "local_terms": [
             "tissu au mètre", "tissu coton", "tissu lin", "tissu liberty",
@@ -344,6 +363,545 @@ EUROPEAN_COUNTRIES = {
             "tissu au mètre", "tissu coton", "tissu lin", "tissu liberty",
             "toile de jouy", "tissu ameublement", "tissu jersey",
         ],
+    },
+}
+
+# --------------------------------------------------------------------------
+# Verified European Shop Database
+# Methodology: Each shop verified via web research. Categorized by role:
+#   retailer  — shows what's selling at volume (scrape bestsellers)
+#   brand     — sets trends (scrape new collections)
+#   wholesaler — shows B2B demand (professional buying patterns)
+# --------------------------------------------------------------------------
+
+EU_SHOPS = {
+    # === PHASE 1: Highest-impact shops (one scraper each covers the most ground) ===
+    "selfmade": {
+        "name": "Selfmade (Stoff & Stil)",
+        "base_url": "https://selfmade.com",
+        "countries": ["DK", "DE", "NO", "SE", "FI", "BE", "NL"],
+        "locale_paths": {
+            "DK": "/da-dk", "DE": "/de-de", "NO": "/nb-no", "SE": "/sv-se",
+            "FI": "/fi-fi", "BE": "/nl-be", "NL": "/nl-nl",
+        },
+        "role": "retailer",
+        "priority": 1,
+        "note": "Scandinavian chain — one scraper covers 7 markets",
+    },
+    "stoffe_de": {
+        "name": "Stoffe.de",
+        "base_url": "https://www.stoffe.de",
+        "countries": ["DE"],
+        "role": "retailer",
+        "priority": 1,
+        "note": "Largest DE, Shopware-based (store-api likely). Sister of Tyg.se",
+    },
+    "snaply": {
+        "name": "Snaply",
+        "base_url": "https://www.snaply.de",
+        "countries": ["DE"],
+        "role": "retailer",
+        "priority": 1,
+        "note": "15k+ fabrics. Has /stoffe/bestseller/ and /stoffe/sale/",
+    },
+    "textielstad": {
+        "name": "Textielstad",
+        "base_url": "https://www.textielstad.nl",
+        "countries": ["NL"],
+        "role": "retailer",
+        "priority": 1,
+        "note": "Largest NL. 10k+ fabrics. Good category structure",
+    },
+    "mondial_tissus": {
+        "name": "Mondial Tissus",
+        "base_url": "https://www.mondialtissus.fr",
+        "countries": ["FR"],
+        "role": "retailer",
+        "priority": 1,
+        "note": "100+ stores, largest French fabric chain",
+    },
+    "dresowka": {
+        "name": "Dresowka.pl",
+        "base_url": "https://www.dresowka.pl",
+        "countries": ["PL"],
+        "role": "retailer",
+        "priority": 1,
+        "note": "Largest PL, strong in jersey/french terry. Has English site",
+    },
+    "eurokangas": {
+        "name": "Eurokangas",
+        "base_url": "https://www.eurokangas.fi",
+        "countries": ["FI"],
+        "role": "retailer",
+        "priority": 1,
+        "note": "Dominant Finnish market. 30+ physical stores",
+    },
+    "ernst_textil": {
+        "name": "Ernst Textil",
+        "base_url": "https://www.ernsttextil.se",
+        "countries": ["SE"],
+        "role": "retailer",
+        "priority": 1,
+        "note": "Largest SE with own jersey prints (BY ERNST collection)",
+    },
+
+    # === DE retailers (Phase 2) ===
+    "stoffe_hemmers": {
+        "name": "Stoffe Hemmers",
+        "base_url": "https://www.stoffe-hemmers.de",
+        "countries": ["DE"],
+        "role": "retailer",
+        "priority": 2,
+        "note": "8k+ fabrics, 35+ years, strong community",
+    },
+    "buttinette": {
+        "name": "Buttinette",
+        "base_url": "https://basteln-de.buttinette.com",
+        "countries": ["DE"],
+        "role": "retailer",
+        "priority": 2,
+        "note": "Large craft+fabric chain, exclusive designs. Also in FR",
+    },
+    "stoffkontor": {
+        "name": "Stoffkontor",
+        "base_url": "https://www.stoffkontor.eu",
+        "countries": ["DE"],
+        "role": "retailer",
+        "priority": 2,
+        "note": "10k+ fabrics, also serves schools/institutions",
+    },
+    "stoffmonster": {
+        "name": "Stoffmonster",
+        "base_url": "https://www.stoffmonster.net",
+        "countries": ["DE"],
+        "role": "retailer",
+        "priority": 2,
+        "note": "Swafing specialist. Stoffmarkt Holland crossover",
+    },
+    "schnuckidu": {
+        "name": "Schnuckidu",
+        "base_url": "https://www.schnuckidu.com",
+        "countries": ["DE"],
+        "role": "retailer",
+        "priority": 2,
+        "note": "Curated jersey/french terry specialist. Kids/panel focus",
+    },
+
+    # === NL retailers (Phase 2) ===
+    "destoffenkraam": {
+        "name": "De Stoffenkraam",
+        "base_url": "https://www.destoffenkraam.nl",
+        "countries": ["NL"],
+        "role": "retailer",
+        "priority": 2,
+        "note": "Excellent reviews, sells to DE too",
+    },
+    "hoofs_stoffen": {
+        "name": "Hoofs Stoffen",
+        "base_url": "https://www.hoofs-stoffen.nl",
+        "countries": ["NL"],
+        "role": "retailer",
+        "priority": 2,
+        "note": "Rating 8.8/10. Wholesale from 10m+",
+    },
+    "stoffenkoning": {
+        "name": "De Stoffenkoning",
+        "base_url": "https://www.stoffenkoning.nl",
+        "countries": ["NL"],
+        "role": "retailer",
+        "priority": 2,
+        "note": "Physical + online + market stalls",
+    },
+    "royallook": {
+        "name": "Royal Look",
+        "base_url": "https://www.royallook.nl",
+        "countries": ["NL"],
+        "role": "retailer",
+        "priority": 2,
+        "note": "Tricot specialist, budget segment. Bulk discount 10m+",
+    },
+    "stoffenland": {
+        "name": "Stoffenland",
+        "base_url": "https://www.stoffenland.com",
+        "countries": ["NL"],
+        "role": "retailer",
+        "priority": 2,
+        "note": "B2B quote system, baby/kids tricot",
+    },
+    "delappenkraam": {
+        "name": "De Lappenkraam",
+        "base_url": "https://www.delappenkraam.nl",
+        "countries": ["NL"],
+        "role": "retailer",
+        "priority": 2,
+        "note": "Unique kids prints. Broderie tricot — emerging niches",
+    },
+    "bottger": {
+        "name": "Bottger",
+        "base_url": "https://www.bottger.nl",
+        "countries": ["NL"],
+        "role": "retailer",
+        "priority": 2,
+        "note": "Premium. Hilco, Nooteboom, Burda. Seasonal trend pages",
+    },
+
+    # === FR retailers (Phase 2) ===
+    "tissus_ursules": {
+        "name": "Tissus des Ursules",
+        "base_url": "https://www.tissusdesursules.fr",
+        "countries": ["FR"],
+        "role": "retailer",
+        "priority": 2,
+        "note": "80 stores, mainstream FR demand",
+    },
+    "mapetitemercerie": {
+        "name": "Ma Petite Mercerie",
+        "base_url": "https://www.mapetitemercerie.com",
+        "countries": ["FR"],
+        "role": "retailer",
+        "priority": 2,
+        "note": "30k+ refs, designer patterns (Ikatee, Maison Fauve)",
+    },
+    "mercerine": {
+        "name": "Mercerine",
+        "base_url": "https://www.mercerine.com",
+        "countries": ["FR"],
+        "role": "retailer",
+        "priority": 2,
+        "note": "Strong jersey section. YouTube channel",
+    },
+    "tissus_net": {
+        "name": "Tissus.net",
+        "base_url": "https://www.tissus.net",
+        "countries": ["FR"],
+        "role": "retailer",
+        "priority": 2,
+        "note": "Same parent as Stoffe.de/Tyg.se — compare DE vs FR",
+    },
+    "madeintissus": {
+        "name": "Made in Tissus",
+        "base_url": "https://www.madeintissus.fr",
+        "countries": ["FR"],
+        "role": "retailer",
+        "priority": 2,
+        "note": "Pro textile specialist, OEKO-TEX. Ships Benelux",
+    },
+    "stragier": {
+        "name": "Stragier",
+        "base_url": "https://www.stragier.com",
+        "countries": ["FR", "BE"],
+        "role": "retailer",
+        "priority": 2,
+        "note": "Since 1935, Liberty, luxury. Pro fashion designers",
+    },
+    "tissus_ellen": {
+        "name": "Tissus Ellen",
+        "base_url": "https://www.tissusellen.com",
+        "countries": ["FR"],
+        "role": "retailer",
+        "priority": 2,
+        "note": "Troyes, physical + online, 35+ year loyalty",
+    },
+
+    # === SE retailers (Phase 2) ===
+    "tyg_se": {
+        "name": "Tyg.se",
+        "base_url": "https://www.tyg.se",
+        "countries": ["SE"],
+        "role": "retailer",
+        "priority": 2,
+        "note": "Swedish branch of Stoffe.de. Eco brand Tula",
+    },
+    "skapamer": {
+        "name": "Skapamer",
+        "base_url": "https://www.skapamer.se",
+        "countries": ["SE"],
+        "role": "retailer",
+        "priority": 2,
+        "note": "Budget-friendly generalist, volume demand",
+    },
+    "tygverket": {
+        "name": "Tygverket",
+        "base_url": "https://www.tygverket.se",
+        "countries": ["SE"],
+        "role": "retailer",
+        "priority": 2,
+        "note": "Premium: Liberty, Morris & Co, Stig Lindberg",
+    },
+    "nordisk_textil": {
+        "name": "Nordisk Textil",
+        "base_url": "https://www.nordisktextil.se",
+        "countries": ["SE"],
+        "role": "retailer",
+        "priority": 2,
+        "note": "Carries Almedahls + Arvidssons. Since 2006",
+    },
+
+    # === NO retailers ===
+    "stoffbutikken": {
+        "name": "Stoffbutikken",
+        "base_url": "https://www.stoffbutikken.no",
+        "countries": ["NO"],
+        "role": "retailer",
+        "priority": 2,
+    },
+    "syspansen": {
+        "name": "Sy-Spansen",
+        "base_url": "https://www.syspansen.no",
+        "countries": ["NO"],
+        "role": "retailer",
+        "priority": 2,
+    },
+
+    # === DK retailers ===
+    "stofdepotet": {
+        "name": "Stofdepotet",
+        "base_url": "https://www.stofdepotet.dk",
+        "countries": ["DK"],
+        "role": "retailer",
+        "priority": 2,
+    },
+    "sysiden": {
+        "name": "SySiden",
+        "base_url": "https://www.sysiden.dk",
+        "countries": ["DK"],
+        "role": "retailer",
+        "priority": 2,
+    },
+    "stof2000": {
+        "name": "Stof2000",
+        "base_url": "https://www.stof2000.dk",
+        "countries": ["DK"],
+        "role": "retailer",
+        "priority": 2,
+    },
+
+    # === PL retailers ===
+    "textilmar": {
+        "name": "Textilmar",
+        "base_url": "https://sklep.textilmar.pl",
+        "countries": ["PL"],
+        "role": "retailer",
+        "priority": 2,
+    },
+    "popcouture": {
+        "name": "Popcouture",
+        "base_url": "https://www.popcouture.pl",
+        "countries": ["PL"],
+        "role": "retailer",
+        "priority": 2,
+        "note": "Curated dresowka specialist",
+    },
+    "ultramaszyna": {
+        "name": "Ultramaszyna",
+        "base_url": "https://www.ultramaszyna.com",
+        "countries": ["PL"],
+        "role": "retailer",
+        "priority": 2,
+        "note": "Polish-produced fabrics",
+    },
+    "supertkaniny": {
+        "name": "SuperTkaniny",
+        "base_url": "https://www.supertkaniny.pl",
+        "countries": ["PL"],
+        "role": "retailer",
+        "priority": 2,
+    },
+
+    # === CZ retailers ===
+    "stoklasa": {
+        "name": "Stoklasa",
+        "base_url": "https://www.stoklasa.cz",
+        "countries": ["CZ"],
+        "role": "retailer",
+        "priority": 2,
+        "note": "Largest CZ textile retailer. Also SK, PL, HU",
+    },
+
+    # === BE retailers ===
+    "stoffen_net": {
+        "name": "Stoffen.net",
+        "base_url": "https://www.stoffen.net",
+        "countries": ["BE"],
+        "role": "retailer",
+        "priority": 2,
+    },
+
+    # === FI retailers ===
+    "kankaita": {
+        "name": "Kankaita.com",
+        "base_url": "https://www.kankaita.com",
+        "countries": ["FI"],
+        "role": "retailer",
+        "priority": 2,
+        "note": "Jersey/trikoo specialist",
+    },
+}
+
+# Direct competitors: cotton jersey with digital prints (identical business model)
+COMPETITOR_BRANDS = {
+    "lillestoff": {
+        "name": "Lillestoff",
+        "url": "https://www.lillestoff.com",
+        "country": "DE",
+        "tier": "direct",
+        "note": "Organic jersey, GOTS digital prints. Closest competitor",
+    },
+    "albstoffe": {
+        "name": "Albstoffe / Hamburger Liebe",
+        "url": "https://www.albstoffe.com",
+        "country": "DE",
+        "tier": "direct",
+        "note": "Bio jersey, jacquard, digital prints. Made in Germany. Premium",
+    },
+    "seeyouatsix": {
+        "name": "See You at Six",
+        "url": "https://www.seeyouatsix.com",
+        "country": "BE",
+        "tier": "direct",
+        "note": "Jersey/French terry, trendy prints. Strong social media",
+    },
+    "paapii": {
+        "name": "PaaPii Design",
+        "url": "https://www.paapiidesign.com",
+        "country": "FI",
+        "tier": "direct",
+        "note": "Finnish organic jersey, GOTS. Own factory",
+    },
+    "elvelyckan": {
+        "name": "Elvelyckan Design",
+        "url": "https://www.elvelyckan.com",
+        "country": "SE",
+        "tier": "direct",
+        "note": "Organic jersey + POD. Licensed prints. Almost identical model",
+    },
+    "stoffonkel": {
+        "name": "Stoffonkel",
+        "url": "https://www.stoffonkel.de",
+        "country": "DE",
+        "tier": "direct",
+        "note": "German organic digital print jersey",
+    },
+    "stenzo": {
+        "name": "Stenzo",
+        "url": "https://www.stenzo.com",
+        "country": "NL",
+        "tier": "direct",
+        "note": "Dutch digital print jersey, EU-wide distribution",
+    },
+    "gluenz": {
+        "name": "Glunz",
+        "url": "https://www.gluenz.com",
+        "country": "DE",
+        "tier": "direct",
+        "note": "German jersey/sweat brand with digital prints",
+    },
+    # Close competitors (overlap in fabric type or market)
+    "arvidssons": {
+        "name": "Arvidssons Textil",
+        "url": "https://www.arvidssonstextil.se",
+        "country": "SE",
+        "tier": "close",
+        "note": "Swedish design house, 15+ designers. Nordic trendsetter",
+    },
+    "hilco": {
+        "name": "Hilco",
+        "url": "https://www.hilco.de",
+        "country": "DE",
+        "tier": "close",
+        "note": "German fabric brand, jersey + woven prints",
+    },
+    "cpauli": {
+        "name": "C.Pauli",
+        "url": "https://www.cpauli.com",
+        "country": "DE",
+        "tier": "close",
+        "note": "Organic cotton prints, children's focus",
+    },
+    "verhees": {
+        "name": "Verhees Textiles",
+        "url": "https://www.verhees.nl",
+        "country": "NL",
+        "tier": "close",
+        "note": "Dutch wholesale print fabrics. Supplies many EU retailers",
+    },
+    "swafing": {
+        "name": "Swafing",
+        "url": "https://www.swafing.de",
+        "country": "DE",
+        "tier": "close",
+        "role": "wholesaler",
+        "note": "Major DE wholesaler. Seasonal collections set retail trends",
+    },
+    "nooteboom": {
+        "name": "Nooteboom Textiles",
+        "url": "https://www.nooteboom.com",
+        "country": "NL",
+        "tier": "close",
+        "note": "Dutch fabric brand, design-forward",
+    },
+    "rijs": {
+        "name": "Rijs Textiles",
+        "url": "https://www.rijstextiles.com",
+        "country": "NL",
+        "tier": "close",
+        "note": "NL wholesale. Digital print jersey, French terry",
+    },
+    "fabriking": {
+        "name": "FabriKing",
+        "url": "https://www.fabriking.fi",
+        "country": "FI",
+        "tier": "close",
+        "note": "Finnish stretchy prints for adults",
+    },
+    # Design references (different product but trend signal)
+    "atelierbrunette": {
+        "name": "Atelier Brunette",
+        "url": "https://www.atelierbrunette.com",
+        "country": "FR",
+        "tier": "reference",
+        "note": "French fabric design. Natural tones. Shows French taste",
+    },
+    "marimekko": {
+        "name": "Marimekko",
+        "url": "https://www.marimekko.com",
+        "country": "FI",
+        "tier": "reference",
+        "note": "Finnish icon. Color/pattern choices influence Nordic taste",
+    },
+}
+
+# Wholesalers that show B2B demand (what retailers are ordering 3-6 months ahead)
+EU_WHOLESALERS = {
+    "swafing": {
+        "name": "Swafing",
+        "url": "https://www.swafing.de",
+        "country": "DE",
+        "note": "Seasonal collections set what appears in retail 3-6 months later",
+    },
+    "stofferia": {
+        "name": "Stofferia",
+        "url": "https://www.stofferia.de",
+        "country": "DE",
+        "note": "B2B wholesale with EU-wide portal. GOTS-certified",
+    },
+    "gm_textiles": {
+        "name": "G&M Textiles (Tyger & Textil)",
+        "url": "https://www.tygerochtextil.se",
+        "country": "DK",
+        "note": "Aarhus-based B2B. Sources from DE, NL, IT, TR. Wholesale rolls",
+    },
+    "cottonstories": {
+        "name": "CottonStories (CoStories)",
+        "url": "https://www.costories.com",
+        "country": "PL",
+        "note": "Knit MANUFACTURER in Lodz. Produces dresowka in bamboo, cotton, organic",
+    },
+    "cottye": {
+        "name": "Cottye",
+        "url": "https://www.cottye.pl",
+        "country": "PL",
+        "note": "Fabric wholesaler. TUV + OEKO-TEX certified",
     },
 }
 

@@ -14,6 +14,7 @@ from scrapers import (
     get_seed_listings, get_european_seed_listings,
     scrape_pinterest, analyze_pinterest_data,
     fetch_trend_reports,
+    scrape_eu_shops, scrape_competitors, get_eu_shop_summary,
 )
 from analysis import analyze_trends, analyze_european_trends, run_forecasts
 from database import save_listings
@@ -471,16 +472,60 @@ def _run_scrape():
         except Exception as e:
             logger.warning("Pinterest analysis failed: %s", e)
 
-        # Step 7: European Markets
+        # Step 7: European Markets (seed data + live shop scraping)
         logger.info("Loading European market data...")
         eu_listings = get_european_seed_listings()
-        if eu_listings:
-            save_listings(eu_listings)
-        source_status["EU Markets"] = {
+        source_status["EU Seed Data"] = {
             "status": "ok",
             "count": len(eu_listings),
-            "note": f"{len(EUROPEAN_COUNTRIES)} countries",
+            "note": f"{len(EUROPEAN_COUNTRIES)} countries baseline",
         }
+
+        # Step 7b: Scrape real EU shops (Phase 1 = highest impact)
+        eu_shop_listings = []
+        try:
+            logger.info("Scraping EU shops (Phase 1)...")
+            eu_shop_result = scrape_eu_shops(priority=1)
+            eu_shop_listings = eu_shop_result.get("listings", [])
+            eu_listings.extend(eu_shop_listings)
+            source_status["EU Shops"] = {
+                "status": "ok" if eu_shop_listings else "empty",
+                "count": len(eu_shop_listings),
+                "note": f"{eu_shop_result.get('shop_count', 0)} shops scraped",
+            }
+            # Store shop stats for dashboard
+            scrape_status["eu_shop_stats"] = eu_shop_result.get("stats", {})
+        except Exception as e:
+            source_status["EU Shops"] = {
+                "status": "error",
+                "count": 0,
+                "note": str(e)[:100],
+            }
+            logger.warning("EU shop scraping failed: %s", e)
+
+        # Step 7c: Scrape competitor brands
+        competitor_listings = []
+        try:
+            logger.info("Scraping competitor brands...")
+            comp_result = scrape_competitors()
+            competitor_listings = comp_result.get("listings", [])
+            eu_listings.extend(competitor_listings)
+            source_status["Competitors"] = {
+                "status": "ok" if competitor_listings else "empty",
+                "count": len(competitor_listings),
+                "note": f"{comp_result.get('brand_count', 0)} brands",
+            }
+            scrape_status["competitor_stats"] = comp_result.get("stats", {})
+        except Exception as e:
+            source_status["Competitors"] = {
+                "status": "error",
+                "count": 0,
+                "note": str(e)[:100],
+            }
+            logger.warning("Competitor scraping failed: %s", e)
+
+        if eu_listings:
+            save_listings(eu_listings)
 
         # European Google Trends (optional, may be rate-limited)
         eu_google = {}
@@ -518,6 +563,8 @@ def _run_scrape():
             "live_listings": live_count,
             "seed_listings": len(seed_listings),
             "eu_listings": len(eu_listings),
+            "eu_shop_listings": len(eu_shop_listings),
+            "competitor_listings": len(competitor_listings),
             "eu_countries": eu_result.get("total_countries", 0),
             "google_keywords": len(google_data),
             "top_fabric": (
@@ -540,8 +587,11 @@ def _run_scrape():
         }
         logger.info(
             "Collection complete! %d US listings (%d live), %d EU listings "
-            "(%d countries), %d forecasts. Sources OK: %s. Failed: %s",
+            "(%d seed + %d shops + %d competitors, %d countries), "
+            "%d forecasts. Sources OK: %s. Failed: %s",
             len(all_listings), live_count, len(eu_listings),
+            len(eu_listings) - len(eu_shop_listings) - len(competitor_listings),
+            len(eu_shop_listings), len(competitor_listings),
             eu_result.get("total_countries", 0), len(forecasts),
             ok_sources, failed_sources,
         )

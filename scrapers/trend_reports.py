@@ -24,8 +24,9 @@ from config import (
 logger = logging.getLogger(__name__)
 
 # Authoritative trend sources - each has a track record of setting/predicting trends
+# Organized by tier: higher tiers are leading indicators, lower tiers are real-time demand
 TREND_SOURCES = [
-    # Textile/fabric industry publications
+    # --- TIER 1: Color & Trend Forecasting Authorities (6-18 months ahead) ---
     {
         "name": "Pantone",
         "url": "https://www.pantone.com/articles/fashion-color-trend-report",
@@ -33,17 +34,42 @@ TREND_SOURCES = [
         "authority_score": 10,  # Highest - Pantone literally sets color trends
     },
     {
+        "name": "Coloro Key Colors",
+        "url": "https://www.coloro.com/key-colors",
+        "type": "color_authority",
+        "authority_score": 10,
+    },
+    {
+        "name": "Heuritech",
+        "url": "https://www.heuritech.com/articles",
+        "type": "forecasting",
+        "authority_score": 9,
+    },
+    {
+        "name": "Italtex Trends",
+        "url": "https://www.italtextrends.com/blogs/latest-trends",
+        "type": "forecasting",
+        "authority_score": 8,
+    },
+
+    # --- TIER 2: Trade Show / Industry Intelligence (3-12 months ahead) ---
+    {
+        "name": "Premiere Vision",
+        "url": "https://www.premierevision.com/en",
+        "type": "trade_show",
+        "authority_score": 9,
+    },
+    {
+        "name": "Texworld Paris",
+        "url": "https://texpertisenetwork.messefrankfurt.com",
+        "type": "trade_show",
+        "authority_score": 9,
+    },
+    {
         "name": "Textile Magazine",
         "url": "https://www.textilemagazine.com/category/trends/",
         "type": "industry",
         "authority_score": 8,
-    },
-    # Fashion trend publications that influence fabric demand
-    {
-        "name": "Dezeen Textiles",
-        "url": "https://www.dezeen.com/tag/textiles/",
-        "type": "design",
-        "authority_score": 7,
     },
     {
         "name": "Trend-Monitor Textiles",
@@ -51,7 +77,54 @@ TREND_SOURCES = [
         "type": "forecasting",
         "authority_score": 8,
     },
-    # Sewing community trend sources (what makers are excited about)
+
+    # --- TIER 3: Print & Pattern Design (directly relevant to jersey prints) ---
+    {
+        "name": "Patternbank",
+        "url": "https://patternbank.com/trends",
+        "type": "print_design",
+        "authority_score": 9,
+    },
+    {
+        "name": "Plumager",
+        "url": "https://plumager.com/blogs/plumager-print-design",
+        "type": "print_design",
+        "authority_score": 8,
+    },
+    {
+        "name": "Print and Pattern",
+        "url": "https://www.printandpattern.com",
+        "type": "print_design",
+        "authority_score": 7,
+    },
+    {
+        "name": "Textile Design Lab",
+        "url": "https://www.textiledesignlab.com/blog",
+        "type": "print_design",
+        "authority_score": 7,
+    },
+
+    # --- TIER 4: Fashion Publications (trickle-down to fabric, 3-6 months) ---
+    {
+        "name": "Dezeen Textiles",
+        "url": "https://www.dezeen.com/tag/textiles/",
+        "type": "design",
+        "authority_score": 7,
+    },
+    {
+        "name": "Fashionating World",
+        "url": "https://www.fashionatingworld.com",
+        "type": "fashion",
+        "authority_score": 7,
+    },
+    {
+        "name": "Knitting Industry Creative",
+        "url": "https://creative.knittingindustry.com",
+        "type": "industry",
+        "authority_score": 6,
+    },
+
+    # --- TIER 5: Sewing & Maker Community (real demand signals, 0-3 months) ---
     {
         "name": "Seamwork Magazine",
         "url": "https://www.seamwork.com/magazine",
@@ -64,20 +137,38 @@ TREND_SOURCES = [
         "type": "community",
         "authority_score": 6,
     },
+    {
+        "name": "Mood Fabrics Blog",
+        "url": "https://www.moodfabrics.com/blog",
+        "type": "community",
+        "authority_score": 7,
+    },
+    {
+        "name": "All About Fabrics",
+        "url": "https://www.allaboutfabrics.com/blogs/news",
+        "type": "community",
+        "authority_score": 6,
+    },
+    {
+        "name": "WeAllSew",
+        "url": "https://weallsew.com",
+        "type": "community",
+        "authority_score": 6,
+    },
 ]
 
 # Search-based sources (Google News, etc.) for recent trend articles
 TREND_SEARCH_QUERIES = [
     "fabric trends 2026",
     "textile trends forecast",
-    "sewing trends popular",
-    "quilting fabric trends",
     "Pantone color year fabric",
-    "fashion week fabric textile",
     "Première Vision textile trends",
     "Scandinavian textile design trends",
-    "sustainable fabric trends",
-    "home decor fabric trends 2026",
+    "cotton jersey print trends",
+    "digital print fabric trends",
+    "surface pattern design trends 2026",
+    "sustainable fabric trends organic cotton",
+    "print and pattern trends sewing",
 ]
 
 
