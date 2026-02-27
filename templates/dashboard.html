@@ -68,37 +68,37 @@
         </div>
         {% endif %}
 
-        <!-- ========== SECTION 0: ACTION BOARD ========== -->
+        <!-- ========== SECTION 0: ACTION BOARD (Unified) ========== -->
         {% if action_board %}
         <section id="actions" class="section">
             <div class="section-header">
                 <h2>Action Board</h2>
-                <p class="section-subtitle">Role-specific recommendations &mdash; what to do right now</p>
+                <p class="section-subtitle">Everything you need to act on &mdash; prioritized and unified</p>
             </div>
 
-            <!-- CEO Summary -->
-            {% if action_board.ceo %}
-            {% set summary = action_board.ceo[0] %}
+            <!-- Summary Bar -->
+            {% if action_board.summary %}
+            {% set summary = action_board.summary %}
             <div class="action-summary-bar">
                 <div class="summary-stat">
                     <span class="summary-number">{{ summary.total_trends_tracked }}</span>
                     <span class="summary-label">Trends tracked</span>
                 </div>
                 <div class="summary-stat emerging">
-                    <span class="summary-number">{{ summary.emerging_count }}</span>
-                    <span class="summary-label">Emerging</span>
+                    <span class="summary-number">{{ summary.design_now_count }}</span>
+                    <span class="summary-label">Design Now</span>
                 </div>
                 <div class="summary-stat rising">
-                    <span class="summary-number">{{ summary.rising_count }}</span>
-                    <span class="summary-label">Rising</span>
+                    <span class="summary-number">{{ summary.evergreen_count }}</span>
+                    <span class="summary-label">Evergreen</span>
                 </div>
                 <div class="summary-stat peak">
-                    <span class="summary-number">{{ summary.peak_count }}</span>
-                    <span class="summary-label">At Peak</span>
+                    <span class="summary-number">{{ summary.watch_count }}</span>
+                    <span class="summary-label">Watch</span>
                 </div>
                 <div class="summary-stat declining">
-                    <span class="summary-number">{{ summary.declining_count }}</span>
-                    <span class="summary-label">Declining</span>
+                    <span class="summary-number">{{ summary.phase_out_count }}</span>
+                    <span class="summary-label">Phase Out</span>
                 </div>
                 <div class="summary-top">
                     <span class="top-item">Top fabric: <strong>{{ summary.top_fabric|title }}</strong></span>
@@ -109,138 +109,104 @@
             </div>
             {% endif %}
 
-            <!-- Role Tabs -->
-            <div class="action-tabs">
-                <button class="action-tab active" data-role="buyer" onclick="switchRole('buyer')">Buyer / Indkober</button>
-                <button class="action-tab" data-role="designer" onclick="switchRole('designer')">Designer</button>
-                <button class="action-tab" data-role="marketing" onclick="switchRole('marketing')">Marketing</button>
-                <button class="action-tab" data-role="sales" onclick="switchRole('sales')">Sales</button>
-                <button class="action-tab" data-role="seasonal" onclick="switchRole('seasonal')">Seasonal</button>
+            <!-- ===== DESIGN BRIEFS ===== -->
+            {% if action_board.design_briefs %}
+            <div class="design-briefs-section">
+                <h3 class="subsection-title">Design Briefs</h3>
+                <p class="section-subtitle">Cross-referenced color &times; pattern &times; style combinations &mdash; sorted by opportunity</p>
+                <div class="briefs-grid">
+                    {% for brief in action_board.design_briefs %}
+                    <div class="brief-card brief-{{ brief.priority }}">
+                        <div class="brief-header">
+                            <span class="brief-priority {{ brief.priority }}">{{ brief.priority|upper }}</span>
+                            <span class="brief-score">{{ brief.opportunity_score }}</span>
+                        </div>
+                        <div class="brief-combo">
+                            <span class="brief-chip brief-color">{{ brief.color|title }}</span>
+                            <span class="brief-x">&times;</span>
+                            <span class="brief-chip brief-pattern">{{ brief.pattern|title }}</span>
+                            {% if brief.style %}
+                            <span class="brief-x">&mdash;</span>
+                            <span class="brief-chip brief-style">{{ brief.style|title }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="brief-meta">
+                            <span class="brief-lc {{ brief.color_lifecycle }}">{{ brief.color|title }}: {{ brief.color_lifecycle }}</span>
+                            <span class="brief-lc {{ brief.pattern_lifecycle }}">{{ brief.pattern|title }}: {{ brief.pattern_lifecycle }}</span>
+                        </div>
+                        {% if brief.signals %}
+                        <div class="brief-signals">
+                            {% for sig in brief.signals[:3] %}
+                            <span class="brief-signal">{{ sig }}</span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
             </div>
+            {% endif %}
 
-            <!-- Buyer View -->
-            <div class="action-content active" id="role-buyer">
-                {% for item in action_board.buyer %}
-                <div class="action-card action-{{ item.action }}">
+            <!-- ===== UNIFIED ACTION LIST ===== -->
+            {% if action_board.actions %}
+            <div class="unified-actions-section">
+                <h3 class="subsection-title">Actions</h3>
+                <p class="section-subtitle">All recommendations in one list &mdash; what to order, promote, sample, or phase out</p>
+                {% for item in action_board.actions %}
+                <div class="action-card action-{{ item.action }} bucket-{{ item.bucket }}">
                     <div class="action-badge {{ item.priority }}">
-                        {% if item.action == 'order' %}ORDER{% elif item.action == 'sample' %}SAMPLE{% elif item.action == 'reduce' %}REDUCE{% endif %}
+                        {% if item.action == 'order' %}ORDER{% elif item.action == 'sample' %}SAMPLE{% elif item.action == 'reduce' %}PHASE OUT{% elif item.action == 'promote' %}PROMOTE{% elif item.action == 'premium' %}PREMIUM{% endif %}
                     </div>
                     <div class="action-body">
                         <h4>{{ item.term|title }} <span class="action-cat">{{ item.category|replace('_', ' ')|title }}</span></h4>
                         <p>{{ item.reason }}</p>
                     </div>
-                </div>
-                {% endfor %}
-                {% if not action_board.buyer %}
-                <div class="empty-state"><p>No buyer recommendations yet. Run a scrape to generate data.</p></div>
-                {% endif %}
-            </div>
-
-            <!-- Designer View -->
-            <div class="action-content" id="role-designer">
-                {% for item in action_board.designer %}
-                <div class="action-card action-{{ item.action }}">
-                    <div class="action-badge">
-                        {% if item.action == 'color_palette' %}PALETTE{% elif item.action == 'pattern_direction' %}PATTERN{% elif item.action == 'style_direction' %}STYLE{% endif %}
-                    </div>
-                    <div class="action-body">
-                        {% if item.terms is defined %}
-                        <h4>{% for t in item.terms %}<span class="action-term-chip">{{ t|title }}</span>{% endfor %}</h4>
-                        {% else %}
-                        <h4>{{ item.term|title }}</h4>
-                        {% endif %}
-                        <p>{{ item.reason }}</p>
-                    </div>
+                    <span class="bucket-badge bucket-{{ item.bucket }}">
+                        {% if item.bucket == 'design_now' %}Design Now{% elif item.bucket == 'evergreen' %}Evergreen{% elif item.bucket == 'phase_out' %}Phase Out{% elif item.bucket == 'watch' %}Watch{% endif %}
+                    </span>
                 </div>
                 {% endfor %}
             </div>
+            {% endif %}
 
-            <!-- Marketing View -->
-            <div class="action-content" id="role-marketing">
-                {% for item in action_board.marketing %}
-                <div class="action-card action-{{ item.action }}">
-                    <div class="action-badge">
-                        {% if item.action == 'content_theme' %}CONTENT{% elif item.action == 'campaign_aesthetic' %}CAMPAIGN{% endif %}
-                    </div>
-                    <div class="action-body">
-                        {% if item.terms is defined %}
-                        <h4>{% for t in item.terms %}<span class="action-term-chip">{{ t|title }}</span>{% endfor %}</h4>
-                        {% else %}
-                        <h4>{{ item.term|title }} <span class="action-cat">{{ item.category|replace('_', ' ')|title }}</span></h4>
-                        {% endif %}
-                        <p>{{ item.reason }}</p>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-
-            <!-- Sales View -->
-            <div class="action-content" id="role-sales">
-                {% for item in action_board.sales %}
-                <div class="action-card action-{{ item.action }}">
-                    <div class="action-badge {{ item.priority }}">
-                        {% if item.action == 'promote' %}PROMOTE{% elif item.action == 'upsell' %}UPSELL{% elif item.action == 'premium' %}PREMIUM{% endif %}
-                    </div>
-                    <div class="action-body">
-                        <h4>{{ item.term|title }}</h4>
-                        <p>{{ item.reason }}</p>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-
-            <!-- Seasonal View -->
-            <div class="action-content" id="role-seasonal">
-                {% if action_board.seasonal %}
-                {% set season = action_board.seasonal[0] %}
-                <div class="seasonal-card">
-                    <h3>{{ season.season }}</h3>
-                    <p class="seasonal-reason">{{ season.reason }}</p>
-                    <div class="seasonal-grid">
-                        <div class="seasonal-col">
-                            <h4>Recommended Colors</h4>
-                            <div class="seasonal-chips">
-                                {% for c in season.recommended_colors %}
-                                <span class="seasonal-chip color-chip">{{ c|title }}</span>
-                                {% endfor %}
-                            </div>
+            <!-- ===== SEASONAL CONTEXT ===== -->
+            {% if action_board.seasonal %}
+            {% set season = action_board.seasonal %}
+            <div class="seasonal-card">
+                <h3>{{ season.season }}</h3>
+                <p class="seasonal-reason">{{ season.reason }}</p>
+                <div class="seasonal-grid">
+                    <div class="seasonal-col">
+                        <h4>Recommended Colors</h4>
+                        <div class="seasonal-chips">
+                            {% for c in season.recommended_colors %}
+                            <span class="seasonal-chip color-chip">{{ c|title }}</span>
+                            {% endfor %}
                         </div>
-                        <div class="seasonal-col">
-                            <h4>Recommended Fabrics</h4>
-                            <div class="seasonal-chips">
-                                {% for f in season.recommended_fabrics %}
-                                <span class="seasonal-chip fabric-chip">{{ f|title }}</span>
-                                {% endfor %}
-                            </div>
+                    </div>
+                    <div class="seasonal-col">
+                        <h4>Recommended Fabrics</h4>
+                        <div class="seasonal-chips">
+                            {% for f in season.recommended_fabrics %}
+                            <span class="seasonal-chip fabric-chip">{{ f|title }}</span>
+                            {% endfor %}
                         </div>
                     </div>
                 </div>
-                {% endif %}
-
-                <!-- Macro Trends -->
-                {% if action_board.macro_trends %}
-                <div class="horizon-section">
-                    <h4>Macro Trends (6-12 months)</h4>
-                    <div class="horizon-chips">
-                        {% for t in action_board.macro_trends %}
-                        <span class="horizon-chip macro" title="Score: {{ t.score }}">{{ t.term|title }}</span>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endif %}
-
-                <!-- Short Term -->
-                {% if action_board.short_term %}
-                <div class="horizon-section">
-                    <h4>Fast-Moving (1-3 months)</h4>
-                    <div class="horizon-chips">
-                        {% for t in action_board.short_term %}
-                        <span class="horizon-chip shortterm" title="Velocity: {{ '%.0f'|format(t.velocity * 100) }}%">{{ t.term|title }}</span>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endif %}
             </div>
+            {% endif %}
+
+            <!-- Macro Trends -->
+            {% if action_board.macro_trends %}
+            <div class="horizon-section">
+                <h4>Macro Trends (6-12 months)</h4>
+                <div class="horizon-chips">
+                    {% for t in action_board.macro_trends %}
+                    <span class="horizon-chip macro" title="Score: {{ t.score }}">{{ t.term|title }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
         </section>
 
         <!-- Insights Cards -->
@@ -271,24 +237,25 @@
         {% endif %}
         {% endif %}
 
-        <!-- ========== SECTION 1: TREND FORECASTS ========== -->
+        <!-- ========== SECTION 1: TREND FORECASTS (4 Buckets) ========== -->
         <section id="forecasts" class="section">
             <div class="section-header">
                 <h2>Trend Forecasts</h2>
-                <p class="section-subtitle">Predicting what's next &mdash; lifecycle, velocity &amp; signals</p>
+                <p class="section-subtitle">4 clear buckets &mdash; Design Now, Watch, Evergreen, Phase Out</p>
             </div>
 
-            <!-- Lifecycle Pipeline -->
+            <!-- 4-Bucket Pipeline -->
+            {% if action_board and action_board.buckets %}
             <div class="lifecycle-pipeline">
-                <div class="pipeline-stage" data-stage="emerging">
+                <div class="pipeline-stage" data-stage="design_now">
                     <div class="stage-header">
                         <span class="stage-dot emerging"></span>
-                        <h3>Emerging</h3>
-                        <span class="stage-desc">Get in early</span>
+                        <h3>Design Now</h3>
+                        <span class="stage-desc">Act on these</span>
                     </div>
-                    <div class="stage-items" id="emerging-items">
-                        {% for f in forecasts if f.lifecycle == 'emerging' %}
-                        <div class="forecast-chip emerging" title="Score: {{ f.current_score }} → {{ f.predicted_score }} | Confidence: {{ f.confidence }}%">
+                    <div class="stage-items">
+                        {% for f in action_board.buckets.design_now[:10] %}
+                        <div class="forecast-chip emerging" title="Score: {{ f.current_score }} &rarr; {{ f.predicted_score }} | Confidence: {{ f.confidence }}%">
                             <span class="chip-term">{{ f.term|title }}</span>
                             <span class="chip-arrow">&#9650;</span>
                             <span class="chip-score">{{ f.predicted_score }}</span>
@@ -297,32 +264,15 @@
                     </div>
                 </div>
                 <div class="pipeline-arrow">&#10132;</div>
-                <div class="pipeline-stage" data-stage="rising">
-                    <div class="stage-header">
-                        <span class="stage-dot rising"></span>
-                        <h3>Rising</h3>
-                        <span class="stage-desc">Growing fast</span>
-                    </div>
-                    <div class="stage-items" id="rising-items">
-                        {% for f in forecasts if f.lifecycle == 'rising' %}
-                        <div class="forecast-chip rising" title="Score: {{ f.current_score }} → {{ f.predicted_score }} | Confidence: {{ f.confidence }}%">
-                            <span class="chip-term">{{ f.term|title }}</span>
-                            <span class="chip-arrow">&#9650;</span>
-                            <span class="chip-score">{{ f.predicted_score }}</span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-                <div class="pipeline-arrow">&#10132;</div>
-                <div class="pipeline-stage" data-stage="peak">
+                <div class="pipeline-stage" data-stage="watch">
                     <div class="stage-header">
                         <span class="stage-dot peak"></span>
-                        <h3>Peak</h3>
-                        <span class="stage-desc">Saturated</span>
+                        <h3>Watch</h3>
+                        <span class="stage-desc">Monitor these</span>
                     </div>
-                    <div class="stage-items" id="peak-items">
-                        {% for f in forecasts if f.lifecycle == 'peak' %}
-                        <div class="forecast-chip peak" title="Score: {{ f.current_score }} → {{ f.predicted_score }} | Confidence: {{ f.confidence }}%">
+                    <div class="stage-items">
+                        {% for f in action_board.buckets.watch[:10] %}
+                        <div class="forecast-chip peak" title="Score: {{ f.current_score }} &rarr; {{ f.predicted_score }} | Confidence: {{ f.confidence }}%">
                             <span class="chip-term">{{ f.term|title }}</span>
                             <span class="chip-arrow">&#9654;</span>
                             <span class="chip-score">{{ f.predicted_score }}</span>
@@ -331,15 +281,32 @@
                     </div>
                 </div>
                 <div class="pipeline-arrow">&#10132;</div>
-                <div class="pipeline-stage" data-stage="declining">
+                <div class="pipeline-stage" data-stage="evergreen">
+                    <div class="stage-header">
+                        <span class="stage-dot rising"></span>
+                        <h3>Evergreen</h3>
+                        <span class="stage-desc">Proven sellers</span>
+                    </div>
+                    <div class="stage-items">
+                        {% for f in action_board.buckets.evergreen[:10] %}
+                        <div class="forecast-chip rising" title="Score: {{ f.current_score }} | Confidence: {{ f.confidence }}%">
+                            <span class="chip-term">{{ f.term|title }}</span>
+                            <span class="chip-arrow">&#9679;</span>
+                            <span class="chip-score">{{ f.current_score }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="pipeline-arrow">&#10132;</div>
+                <div class="pipeline-stage" data-stage="phase_out">
                     <div class="stage-header">
                         <span class="stage-dot declining"></span>
-                        <h3>Declining</h3>
-                        <span class="stage-desc">Move on</span>
+                        <h3>Phase Out</h3>
+                        <span class="stage-desc">Sell through</span>
                     </div>
-                    <div class="stage-items" id="declining-items">
-                        {% for f in forecasts if f.lifecycle == 'declining' %}
-                        <div class="forecast-chip declining" title="Score: {{ f.current_score }} → {{ f.predicted_score }} | Confidence: {{ f.confidence }}%">
+                    <div class="stage-items">
+                        {% for f in action_board.buckets.phase_out[:10] %}
+                        <div class="forecast-chip declining" title="Score: {{ f.current_score }} &rarr; {{ f.predicted_score }} | Confidence: {{ f.confidence }}%">
                             <span class="chip-term">{{ f.term|title }}</span>
                             <span class="chip-arrow">&#9660;</span>
                             <span class="chip-score">{{ f.predicted_score }}</span>
@@ -348,13 +315,17 @@
                     </div>
                 </div>
             </div>
+            {% endif %}
 
-            <!-- Forecast Detail Cards -->
+            <!-- Forecast Detail Cards (top movers) -->
             <div class="forecast-cards">
                 {% for f in forecasts[:8] %}
+                {% set bucket = 'design_now' if f.lifecycle in ('emerging', 'rising') else ('phase_out' if f.lifecycle == 'declining' else ('evergreen' if f.lifecycle == 'peak' and f.current_score >= 30 else 'watch')) %}
                 <div class="forecast-card {{ f.lifecycle }}">
                     <div class="fc-top">
-                        <span class="fc-lifecycle {{ f.lifecycle }}">{{ f.lifecycle|title }}</span>
+                        <span class="fc-lifecycle {{ f.lifecycle }}">
+                            {% if bucket == 'design_now' %}Design Now{% elif bucket == 'evergreen' %}Evergreen{% elif bucket == 'phase_out' %}Phase Out{% else %}Watch{% endif %}
+                        </span>
                         <span class="fc-confidence conf-{{ 'high' if f.confidence >= 60 else ('mid' if f.confidence >= 35 else 'low') }}">
                             {% if f.confidence >= 60 %}&#9679;&#9679;&#9679;{% elif f.confidence >= 35 %}&#9679;&#9679;&#9675;{% else %}&#9679;&#9675;&#9675;{% endif %}
                             {{ f.confidence }}%

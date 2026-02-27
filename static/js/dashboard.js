@@ -149,15 +149,8 @@ function switchSegment(seg) {
 }
 
 /* ==========================================
-   ACTION BOARD ROLES
+   ACTION BOARD (unified - no role tabs needed)
    ========================================== */
-
-function switchRole(role) {
-    document.querySelectorAll('.action-tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.action-content').forEach(c => c.classList.remove('active'));
-    document.querySelector(`[data-role="${role}"]`)?.classList.add('active');
-    document.getElementById(`role-${role}`)?.classList.add('active');
-}
 
 /* ==========================================
    GALLERY FILTER
