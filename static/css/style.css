@@ -1747,6 +1747,97 @@ a.pt-pin-title:hover { color: var(--red); }
 }
 
 /* ==========================================
+   VISUAL TREND BOARD
+   ========================================== */
+
+.trend-board-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+.trend-board-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+.trend-board-header {
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid var(--border);
+}
+.trend-board-header h4 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 0.3rem;
+}
+.trend-board-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+.trend-board-score {
+    margin-left: auto;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--accent);
+}
+
+.trend-board-images {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    padding: 2px;
+}
+.trend-board-thumb {
+    position: relative;
+    aspect-ratio: 1;
+    overflow: hidden;
+    display: block;
+    background: rgba(42,46,63,0.3);
+}
+.trend-board-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.2s;
+}
+.trend-board-thumb:hover img {
+    transform: scale(1.05);
+}
+.thumb-price {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 0.1rem 0.3rem;
+    background: rgba(0,0,0,0.7);
+    color: var(--green);
+    border-radius: 3px;
+}
+.thumb-source {
+    position: absolute;
+    bottom: 4px;
+    left: 4px;
+    font-size: 0.55rem;
+    padding: 0.05rem 0.25rem;
+    background: rgba(0,0,0,0.6);
+    color: rgba(255,255,255,0.7);
+    border-radius: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.trend-board-empty {
+    padding: 1.5rem 1rem;
+    text-align: center;
+}
+.trend-board-empty p {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* ==========================================
    TREND DELTAS
    ========================================== */
 
@@ -2282,6 +2373,7 @@ a.pt-pin-title:hover { color: var(--red); }
     .margin-grid { grid-template-columns: 1fr; }
     .comp-brand-grid { grid-template-columns: 1fr; }
     .comp-strengths-grid { grid-template-columns: 1fr; }
+    .trend-board-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 1000px) {
     .charts-section, .charts-section.charts-4col { grid-template-columns: 1fr; }
@@ -2297,6 +2389,8 @@ a.pt-pin-title:hover { color: var(--red); }
 @media (max-width: 600px) {
     .forecast-cards { grid-template-columns: 1fr; }
     .briefs-grid { grid-template-columns: 1fr; }
+    .trend-board-grid { grid-template-columns: 1fr; }
+    .trend-board-images { grid-template-columns: repeat(2, 1fr); }
     header { padding: 1rem; }
     main { padding: 1rem; }
     .eu-tabs { gap: 0.25rem; }

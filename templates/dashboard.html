@@ -40,6 +40,7 @@
             <a href="#weekly" class="nav-link active" data-nav-channel="both" onclick="scrollToSection('weekly')">This Week</a>
             <a href="#pipeline" class="nav-link" data-nav-channel="both" onclick="scrollToSection('pipeline')">Design Pipeline</a>
             <a href="#signals" class="nav-link" data-nav-channel="both" onclick="scrollToSection('signals')">Market Signals</a>
+            <a href="#trendboard" class="nav-link" data-nav-channel="both" onclick="scrollToSection('trendboard')">Trend Board</a>
             <a href="#deltas" class="nav-link" data-nav-channel="both" onclick="scrollToSection('deltas')">Deltas</a>
             <a href="#crosschannel" class="nav-link" data-nav-channel="both" onclick="scrollToSection('crosschannel')">Cross-Channel</a>
             <a href="#etsy" class="nav-link" data-nav-channel="b2c" onclick="scrollToSection('etsy')">Etsy Intel</a>
@@ -228,6 +229,56 @@
             <div class="empty-state"><p>No market signal data yet. Click <strong>Refresh Data</strong> to start.</p></div>
             {% endif %}
         </section>
+
+        <!-- ========== SECTION 3A: VISUAL TREND BOARD ========== -->
+        {% set tb = action_board.trend_board if action_board and action_board.trend_board else {} %}
+        {% if tb.boards %}
+        <section id="trendboard" class="section" data-channel="both">
+            <div class="section-header">
+                <h2>Visual Trend Board</h2>
+                <p class="section-subtitle">
+                    What's trending in fabric &mdash; {{ tb.total_images }} images across {{ tb.terms_with_images }} trends
+                    {% if not scrape_status.last_result or not scrape_status.last_result.serpapi_configured %}
+                    <br><small style="color:var(--yellow)">Set SERPAPI_KEY for full visual trend data (10x more images)</small>
+                    {% endif %}
+                </p>
+            </div>
+
+            <div class="trend-board-grid">
+                {% for board in tb.boards %}
+                <div class="trend-board-card">
+                    <div class="trend-board-header">
+                        <h4>{{ board.term|title }}</h4>
+                        <div class="trend-board-meta">
+                            <span class="action-cat">{{ board.category|title }}</span>
+                            <span class="lifecycle-badge {{ board.lifecycle }}">{{ board.lifecycle|title }}</span>
+                            <span class="trend-board-score">{{ board.score }}</span>
+                        </div>
+                    </div>
+                    {% if board.images %}
+                    <div class="trend-board-images">
+                        {% for img in board.images %}
+                        <a href="{{ img.listing_url }}" target="_blank" rel="noopener"
+                           class="trend-board-thumb" title="{{ img.title }}">
+                            <img src="{{ img.url }}" alt="{{ img.title }}" loading="lazy"
+                                 onerror="this.parentElement.style.display='none'">
+                            {% if img.price %}
+                            <span class="thumb-price">${{ "%.0f"|format(img.price) }}</span>
+                            {% endif %}
+                            <span class="thumb-source">{{ img.source }}</span>
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="trend-board-empty">
+                        <p>No images yet &mdash; run <strong>Refresh Data</strong></p>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
 
         <!-- ========== SECTION 3B: TREND DELTAS (Week-over-Week) ========== -->
         {% set td = action_board.trend_deltas if action_board and action_board.trend_deltas else {} %}

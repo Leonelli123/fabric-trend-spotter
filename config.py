@@ -5,6 +5,10 @@ import os
 # Etsy API (fill in when your key is approved)
 ETSY_API_KEY = os.environ.get("ETSY_API_KEY", "")
 
+# SerpAPI (for high-volume Google Trends, Google Shopping, Google Images)
+# Sign up at serpapi.com — $50/mo gets 5000 searches
+SERPAPI_KEY = os.environ.get("SERPAPI_KEY", "")
+
 # Scraping settings
 REQUEST_DELAY = 2  # seconds between requests to be polite
 USER_AGENT = (

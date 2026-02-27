@@ -17,7 +17,11 @@ from scrapers import (
     scrape_pinterest, analyze_pinterest_data,
     fetch_trend_reports,
     scrape_eu_shops, scrape_competitors, get_eu_shop_summary,
+    fetch_serpapi_trends, fetch_serpapi_shopping,
+    fetch_serpapi_trend_images, fetch_serpapi_etsy,
+    get_serpapi_summary,
 )
+from database import save_trend_images
 from analysis import analyze_trends, analyze_european_trends, run_forecasts
 from database import save_listings
 from config import SEGMENTS, EUROPEAN_COUNTRIES, EUROPEAN_REGIONS
@@ -321,6 +325,65 @@ def api_status():
     return jsonify(scrape_status)
 
 
+def _collect_listing_images(listings):
+    """Extract images from scraped listings and save to trend_images table.
+
+    Groups listings by their tags and saves images for each detected trend term.
+    This builds the visual trend board from Etsy, Amazon, Spoonflower, etc.
+    """
+    from config import FABRIC_TYPES, PATTERN_TYPES, COLOR_TERMS, STYLE_TERMS
+
+    images = []
+    seen_urls = set()
+
+    # Category mapping for tag classification
+    color_set = {c.lower() for c in COLOR_TERMS}
+    pattern_set = {p.lower() for p in PATTERN_TYPES}
+    style_set = {s.lower() for s in STYLE_TERMS}
+
+    for listing in listings:
+        image_url = listing.get("image_url", "")
+        if not image_url or image_url in seen_urls:
+            continue
+        seen_urls.add(image_url)
+
+        tags = listing.get("tags", [])
+        if isinstance(tags, str):
+            import json as _json
+            try:
+                tags = _json.loads(tags)
+            except (ValueError, TypeError):
+                tags = []
+
+        title = listing.get("title", "")
+        source = listing.get("source", "")
+
+        for tag in tags[:5]:  # Limit to avoid too many entries per listing
+            tag_lower = tag.lower()
+            if tag_lower in color_set:
+                category = "color"
+            elif tag_lower in pattern_set:
+                category = "pattern"
+            elif tag_lower in style_set:
+                category = "style"
+            else:
+                category = "fabric_type"
+
+            images.append({
+                "term": tag_lower,
+                "category": category,
+                "image_url": image_url,
+                "source": source,
+                "listing_title": title[:200],
+                "listing_url": listing.get("url", ""),
+                "price": listing.get("price"),
+            })
+
+    if images:
+        save_trend_images(images)
+        logger.info("Collected %d trend images from %d listings", len(images), len(listings))
+
+
 def _run_scrape():
     """Run all scrapers and analyze the results.
 
@@ -385,11 +448,92 @@ def _run_scrape():
                 }
                 logger.warning("%s failed: %s", name, e)
 
-        # Step 3: Google Trends (works with backoff)
+        # Step 2b: SerpAPI high-volume data (if configured)
+        serpapi_summary = get_serpapi_summary()
+        if serpapi_summary.get("configured"):
+            logger.info("SerpAPI configured — using high-volume data collection")
+
+            # SerpAPI Shopping — 500+ product listings with images
+            try:
+                shopping_listings = fetch_serpapi_shopping()
+                if shopping_listings:
+                    all_listings.extend(shopping_listings)
+                    live_count += len(shopping_listings)
+                    source_status["SerpAPI Shopping"] = {
+                        "status": "ok",
+                        "count": len(shopping_listings),
+                        "note": f"{len(shopping_listings)} products with images",
+                    }
+                else:
+                    source_status["SerpAPI Shopping"] = {
+                        "status": "empty", "count": 0,
+                    }
+            except Exception as e:
+                source_status["SerpAPI Shopping"] = {
+                    "status": "error", "count": 0, "note": str(e)[:100],
+                }
+                logger.warning("SerpAPI Shopping failed: %s", e)
+
+            # SerpAPI Etsy — reliable Etsy data from cloud IPs
+            try:
+                etsy_serp = fetch_serpapi_etsy()
+                if etsy_serp:
+                    all_listings.extend(etsy_serp)
+                    live_count += len(etsy_serp)
+                    source_status["SerpAPI Etsy"] = {
+                        "status": "ok",
+                        "count": len(etsy_serp),
+                        "note": f"{len(etsy_serp)} Etsy listings via SERP",
+                    }
+                else:
+                    source_status["SerpAPI Etsy"] = {
+                        "status": "empty", "count": 0,
+                    }
+            except Exception as e:
+                source_status["SerpAPI Etsy"] = {
+                    "status": "error", "count": 0, "note": str(e)[:100],
+                }
+                logger.warning("SerpAPI Etsy failed: %s", e)
+
+            # SerpAPI Trend Images — visual trend board
+            try:
+                trend_images = fetch_serpapi_trend_images()
+                if trend_images:
+                    save_trend_images(trend_images)
+                    source_status["Trend Images"] = {
+                        "status": "ok",
+                        "count": len(trend_images),
+                        "note": f"{len(trend_images)} trend images collected",
+                    }
+                    logger.info("Saved %d trend images", len(trend_images))
+                else:
+                    source_status["Trend Images"] = {
+                        "status": "empty", "count": 0,
+                    }
+            except Exception as e:
+                source_status["Trend Images"] = {
+                    "status": "error", "count": 0, "note": str(e)[:100],
+                }
+                logger.warning("SerpAPI Images failed: %s", e)
+        else:
+            logger.info("SerpAPI not configured (set SERPAPI_KEY for 10x data volume)")
+
+        # Step 2c: Collect images from all listing sources
+        _collect_listing_images(all_listings)
+
+        # Step 3: Google Trends (works with backoff + curated fallback)
         google_data = {}
         try:
-            logger.info("Fetching Google Trends...")
-            google_data = fetch_google_trends()
+            # Use SerpAPI for Google Trends if available, otherwise pytrends
+            if serpapi_summary.get("configured"):
+                logger.info("Fetching Google Trends via SerpAPI...")
+                google_data = fetch_serpapi_trends()
+                if not google_data:
+                    logger.info("SerpAPI Trends empty, falling back to pytrends...")
+                    google_data = fetch_google_trends()
+            else:
+                logger.info("Fetching Google Trends via pytrends...")
+                google_data = fetch_google_trends()
             # Check if we got live data or fell back to curated
             has_history = any(
                 isinstance(v, dict) and "history" in v
@@ -593,6 +737,7 @@ def _run_scrape():
             "rising_count": len(rising),
             "segments_analyzed": len(result.get("segment_trends", {})),
             "pinterest_pins": pinterest_result.get("total_pins_analyzed", 0),
+            "serpapi_configured": serpapi_summary.get("configured", False),
             "source_status": source_status,
             "ok_sources": ok_sources,
             "failed_sources": failed_sources,
@@ -679,6 +824,7 @@ def _build_action_board(result, forecasts, google_data, eu_data=None):
     price_intel = _build_price_intel(result, forecasts, eu_data)
     competitor_watch = _build_competitor_watch(result, forecasts, eu_data)
     trend_deltas = _build_trend_deltas(result, forecasts)
+    trend_board = _build_trend_board(result, forecasts)
 
     # --- Weekly actions: concrete tasks citing specific data ---
     weekly_actions = _build_weekly_actions(
@@ -698,6 +844,7 @@ def _build_action_board(result, forecasts, google_data, eu_data=None):
         "price_intel": price_intel,
         "competitor_watch": competitor_watch,
         "trend_deltas": trend_deltas,
+        "trend_board": trend_board,
         "opportunity_gaps": opportunity_gaps,
         "seasonal_calendar": seasonal_calendar,
         "buckets": {
@@ -1818,6 +1965,75 @@ def _build_price_intel(result, forecasts, eu_data=None):
         "cross_market": cross_market,
         "margin_map": margin_map,
         "tiers": tiers,
+    }
+
+
+def _build_trend_board(result, forecasts):
+    """Build visual trend board data — images grouped by top trend terms.
+
+    Returns a dict with:
+      boards — list of {term, category, lifecycle, score, images: [...]}
+               each board has up to 6 images for that trend
+    """
+    fc_lookup = {f["term"].lower(): f for f in forecasts}
+
+    colors = result.get("colors", [])
+    patterns = result.get("patterns", [])
+    styles = result.get("styles", [])
+
+    # Top trends to show boards for
+    top_terms = []
+    for cat_list, cat_name in [(colors, "color"), (patterns, "pattern"), (styles, "style")]:
+        for t in cat_list[:5]:
+            fc = fc_lookup.get(t["term"].lower(), {})
+            top_terms.append({
+                "term": t["term"],
+                "category": cat_name,
+                "score": t.get("score", 0),
+                "lifecycle": fc.get("lifecycle", "unknown"),
+            })
+
+    top_terms.sort(key=lambda x: x["score"], reverse=True)
+    top_terms = top_terms[:12]
+
+    boards = []
+    for t in top_terms:
+        images = get_trend_images(term=t["term"].lower(), limit=6)
+        if not images:
+            # Try partial match — search term might be in the image term
+            all_images = get_trend_images(category=t["category"], limit=50)
+            images = [
+                img for img in all_images
+                if t["term"].lower() in img.get("term", "").lower()
+                   or img.get("term", "").lower() in t["term"].lower()
+            ][:6]
+
+        boards.append({
+            "term": t["term"],
+            "category": t["category"],
+            "score": t["score"],
+            "lifecycle": t["lifecycle"],
+            "images": [
+                {
+                    "url": img.get("image_url", ""),
+                    "title": img.get("listing_title", "")[:60],
+                    "listing_url": img.get("listing_url", ""),
+                    "source": img.get("source", ""),
+                    "price": img.get("price"),
+                }
+                for img in images
+            ],
+            "image_count": len(images),
+        })
+
+    # Only return boards that have images
+    boards_with_images = [b for b in boards if b["images"]]
+    boards_empty = [b for b in boards if not b["images"]]
+
+    return {
+        "boards": boards_with_images + boards_empty[:4],  # Show empty ones too for context
+        "total_images": sum(b["image_count"] for b in boards),
+        "terms_with_images": len(boards_with_images),
     }
 
 
