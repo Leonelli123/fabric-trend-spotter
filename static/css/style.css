@@ -1572,6 +1572,237 @@ a.pt-pin-title:hover { color: var(--red); }
 .site-footer a:hover { color: var(--accent); }
 .footer-sep { margin: 0 0.5rem; }
 
+/* ==========================================
+   REPORT EXPORT BAR
+   ========================================== */
+
+.report-export-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.8rem 1.2rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+.report-export-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text);
+}
+.report-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.4rem 1rem;
+    border-radius: 6px;
+    background: var(--accent);
+    color: #fff;
+    text-decoration: none;
+    font-size: 0.8rem;
+    font-weight: 600;
+    transition: opacity 0.2s;
+}
+.report-btn:hover { opacity: 0.85; }
+
+/* ==========================================
+   ETSY INTELLIGENCE — SEO TAGS
+   ========================================== */
+
+.intel-seo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 0.8rem;
+}
+.seo-tag-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.8rem 1rem;
+}
+.seo-tag-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.4rem;
+}
+.seo-term { font-weight: 700; font-size: 0.95rem; }
+.seo-tag-meta {
+    display: flex;
+    gap: 0.6rem;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+}
+.seo-cat { text-transform: capitalize; }
+.seo-score { font-weight: 600; color: var(--accent); }
+.seo-google { color: var(--text-muted); }
+.seo-google.trending { color: var(--green); font-weight: 600; }
+.seo-tag-list { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.seo-chip {
+    font-size: 0.72rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    background: rgba(108, 99, 255, 0.1);
+    color: var(--accent);
+    font-weight: 500;
+}
+
+/* ==========================================
+   ETSY INTELLIGENCE — LISTING TIMING
+   ========================================== */
+
+.intel-timing-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.8rem;
+}
+.timing-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+}
+.timing-card.timing-current {
+    border-color: var(--accent);
+    box-shadow: 0 0 12px var(--accent-glow);
+}
+.timing-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.4rem;
+}
+.timing-month {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text);
+}
+.timing-now {
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    background: var(--accent);
+    color: #fff;
+}
+.timing-theme {
+    font-size: 0.9rem;
+    margin-bottom: 0.3rem;
+}
+.timing-deadline {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+}
+.timing-terms { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.timing-term {
+    font-size: 0.72rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    background: rgba(236,72,153,0.1);
+    color: var(--pink);
+}
+
+/* ==========================================
+   ETSY INTELLIGENCE — PRICING
+   ========================================== */
+
+.intel-pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.8rem;
+}
+.pricing-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.2rem;
+    text-align: center;
+}
+.pricing-category {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.5rem;
+}
+.pricing-main {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 0.2rem;
+}
+.pricing-range {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 0.6rem;
+}
+.pricing-meta {
+    display: flex;
+    justify-content: center;
+    gap: 0.8rem;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+/* ==========================================
+   ETSY INTELLIGENCE — ENTRY SIGNALS
+   ========================================== */
+
+.intel-entry-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+.entry-signal-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.8rem 1rem;
+}
+.entry-flag {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--accent);
+    min-width: 2rem;
+    text-align: center;
+}
+.entry-body { flex: 1; }
+.entry-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.2rem;
+}
+.entry-term { font-weight: 700; font-size: 0.95rem; }
+.entry-reason {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+.entry-stats {
+    text-align: right;
+    min-width: 80px;
+}
+.entry-score {
+    display: block;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--accent);
+}
+.entry-sellers {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
 /* Responsive */
 @media (max-width: 1200px) {
     .charts-section.charts-4col { grid-template-columns: repeat(2, 1fr); }
@@ -1585,6 +1816,8 @@ a.pt-pin-title:hover { color: var(--red); }
     .eu-trends-grid { grid-template-columns: 1fr; }
     .signals-grid { grid-template-columns: 1fr; }
     .calendar-grid { grid-template-columns: 1fr; }
+    .intel-timing-grid { grid-template-columns: repeat(2, 1fr); }
+    .intel-seo-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 600px) {
@@ -1600,4 +1833,6 @@ a.pt-pin-title:hover { color: var(--red); }
     .summary-top { width: 100%; }
     .main-nav { gap: 0; }
     .nav-link { font-size: 0.7rem; padding: 0.6rem 0.5rem; }
+    .intel-timing-grid { grid-template-columns: 1fr; }
+    .report-export-bar { flex-direction: column; align-items: flex-start; }
 }

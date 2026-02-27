@@ -198,6 +198,148 @@ def api_pinterest_trends():
     return jsonify(pinterest_data)
 
 
+@app.route("/report/<country_code>")
+def trend_report(country_code):
+    """Generate a print-friendly B2B trend report for a wholesale market."""
+    country_code = country_code.upper()
+    eu_data = scrape_status.get("eu_result", {})
+    countries = eu_data.get("countries", {})
+
+    if country_code not in countries:
+        return f"No data for {country_code}. Run a data refresh first.", 404
+
+    ci = countries[country_code]
+    action_board = scrape_status.get("action_board", {})
+    forecasts = get_forecasts(limit=50)
+    fc_lookup = {f["term"].lower(): f for f in forecasts}
+
+    # Build top 5 color × pattern combos for this market
+    combos = []
+    for color in ci.get("colors", [])[:5]:
+        for pattern in ci.get("patterns", [])[:5]:
+            c_fc = fc_lookup.get(color["term"].lower(), {})
+            p_fc = fc_lookup.get(pattern["term"].lower(), {})
+            c_lc = c_fc.get("lifecycle", "unknown")
+            p_lc = p_fc.get("lifecycle", "unknown")
+            # Skip if either is declining
+            if c_lc == "declining" or p_lc == "declining":
+                continue
+            score = color.get("score", 0) + pattern.get("score", 0)
+            for lc in [c_lc, p_lc]:
+                if lc == "emerging":
+                    score += 10
+                elif lc == "rising":
+                    score += 7
+            combos.append({
+                "color": color["term"],
+                "pattern": pattern["term"],
+                "color_score": color.get("score", 0),
+                "pattern_score": pattern.get("score", 0),
+                "combined_score": score,
+                "color_lifecycle": c_lc,
+                "pattern_lifecycle": p_lc,
+            })
+    combos.sort(key=lambda c: c["combined_score"], reverse=True)
+    top_combos = combos[:5]
+
+    # Seasonal data
+    calendar = action_board.get("seasonal_calendar", [])
+    current_season = calendar[0] if calendar else None
+    next_season = calendar[1] if len(calendar) > 1 else None
+
+    return render_template(
+        "report.html",
+        country_code=country_code,
+        country=ci,
+        top_combos=top_combos,
+        current_season=current_season,
+        next_season=next_season,
+        generated_at=datetime.now().strftime("%B %d, %Y"),
+        buckets=action_board.get("buckets", {}),
+    )
+
+
+@app.route("/api/trend-report")
+@app.route("/api/trend-report/<country_code>")
+def api_trend_report(country_code=None):
+    """API endpoint returning B2B trend report data as JSON.
+
+    Usage:
+      GET /api/trend-report          — list available markets
+      GET /api/trend-report/DK       — full trend report for Denmark
+    """
+    eu_data = scrape_status.get("eu_result", {})
+    countries = eu_data.get("countries", {})
+
+    if not country_code:
+        available = []
+        for cc, ci in countries.items():
+            available.append({
+                "code": cc,
+                "name": ci.get("name", cc),
+                "flag": ci.get("flag", ""),
+                "listing_count": ci.get("listing_count", 0),
+                "report_url": f"/report/{cc}",
+                "api_url": f"/api/trend-report/{cc}",
+            })
+        return jsonify({"available_markets": available})
+
+    country_code = country_code.upper()
+    if country_code not in countries:
+        return jsonify({"error": f"No data for {country_code}"}), 404
+
+    ci = countries[country_code]
+    action_board = scrape_status.get("action_board", {})
+    forecasts = get_forecasts(limit=50)
+    fc_lookup = {f["term"].lower(): f for f in forecasts}
+
+    # Build top 5 color × pattern combos
+    combos = []
+    for color in ci.get("colors", [])[:5]:
+        for pattern in ci.get("patterns", [])[:5]:
+            c_fc = fc_lookup.get(color["term"].lower(), {})
+            p_fc = fc_lookup.get(pattern["term"].lower(), {})
+            c_lc = c_fc.get("lifecycle", "unknown")
+            p_lc = p_fc.get("lifecycle", "unknown")
+            if c_lc == "declining" or p_lc == "declining":
+                continue
+            score = color.get("score", 0) + pattern.get("score", 0)
+            for lc in [c_lc, p_lc]:
+                if lc == "emerging":
+                    score += 10
+                elif lc == "rising":
+                    score += 7
+            combos.append({
+                "color": color["term"],
+                "pattern": pattern["term"],
+                "combined_score": score,
+                "color_lifecycle": c_lc,
+                "pattern_lifecycle": p_lc,
+            })
+    combos.sort(key=lambda c: c["combined_score"], reverse=True)
+
+    calendar = action_board.get("seasonal_calendar", [])
+
+    return jsonify({
+        "country_code": country_code,
+        "country_name": ci.get("name", country_code),
+        "generated_at": datetime.now().isoformat(),
+        "listing_count": ci.get("listing_count", 0),
+        "top_combos": combos[:5],
+        "top_colors": ci.get("colors", [])[:8],
+        "top_patterns": ci.get("patterns", [])[:8],
+        "top_fabric_types": ci.get("fabric_types", [])[:8],
+        "local_marketplaces": ci.get("local_marketplaces", []),
+        "seasonal_preview": calendar[:2] if calendar else [],
+        "forecast_buckets": {
+            k: [{"term": f["term"], "score": f.get("predicted_score", f.get("current_score", 0)),
+                 "lifecycle": f.get("lifecycle", "unknown")} for f in v[:6]]
+            for k, v in action_board.get("buckets", {}).items()
+        },
+        "report_html_url": f"/report/{country_code}",
+    })
+
+
 @app.route("/api/status")
 def api_status():
     """API endpoint for scrape status."""
@@ -491,13 +633,14 @@ def _build_action_board(result, forecasts, google_data, eu_data=None):
         "top_style": styles[0]["term"] if styles else "N/A",
     }
 
-    # --- Compute briefs and gaps first (weekly actions depends on them) ---
+    # --- Compute briefs, gaps, and intel first (weekly actions depends on them) ---
     design_briefs = _generate_design_briefs(
         colors, patterns, styles, fabrics, forecasts, google_data
     )
     market_signals = _build_market_signals(colors, patterns, styles, forecasts)
     opportunity_gaps = _build_opportunity_gaps(all_trends, forecasts, google_data)
     seasonal_calendar = _build_seasonal_calendar()
+    etsy_intel = _build_etsy_intel(result, forecasts, google_data, eu_data)
 
     # --- Weekly actions: concrete tasks citing specific data ---
     weekly_actions = _build_weekly_actions(
@@ -512,6 +655,7 @@ def _build_action_board(result, forecasts, google_data, eu_data=None):
         "weekly_actions": weekly_actions,
         "design_briefs": design_briefs,
         "market_signals": market_signals,
+        "etsy_intel": etsy_intel,
         "opportunity_gaps": opportunity_gaps,
         "seasonal_calendar": seasonal_calendar,
         "buckets": {
@@ -924,6 +1068,150 @@ def _build_seasonal_calendar():
         calendar_items.append(item)
 
     return calendar_items
+
+
+def _build_etsy_intel(result, forecasts, google_data, eu_data=None):
+    """Build Etsy listing intelligence: SEO tags, timing, pricing, entry signals.
+
+    Returns a dict with four sections:
+      seo_tags     — best-performing tags per category for cotton jersey prints
+      timing       — when to list specific themes (month-by-month)
+      pricing      — avg prices by category with market comparison
+      entry_signals— high-demand, low-seller markets to enter
+    """
+    fc_lookup = {f["term"].lower(): f for f in forecasts}
+    eu_countries = eu_data.get("countries", {}) if eu_data else {}
+
+    colors = result.get("colors", [])
+    patterns = result.get("patterns", [])
+    styles = result.get("styles", [])
+    fabrics = result.get("fabric_types", [])
+
+    # --- SEO TAGS: best tags from trending data ---
+    seo_tags = []
+    all_trends = colors + patterns + styles
+    all_trends.sort(key=lambda t: t.get("score", 0), reverse=True)
+    for t in all_trends[:12]:
+        fc = fc_lookup.get(t["term"].lower(), {})
+        lc = fc.get("lifecycle", "unknown")
+        # Build tag suggestions from the trend term
+        term = t["term"]
+        category = t.get("category", "")
+        base_tags = [term, f"{term} fabric", f"{term} cotton jersey"]
+        if category == "color":
+            base_tags.append(f"{term} print")
+        elif category == "pattern":
+            base_tags.extend([f"{term} design", f"{term} textile"])
+        elif category == "style":
+            base_tags.extend([f"{term} aesthetic", f"{term} style fabric"])
+
+        gi, trending = 0, False
+        for key, val in google_data.items():
+            if key.startswith("_"):
+                continue
+            if isinstance(val, dict) and term.lower().split()[0] in key.lower():
+                gi = val.get("interest", 0)
+                trending = val.get("trending_up", False)
+                break
+
+        seo_tags.append({
+            "term": term,
+            "category": category,
+            "score": t.get("score", 0),
+            "lifecycle": lc,
+            "tags": base_tags[:4],
+            "google_interest": gi,
+            "google_trending": trending,
+        })
+
+    # --- LISTING TIMING: when to list specific themes ---
+    from datetime import datetime
+    month = datetime.now().month
+    timing_map = {
+        1: {"theme": "Valentine's Day", "list_by": "Jan 15", "terms": ["blush pink", "floral", "romantic"]},
+        2: {"theme": "Spring Preview", "list_by": "Feb 15", "terms": ["sage green", "botanical", "pastel"]},
+        3: {"theme": "Easter / Spring", "list_by": "Mar 1", "terms": ["lavender", "ditsy", "gingham"]},
+        4: {"theme": "Summer Brights", "list_by": "Apr 1", "terms": ["coral", "tropical", "stripe"]},
+        5: {"theme": "Outdoor / Beach", "list_by": "May 1", "terms": ["teal", "nautical", "tie dye"]},
+        6: {"theme": "Back-to-School Prep", "list_by": "Jun 15", "terms": ["geometric", "plaid", "retro"]},
+        7: {"theme": "Fall Preview", "list_by": "Jul 15", "terms": ["terracotta", "rust", "botanical"]},
+        8: {"theme": "Halloween", "list_by": "Aug 15", "terms": ["celestial", "folk art", "vintage"]},
+        9: {"theme": "Autumn / Harvest", "list_by": "Sep 1", "terms": ["burgundy", "plaid", "cottagecore"]},
+        10: {"theme": "Holiday Gifting", "list_by": "Oct 1", "terms": ["forest green", "damask", "gold"]},
+        11: {"theme": "Christmas Rush", "list_by": "Nov 1", "terms": ["navy", "ivory", "minimalist"]},
+        12: {"theme": "New Year / Winter", "list_by": "Dec 1", "terms": ["charcoal", "geometric", "japandi"]},
+    }
+    timing = []
+    for offset in range(4):
+        m = ((month - 1 + offset) % 12) + 1
+        entry = timing_map.get(m, {})
+        timing.append({
+            "month_num": m,
+            "month_name": datetime(2024, m, 1).strftime("%B"),
+            "is_current": offset == 0,
+            "theme": entry.get("theme", ""),
+            "list_by": entry.get("list_by", ""),
+            "terms": entry.get("terms", []),
+        })
+
+    # --- PRICING: market averages by category ---
+    pricing = []
+    for cat_name, cat_data in [
+        ("Colors", colors), ("Patterns", patterns), ("Styles", styles),
+    ]:
+        priced = [t for t in cat_data if t.get("avg_price") and t["avg_price"] > 0]
+        if priced:
+            prices = [t["avg_price"] for t in priced]
+            avg = sum(prices) / len(prices)
+            low = min(prices)
+            high = max(prices)
+            pricing.append({
+                "category": cat_name,
+                "avg_price": round(avg, 2),
+                "low": round(low, 2),
+                "high": round(high, 2),
+                "sample_count": len(priced),
+                "top_priced": sorted(priced, key=lambda t: t["avg_price"], reverse=True)[0]["term"],
+            })
+
+    # --- ENTRY SIGNALS: high demand + low sellers per EU market ---
+    entry_signals = []
+    etsy_markets = ["NL", "DE"]  # markets where Etsy is big
+    for cc in etsy_markets:
+        ci = eu_countries.get(cc)
+        if not ci:
+            continue
+        listing_count = ci.get("listing_count", 0)
+        for t in ci.get("top_trends", [])[:5]:
+            term = t["term"]
+            score = t.get("score", 0)
+            fc = fc_lookup.get(term.lower(), {})
+            lc = fc.get("lifecycle", "unknown")
+            if lc == "declining":
+                continue
+            # Low seller count relative to demand = entry opportunity
+            mention = t.get("mention_count", 0)
+            if score > 20 and mention < 15:
+                entry_signals.append({
+                    "term": term,
+                    "market": cc,
+                    "market_name": ci.get("name", cc),
+                    "score": score,
+                    "sellers": mention,
+                    "lifecycle": lc,
+                    "reason": (
+                        f"{term.title()} scores {score} in {ci.get('name', cc)} "
+                        f"with only ~{mention} sellers"
+                    ),
+                })
+    entry_signals.sort(key=lambda s: s["score"], reverse=True)
+
+    return {
+        "seo_tags": seo_tags,
+        "timing": timing,
+        "pricing": pricing,
+        "entry_signals": entry_signals[:6],
+    }
 
 
 def _generate_design_briefs(colors, patterns, styles, fabrics, forecasts, google_data):

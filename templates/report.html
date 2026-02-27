@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trend Report — {{ country.name }} | Jydsk Stoflager</title>
+    <style>
+        :root {
+            --bg: #ffffff;
+            --text: #1a1d27;
+            --muted: #6b7280;
+            --accent: #6c63ff;
+            --border: #e5e7eb;
+            --emerging: #22c55e;
+            --rising: #3b82f6;
+            --peak: #eab308;
+            --declining: #ef4444;
+        }
+        @media print {
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .no-print { display: none !important; }
+            .page-break { page-break-before: always; }
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 2rem; }
+
+        /* Header */
+        .report-header { border-bottom: 3px solid var(--accent); padding-bottom: 1.5rem; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: flex-start; }
+        .report-brand h1 { font-size: 1.6rem; color: var(--accent); }
+        .report-brand p { color: var(--muted); font-size: 0.85rem; }
+        .report-meta { text-align: right; }
+        .report-meta .country-flag { font-size: 2.5rem; }
+        .report-meta .country-name { font-size: 1.1rem; font-weight: 700; }
+        .report-meta .report-date { color: var(--muted); font-size: 0.8rem; }
+
+        /* Print button */
+        .print-bar { position: sticky; top: 0; background: var(--bg); padding: 0.5rem 0; margin-bottom: 1rem; display: flex; gap: 0.75rem; z-index: 10; }
+        .print-bar button { padding: 0.5rem 1.2rem; border-radius: 6px; border: 1px solid var(--border); background: var(--accent); color: #fff; cursor: pointer; font-size: 0.85rem; font-weight: 600; }
+        .print-bar button.secondary { background: #fff; color: var(--text); }
+        .print-bar button:hover { opacity: 0.9; }
+
+        /* Sections */
+        .report-section { margin-bottom: 2rem; }
+        .report-section h2 { font-size: 1.15rem; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; margin-bottom: 1rem; }
+        .report-section h3 { font-size: 0.95rem; color: var(--muted); margin-bottom: 0.5rem; }
+
+        /* Market summary */
+        .market-stats { display: flex; gap: 1.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        .market-stat { text-align: center; }
+        .market-stat .stat-num { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
+        .market-stat .stat-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* Combo table */
+        .combo-table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
+        .combo-table th { text-align: left; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); padding: 0.5rem; border-bottom: 2px solid var(--border); }
+        .combo-table td { padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+        .combo-table tr:last-child td { border-bottom: none; }
+        .combo-rank { font-weight: 700; color: var(--accent); width: 2rem; }
+
+        /* Lifecycle badges */
+        .lc-badge { display: inline-block; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; padding: 0.15rem 0.5rem; border-radius: 3px; letter-spacing: 0.3px; }
+        .lc-emerging { background: #dcfce7; color: #166534; }
+        .lc-rising { background: #dbeafe; color: #1e40af; }
+        .lc-peak { background: #fef9c3; color: #854d0e; }
+        .lc-stable { background: #f3f4f6; color: #374151; }
+        .lc-declining { background: #fee2e2; color: #991b1b; }
+        .lc-unknown { background: #f3f4f6; color: #6b7280; }
+
+        /* Trend chips */
+        .trend-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.3rem; }
+        .trend-chip { font-size: 0.78rem; padding: 0.2rem 0.6rem; border-radius: 4px; background: #f3f4f6; color: var(--text); }
+        .trend-chip.color-chip { background: #ede9fe; color: #5b21b6; }
+        .trend-chip.pattern-chip { background: #fce7f3; color: #9d174d; }
+
+        /* Season cards */
+        .season-cards { display: flex; gap: 1rem; }
+        .season-card { flex: 1; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+        .season-card.current { border-color: var(--accent); border-width: 2px; }
+        .season-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent); font-weight: 700; }
+
+        /* Top trends lists */
+        .trend-cols { display: flex; gap: 1.5rem; }
+        .trend-col { flex: 1; }
+        .trend-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0; font-size: 0.85rem; }
+        .trend-rank { color: var(--muted); font-size: 0.75rem; width: 1.5rem; }
+        .trend-score { margin-left: auto; font-weight: 600; color: var(--accent); font-size: 0.8rem; }
+
+        /* Footer */
+        .report-footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.75rem; text-align: center; }
+    </style>
+</head>
+<body>
+    <!-- Print bar -->
+    <div class="print-bar no-print">
+        <button onclick="window.print()">&#128424; Print / Save as PDF</button>
+        <button class="secondary" onclick="window.history.back()">&#8592; Back to Dashboard</button>
+    </div>
+
+    <!-- Report Header -->
+    <div class="report-header">
+        <div class="report-brand">
+            <h1>Jydsk Stoflager</h1>
+            <p>Cotton Jersey Trend Report</p>
+        </div>
+        <div class="report-meta">
+            <div class="country-flag">{{ country.flag }}</div>
+            <div class="country-name">{{ country.name }}</div>
+            <div class="report-date">{{ generated_at }}</div>
+        </div>
+    </div>
+
+    <!-- Market Overview -->
+    <div class="report-section">
+        <h2>Market Overview</h2>
+        <div class="market-stats">
+            <div class="market-stat">
+                <div class="stat-num">{{ country.listing_count }}</div>
+                <div class="stat-label">Listings Analyzed</div>
+            </div>
+            <div class="market-stat">
+                <div class="stat-num">{{ country.colors|length }}</div>
+                <div class="stat-label">Colors Tracked</div>
+            </div>
+            <div class="market-stat">
+                <div class="stat-num">{{ country.patterns|length }}</div>
+                <div class="stat-label">Patterns Tracked</div>
+            </div>
+            <div class="market-stat">
+                <div class="stat-num">{{ top_combos|length }}</div>
+                <div class="stat-label">Top Combos</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top 5 Trending Combos -->
+    <div class="report-section">
+        <h2>Top 5 Trending Color &times; Pattern Combos</h2>
+        <p style="color: var(--muted); font-size: 0.85rem; margin-bottom: 0.8rem;">
+            Best-scoring combinations for {{ country.name }} — ranked by combined trend score with lifecycle bonus.
+        </p>
+        {% if top_combos %}
+        <table class="combo-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Color</th>
+                    <th>Pattern</th>
+                    <th>Score</th>
+                    <th>Color Phase</th>
+                    <th>Pattern Phase</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for combo in top_combos %}
+                <tr>
+                    <td class="combo-rank">{{ loop.index }}</td>
+                    <td>{{ combo.color|title }}</td>
+                    <td>{{ combo.pattern|title }}</td>
+                    <td><strong>{{ combo.combined_score }}</strong></td>
+                    <td><span class="lc-badge lc-{{ combo.color_lifecycle }}">{{ combo.color_lifecycle|title }}</span></td>
+                    <td><span class="lc-badge lc-{{ combo.pattern_lifecycle }}">{{ combo.pattern_lifecycle|title }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="color: var(--muted);">Not enough data to generate combos yet.</p>
+        {% endif %}
+    </div>
+
+    <!-- Top Trends by Category -->
+    <div class="report-section">
+        <h2>Top Trends by Category</h2>
+        <div class="trend-cols">
+            <div class="trend-col">
+                <h3>Colors</h3>
+                {% for t in country.colors[:8] %}
+                <div class="trend-item">
+                    <span class="trend-rank">{{ loop.index }}.</span>
+                    <span>{{ t.term|title }}</span>
+                    <span class="trend-score">{{ t.score }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="trend-col">
+                <h3>Patterns</h3>
+                {% for t in country.patterns[:8] %}
+                <div class="trend-item">
+                    <span class="trend-rank">{{ loop.index }}.</span>
+                    <span>{{ t.term|title }}</span>
+                    <span class="trend-score">{{ t.score }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="trend-col">
+                <h3>Fabric Types</h3>
+                {% for t in country.fabric_types[:8] %}
+                <div class="trend-item">
+                    <span class="trend-rank">{{ loop.index }}.</span>
+                    <span>{{ t.term|title }}</span>
+                    <span class="trend-score">{{ t.score }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Seasonal Preview -->
+    {% if current_season or next_season %}
+    <div class="report-section page-break">
+        <h2>Seasonal Preview</h2>
+        <div class="season-cards">
+            {% if current_season %}
+            <div class="season-card current">
+                <div class="season-label">Now: {{ current_season.quarter }}</div>
+                <h3>{{ current_season.label }}</h3>
+                <p style="font-size:0.85rem; color:var(--muted); margin:0.3rem 0;">{{ current_season.design_focus }}</p>
+                <div class="trend-chips">
+                    {% for c in current_season.colors %}
+                    <span class="trend-chip color-chip">{{ c|title }}</span>
+                    {% endfor %}
+                    {% for p in current_season.patterns %}
+                    <span class="trend-chip pattern-chip">{{ p|title }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            {% if next_season %}
+            <div class="season-card">
+                <div class="season-label">Next: {{ next_season.quarter }}</div>
+                <h3>{{ next_season.label }}</h3>
+                <p style="font-size:0.85rem; color:var(--muted); margin:0.3rem 0;">{{ next_season.design_focus }}</p>
+                <div class="trend-chips">
+                    {% for c in next_season.colors %}
+                    <span class="trend-chip color-chip">{{ c|title }}</span>
+                    {% endfor %}
+                    {% for p in next_season.patterns %}
+                    <span class="trend-chip pattern-chip">{{ p|title }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Forecast Buckets -->
+    {% if buckets %}
+    <div class="report-section">
+        <h2>Forecast Summary</h2>
+        <div class="trend-cols">
+            {% if buckets.design_now %}
+            <div class="trend-col">
+                <h3 style="color: var(--emerging);">Design Now ({{ buckets.design_now|length }})</h3>
+                {% for f in buckets.design_now[:6] %}
+                <div class="trend-item">
+                    <span>{{ f.term|title }}</span>
+                    <span class="trend-score">{{ f.predicted_score }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% if buckets.evergreen %}
+            <div class="trend-col">
+                <h3 style="color: var(--rising);">Evergreen ({{ buckets.evergreen|length }})</h3>
+                {% for f in buckets.evergreen[:6] %}
+                <div class="trend-item">
+                    <span>{{ f.term|title }}</span>
+                    <span class="trend-score">{{ f.current_score }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% if buckets.phase_out %}
+            <div class="trend-col">
+                <h3 style="color: var(--declining);">Phase Out ({{ buckets.phase_out|length }})</h3>
+                {% for f in buckets.phase_out[:6] %}
+                <div class="trend-item">
+                    <span>{{ f.term|title }}</span>
+                    <span class="trend-score">{{ f.predicted_score }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Local Marketplaces -->
+    {% if country.local_marketplaces %}
+    <div class="report-section">
+        <h2>Key Wholesale Contacts &amp; Marketplaces</h2>
+        <div class="trend-chips">
+            {% for mp in country.local_marketplaces %}
+            <span class="trend-chip">{{ mp }}</span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Footer -->
+    <div class="report-footer">
+        <p>Generated by Fabric Trend Spotter for <strong>Jydsk Stoflager</strong> &mdash; {{ generated_at }}</p>
+        <p>Data sources: Etsy, Amazon, Spoonflower, Google Trends, EU Market Analysis</p>
+    </div>
+</body>
+</html>

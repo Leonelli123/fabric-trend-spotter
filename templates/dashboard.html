@@ -219,30 +219,146 @@
         <section id="etsy" class="section">
             <div class="section-header">
                 <h2>Etsy Intelligence</h2>
-                <p class="section-subtitle">B2C market opportunities &mdash; what to list on Etsy in US, UK, DE &amp; NL</p>
+                <p class="section-subtitle">B2C market opportunities &mdash; SEO tags, timing, pricing &amp; entry signals</p>
             </div>
 
-            {% if eu_data and eu_data.countries %}
+            {% set intel = action_board.etsy_intel if action_board and action_board.etsy_intel else {} %}
+
+            {% if eu_data and eu_data.countries or intel %}
             <div class="eu-tabs">
-                <button class="eu-tab active" data-eu="etsy-us" onclick="switchEU('etsy-us')">US / Global Etsy</button>
-                {% for cc in ['DE', 'NL'] %}
-                {% if cc in eu_data.countries %}
-                <button class="eu-tab" data-eu="etsy-{{ cc }}" onclick="switchEU('etsy-{{ cc }}')">
-                    {{ eu_data.countries[cc].flag }} {{ eu_data.countries[cc].name }}
-                </button>
-                {% endif %}
-                {% endfor %}
+                <button class="eu-tab active" data-eu="etsy-seo" onclick="switchEU('etsy-seo')">SEO Tags</button>
+                <button class="eu-tab" data-eu="etsy-timing" onclick="switchEU('etsy-timing')">Listing Timing</button>
+                <button class="eu-tab" data-eu="etsy-pricing" onclick="switchEU('etsy-pricing')">Price Positioning</button>
+                <button class="eu-tab" data-eu="etsy-entry" onclick="switchEU('etsy-entry')">Market Entry</button>
+                <button class="eu-tab" data-eu="etsy-markets" onclick="switchEU('etsy-markets')">Market Trends</button>
             </div>
 
-            <!-- US / Global view uses main trend data -->
-            <div class="eu-content active" id="eu-etsy-us">
+            <!-- SEO Tags Tab -->
+            <div class="eu-content active" id="eu-etsy-seo">
                 <div class="eu-summary-bar">
-                    <span class="eu-stat">Global Etsy / US market</span>
-                    <span class="eu-stat">Based on {{ trends.patterns|length + trends.colors|length }} trend signals</span>
+                    <span class="eu-stat">Best Etsy tags from trending data &mdash; use in titles &amp; tags</span>
+                </div>
+                {% if intel.seo_tags %}
+                <div class="intel-seo-grid">
+                    {% for tag in intel.seo_tags %}
+                    <div class="seo-tag-card">
+                        <div class="seo-tag-header">
+                            <span class="seo-term">{{ tag.term|title }}</span>
+                            <span class="lifecycle-badge {{ tag.lifecycle }}">{{ tag.lifecycle|title }}</span>
+                        </div>
+                        <div class="seo-tag-meta">
+                            <span class="seo-cat">{{ tag.category|replace('_', ' ')|title }}</span>
+                            <span class="seo-score">Score: {{ tag.score }}</span>
+                            {% if tag.google_interest > 0 %}
+                            <span class="seo-google {% if tag.google_trending %}trending{% endif %}">
+                                Google: {{ tag.google_interest }}{% if tag.google_trending %} &#9650;{% endif %}
+                            </span>
+                            {% endif %}
+                        </div>
+                        <div class="seo-tag-list">
+                            {% for t in tag.tags %}
+                            <span class="seo-chip">{{ t }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state"><p>No SEO data yet. Run <strong>Refresh Data</strong>.</p></div>
+                {% endif %}
+            </div>
+
+            <!-- Listing Timing Tab -->
+            <div class="eu-content" id="eu-etsy-timing">
+                <div class="eu-summary-bar">
+                    <span class="eu-stat">When to list specific themes for maximum visibility</span>
+                </div>
+                {% if intel.timing %}
+                <div class="intel-timing-grid">
+                    {% for t in intel.timing %}
+                    <div class="timing-card {% if t.is_current %}timing-current{% endif %}">
+                        <div class="timing-header">
+                            <span class="timing-month">{{ t.month_name }}</span>
+                            {% if t.is_current %}<span class="timing-now">NOW</span>{% endif %}
+                        </div>
+                        <h4 class="timing-theme">{{ t.theme }}</h4>
+                        {% if t.list_by %}
+                        <p class="timing-deadline">List by: <strong>{{ t.list_by }}</strong></p>
+                        {% endif %}
+                        <div class="timing-terms">
+                            {% for term in t.terms %}
+                            <span class="timing-term">{{ term|title }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state"><p>No timing data yet.</p></div>
+                {% endif %}
+            </div>
+
+            <!-- Price Positioning Tab -->
+            <div class="eu-content" id="eu-etsy-pricing">
+                <div class="eu-summary-bar">
+                    <span class="eu-stat">Market price averages &mdash; position your listings competitively</span>
+                </div>
+                {% if intel.pricing %}
+                <div class="intel-pricing-grid">
+                    {% for p in intel.pricing %}
+                    <div class="pricing-card">
+                        <h4 class="pricing-category">{{ p.category }}</h4>
+                        <div class="pricing-main">${{ "%.2f"|format(p.avg_price) }}</div>
+                        <div class="pricing-range">${{ "%.2f"|format(p.low) }} &mdash; ${{ "%.2f"|format(p.high) }}</div>
+                        <div class="pricing-meta">
+                            <span>{{ p.sample_count }} samples</span>
+                            <span>Top: {{ p.top_priced|title }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state"><p>No pricing data available yet. Run <strong>Refresh Data</strong>.</p></div>
+                {% endif %}
+            </div>
+
+            <!-- Market Entry Signals Tab -->
+            <div class="eu-content" id="eu-etsy-entry">
+                <div class="eu-summary-bar">
+                    <span class="eu-stat">High demand + low sellers = entry opportunity</span>
+                </div>
+                {% if intel.entry_signals %}
+                <div class="intel-entry-list">
+                    {% for sig in intel.entry_signals %}
+                    <div class="entry-signal-card">
+                        <div class="entry-flag">{{ sig.market }}</div>
+                        <div class="entry-body">
+                            <div class="entry-header">
+                                <span class="entry-term">{{ sig.term|title }}</span>
+                                <span class="lifecycle-badge {{ sig.lifecycle }}">{{ sig.lifecycle|title }}</span>
+                            </div>
+                            <p class="entry-reason">{{ sig.reason }}</p>
+                        </div>
+                        <div class="entry-stats">
+                            <span class="entry-score">{{ sig.score }}</span>
+                            <span class="entry-sellers">~{{ sig.sellers }} sellers</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state"><p>No entry signals detected yet. Run <strong>Refresh Data</strong> to scan EU markets.</p></div>
+                {% endif %}
+            </div>
+
+            <!-- Market Trends Tab (existing country-level data) -->
+            <div class="eu-content" id="eu-etsy-markets">
+                <div class="eu-summary-bar">
+                    <span class="eu-stat">Trend data by Etsy market &mdash; US, DE, NL</span>
                 </div>
                 <div class="eu-trends-grid">
                     <div class="eu-trend-col">
-                        <h4>Top Patterns to List</h4>
+                        <h4>Top Patterns (US/Global)</h4>
                         {% for t in trends.patterns[:6] %}
                         <div class="eu-trend-item">
                             <span class="rank">#{{ loop.index }}</span>
@@ -252,7 +368,7 @@
                         {% endfor %}
                     </div>
                     <div class="eu-trend-col">
-                        <h4>Top Colors to List</h4>
+                        <h4>Top Colors (US/Global)</h4>
                         {% for t in trends.colors[:6] %}
                         <div class="eu-trend-item">
                             <span class="rank">#{{ loop.index }}</span>
@@ -272,13 +388,11 @@
                         {% endfor %}
                     </div>
                 </div>
-            </div>
-
-            {% for cc in ['DE', 'NL'] %}
-            {% if cc in eu_data.countries %}
-            {% set ci = eu_data.countries[cc] %}
-            <div class="eu-content" id="eu-etsy-{{ cc }}">
-                <div class="eu-country-header">
+                {% if eu_data and eu_data.countries %}
+                {% for cc in ['DE', 'NL'] %}
+                {% if cc in eu_data.countries %}
+                {% set ci = eu_data.countries[cc] %}
+                <div class="eu-country-header" style="margin-top:1.2rem;">
                     <span class="eu-flag-large">{{ ci.flag }}</span>
                     <div>
                         <h3>{{ ci.name }} Etsy Market</h3>
@@ -317,9 +431,10 @@
                     </div>
                 </div>
                 {% endif %}
+                {% endif %}
+                {% endfor %}
+                {% endif %}
             </div>
-            {% endif %}
-            {% endfor %}
 
             {% else %}
             <div class="empty-state"><p>No Etsy market data yet. Click <strong>Refresh Data</strong> to load.</p></div>
@@ -334,6 +449,18 @@
             </div>
 
             {% if eu_data and eu_data.countries %}
+            <!-- Report Export Buttons -->
+            <div class="report-export-bar">
+                <span class="report-export-label">&#128196; Generate Trend Report:</span>
+                {% for cc in ['DK', 'FI', 'DE'] %}
+                {% if cc in eu_data.countries %}
+                <a href="/report/{{ cc }}" target="_blank" class="report-btn">
+                    {{ eu_data.countries[cc].flag }} {{ eu_data.countries[cc].name }}
+                </a>
+                {% endif %}
+                {% endfor %}
+            </div>
+
             <div class="eu-tabs">
                 {% for cc in ['DK', 'FI', 'DE'] %}
                 {% if cc in eu_data.countries %}
