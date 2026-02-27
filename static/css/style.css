@@ -434,8 +434,32 @@ main { max-width: 1400px; margin: 0 auto; padding: 1.5rem 2rem; }
     color: var(--accent);
 }
 
+.task-type {
+    display: inline-block;
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    margin-bottom: 0.3rem;
+}
+.task-type-design { background: rgba(236,72,153,0.15); color: var(--pink); }
+.task-type-list { background: rgba(34,197,94,0.15); color: var(--green); }
+.task-type-pitch { background: rgba(59,130,246,0.15); color: var(--blue); }
+.task-type-promote { background: rgba(234,179,8,0.15); color: var(--yellow); }
+.task-type-watch { background: rgba(168,85,247,0.15); color: var(--purple); }
+.task-type-optimize { background: rgba(249,115,22,0.15); color: var(--orange); }
+.task-type-research { background: rgba(20,184,166,0.15); color: var(--teal); }
+
 .task-body h4 { font-size: 0.95rem; margin-bottom: 0.2rem; }
-.task-body p { font-size: 0.8rem; color: var(--text-muted); line-height: 1.5; }
+.task-reason {
+    font-size: 0.78rem;
+    color: var(--accent);
+    font-weight: 600;
+    line-height: 1.5;
+    margin-top: 0.15rem;
+}
 
 .task-priority {
     flex-shrink: 0;

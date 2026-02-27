@@ -98,11 +98,12 @@
                 <div class="weekly-task priority-{{ task.priority }}">
                     <div class="task-number">{{ loop.index }}</div>
                     <div class="task-icon task-icon-{{ task.icon }}">
-                        {% if task.icon == 'design' %}&#9998;{% elif task.icon == 'clearance' %}&#9888;{% elif task.icon == 'optimize' %}&#9881;{% elif task.icon == 'palette' %}&#127912;{% elif task.icon == 'research' %}&#128269;{% elif task.icon == 'social' %}&#128204;{% elif task.icon == 'pricing' %}${% endif %}
+                        {% if task.icon == 'design' %}&#127912;{% elif task.icon == 'list' %}&#128248;{% elif task.icon == 'pitch' %}&#128231;{% elif task.icon == 'promote' %}&#128176;{% elif task.icon == 'watch' %}&#128269;{% elif task.icon == 'optimize' %}&#9889;{% elif task.icon == 'research' %}&#128202;{% endif %}
                     </div>
                     <div class="task-body">
+                        <span class="task-type task-type-{{ task.icon }}">{{ task.type }}</span>
                         <h4>{{ task.task }}</h4>
-                        <p>{{ task.detail }}</p>
+                        <p class="task-reason">{{ task.reason }}</p>
                     </div>
                     <span class="task-priority {{ task.priority }}">{{ task.priority|upper }}</span>
                 </div>

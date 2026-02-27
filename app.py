@@ -335,10 +335,7 @@ def _run_scrape():
         emerging = [f for f in forecasts if f["lifecycle"] == "emerging"]
         rising = [f for f in forecasts if f["lifecycle"] == "rising"]
 
-        # Generate action board recommendations
-        scrape_status["action_board"] = _build_action_board(
-            result, forecasts, google_data
-        )
+        # Action board is built after EU data is available (below)
 
         # Step 6: Pinterest Social/Visual Trends
         pinterest_result = {}
@@ -389,6 +386,11 @@ def _run_scrape():
         eu_result = analyze_european_trends(eu_listings, eu_google)
         scrape_status["eu_result"] = eu_result
 
+        # Generate action board (after EU data so weekly tasks can cite markets)
+        scrape_status["action_board"] = _build_action_board(
+            result, forecasts, google_data, eu_result
+        )
+
         # Build status report
         ok_sources = [k for k, v in source_status.items() if v["status"] == "ok"]
         failed_sources = [
@@ -437,11 +439,11 @@ def _run_scrape():
         scrape_status["running"] = False
 
 
-def _build_action_board(result, forecasts, google_data):
+def _build_action_board(result, forecasts, google_data, eu_data=None):
     """Build the 7-section dashboard data for a 2-person cotton jersey print company.
 
     Sections:
-      1. weekly_actions  — 5-7 concrete tasks for this week
+      1. weekly_actions  — 5-7 concrete tasks with data-backed reasons
       2. design_briefs   — prioritized color × pattern × style combos
       3. market_signals  — trending colors, patterns, styles combined
       4. etsy_intel      — B2C market opportunities (US/UK/DE/NL)
@@ -459,7 +461,7 @@ def _build_action_board(result, forecasts, google_data):
     styles = result.get("styles", [])
     all_trends = fabrics + patterns + colors + styles
 
-    # --- 4-bucket forecasts (kept from Phase 1) ---
+    # --- 4-bucket forecasts ---
     design_now = []
     watch = []
     phase_out = []
@@ -489,24 +491,20 @@ def _build_action_board(result, forecasts, google_data):
         "top_style": styles[0]["term"] if styles else "N/A",
     }
 
-    # --- 1. This Week's Actions (5-7 concrete tasks) ---
-    weekly_actions = _build_weekly_actions(
-        design_now, phase_out, evergreen, colors, patterns, styles, forecasts, google_data
-    )
-
-    # --- 2. Design Pipeline (design briefs) ---
+    # --- Compute briefs and gaps first (weekly actions depends on them) ---
     design_briefs = _generate_design_briefs(
         colors, patterns, styles, fabrics, forecasts, google_data
     )
-
-    # --- 3. Market Signals (top movers across all categories) ---
     market_signals = _build_market_signals(colors, patterns, styles, forecasts)
-
-    # --- 5. Opportunity Gaps ---
     opportunity_gaps = _build_opportunity_gaps(all_trends, forecasts, google_data)
-
-    # --- 6. Seasonal Calendar ---
     seasonal_calendar = _build_seasonal_calendar()
+
+    # --- Weekly actions: concrete tasks citing specific data ---
+    weekly_actions = _build_weekly_actions(
+        design_briefs, design_now, phase_out, evergreen,
+        colors, patterns, styles, forecasts, google_data,
+        eu_data, opportunity_gaps,
+    )
 
     return {
         "generated_at": datetime.now().isoformat(),
@@ -525,90 +523,256 @@ def _build_action_board(result, forecasts, google_data):
     }
 
 
-def _build_weekly_actions(design_now, phase_out, evergreen, colors, patterns, styles, forecasts, google_data):
-    """Generate 5-7 concrete, specific tasks for this week."""
+def _build_weekly_actions(design_briefs, design_now, phase_out, evergreen,
+                          colors, patterns, styles, forecasts, google_data,
+                          eu_data, opportunity_gaps):
+    """Generate 5-7 concrete tasks with data-backed reasons.
+
+    Each task names exact trend combos, cites specific percentages,
+    references specific markets (DK, FI, DE, Etsy), and gives a
+    concrete action a solo operator can execute this week.
+    """
     actions = []
+    fc_lookup = {f["term"].lower(): f for f in forecasts}
+    eu_countries = eu_data.get("countries", {}) if eu_data else {}
+    used_terms = set()  # avoid recommending same trend in multiple tasks
 
-    # 1. Top design brief to work on
-    if design_now:
-        top = design_now[0]
+    def _vel_pct(term):
+        """Format velocity as '+28%' or '-12%'."""
+        fc = fc_lookup.get(term.lower(), {})
+        vel = fc.get("velocity", 0)
+        if abs(vel) > 0.03:
+            return f"{'+' if vel > 0 else ''}{vel * 100:.0f}%"
+        return None
+
+    def _google_interest(term):
+        """Get Google Trends interest and direction for a term."""
+        for key, val in google_data.items():
+            if key.startswith("_"):
+                continue
+            if isinstance(val, dict) and term.lower().split()[0] in key.lower():
+                return val.get("interest", 0), val.get("trending_up", False)
+        return 0, False
+
+    def _eu_hits(term):
+        """Find which EU country codes show this trend in their top lists."""
+        hits = []
+        for cc, ci in eu_countries.items():
+            for t in ci.get("top_trends", [])[:8]:
+                if term.lower() in t.get("term", "").lower():
+                    hits.append(cc)
+                    break
+        return hits
+
+    # === 1. DESIGN — top brief with cross-market evidence ===
+    if design_briefs:
+        brief = design_briefs[0]
+        color, pattern = brief["color"], brief["pattern"]
+        style = brief.get("style", "")
+        used_terms.update([color.lower(), pattern.lower()])
+
+        reasons = []
+        for term in [color, pattern]:
+            v = _vel_pct(term)
+            if v and not v.startswith("-"):
+                reasons.append(f"{term.title()} {v}")
+
+        hits = list(dict.fromkeys(_eu_hits(color) + _eu_hits(pattern)))
+        if hits:
+            reasons.append(f"demand in {', '.join(hits[:3])}")
+
+        if not reasons:
+            reasons.append(f"opportunity score {brief['opportunity_score']}")
+
+        style_suffix = f" {style}" if style else ""
         actions.append({
+            "type": "Design",
             "icon": "design",
-            "task": f"Design new {top['term'].title()} print",
-            "detail": (
-                f"{top['term'].title()} ({top['category'].replace('_', ' ')}) is "
-                f"{'rising' if top['lifecycle'] == 'rising' else 'emerging'} at "
-                f"+{top['velocity']*100:.0f}% velocity. Create 2-3 print variations."
-            ),
+            "task": f"Create 2-3 {color.title()} {pattern}{style_suffix} patterns",
+            "reason": ", ".join(reasons),
             "priority": "high",
         })
 
-    # 2. Phase out action
+    # === 2. LIST — second brief, photograph and list on Etsy ===
+    if len(design_briefs) > 1:
+        brief = design_briefs[1]
+        color, pattern = brief["color"], brief["pattern"]
+        used_terms.update([color.lower(), pattern.lower()])
+
+        reasons = []
+        for term in [color, pattern]:
+            fc = fc_lookup.get(term.lower(), {})
+            lc = fc.get("lifecycle", "")
+            if lc in ("rising", "peak"):
+                v = _vel_pct(term)
+                reasons.append(
+                    f"{term.title()} {lc}" + (f" ({v})" if v else "")
+                )
+
+        gi, trending = _google_interest(color)
+        if gi > 30:
+            reasons.append(f"Google interest {gi}/100")
+
+        if not reasons:
+            reasons.append(f"score {brief['opportunity_score']}")
+
+        actions.append({
+            "type": "List",
+            "icon": "list",
+            "task": (
+                f"Photograph and list {color.title()} {pattern} "
+                f"prints on Etsy"
+            ),
+            "reason": ", ".join(reasons),
+            "priority": "high",
+        })
+
+    # === 3. PITCH — wholesale opportunity from DK/FI/DE ===
+    ws_codes = ["DK", "FI", "DE"]
+    best_pitch = None
+    for cc in ws_codes:
+        ci = eu_countries.get(cc)
+        if not ci:
+            continue
+        for t in ci.get("top_trends", [])[:5]:
+            term = t.get("term", "")
+            fc = fc_lookup.get(term.lower(), {})
+            lc = fc.get("lifecycle", "")
+            vel = fc.get("velocity", 0)
+            if lc in ("emerging", "rising") and vel > 0:
+                if best_pitch is None or vel > best_pitch["velocity"]:
+                    best_pitch = {
+                        "cc": cc,
+                        "name": ci.get("name", cc),
+                        "term": term,
+                        "lifecycle": lc,
+                        "velocity": vel,
+                    }
+
+    if best_pitch:
+        v = (
+            f" +{best_pitch['velocity'] * 100:.0f}%"
+            if best_pitch["velocity"] > 0.03 else ""
+        )
+        actions.append({
+            "type": "Pitch",
+            "icon": "pitch",
+            "task": (
+                f"Send trend update to {best_pitch['name']} "
+                f"wholesale clients"
+            ),
+            "reason": (
+                f"{best_pitch['term'].title()} "
+                f"{best_pitch['lifecycle']}{v} in {best_pitch['cc']}"
+            ),
+            "priority": "medium",
+        })
+    elif patterns:
+        top = patterns[0]["term"].title()
+        combo = (
+            f"{top} {styles[0]['term'].title()}" if styles else top
+        )
+        actions.append({
+            "type": "Pitch",
+            "icon": "pitch",
+            "task": "Email wholesale contacts in DK, FI, and DE",
+            "reason": f"Lead with {combo} — top-scoring trend this week",
+            "priority": "medium",
+        })
+
+    # === 4. PROMOTE — clearance on declining trends ===
     if phase_out:
-        declining = phase_out[0]
+        dec = phase_out[0]
+        term = dec["term"]
+        vel = dec.get("velocity", 0)
+        vel_str = f" {vel * 100:.0f}%" if vel < -0.03 else ""
+        used_terms.add(term.lower())
+
         actions.append({
-            "icon": "clearance",
-            "task": f"Discount {declining['term'].title()} listings",
-            "detail": (
-                f"{declining['term'].title()} is declining ({declining['velocity']*100:.0f}% velocity). "
-                f"Mark down 15-20% to clear remaining stock."
+            "type": "Promote",
+            "icon": "promote",
+            "task": f"Put {term.title()} listings on 15-20% sale",
+            "reason": (
+                f"Peaked and now declining{vel_str} — "
+                f"clear stock before demand drops further"
             ),
             "priority": "high",
         })
 
-    # 3. Listing optimization for evergreen
-    if evergreen:
-        ev = evergreen[0]
+    # === 5. WATCH — emerging trend, not ready to commit ===
+    emerging = [
+        f for f in design_now
+        if f["lifecycle"] == "emerging"
+        and f["term"].lower() not in used_terms
+    ]
+    if emerging:
+        w = emerging[0]
+        used_terms.add(w["term"].lower())
+
+        extra = ""
+        gi, trending_up = _google_interest(w["term"])
+        if trending_up:
+            extra = ", Google search rising"
+        elif gi > 20:
+            extra = f", Google interest {gi}/100"
+
+        vel_str = (
+            f"+{w['velocity'] * 100:.0f}%"
+            if w["velocity"] > 0 else "low"
+        )
         actions.append({
+            "type": "Watch",
+            "icon": "watch",
+            "task": (
+                f"{w['term'].title()} emerging — save references, "
+                f"don't commit stock yet"
+            ),
+            "reason": f"Early signal at {vel_str} velocity{extra}",
+            "priority": "medium",
+        })
+
+    # === 6. OPTIMIZE — refresh proven evergreen sellers ===
+    unused_ev = [
+        e for e in evergreen if e["term"].lower() not in used_terms
+    ]
+    if unused_ev:
+        ev = unused_ev[0]
+        actions.append({
+            "type": "Optimize",
             "icon": "optimize",
-            "task": f"Refresh {ev['term'].title()} listing SEO",
-            "detail": (
-                f"Proven seller (score {ev['current_score']}). Update titles, tags, "
-                f"and photos to maintain visibility."
+            "task": (
+                f"Refresh {ev['term'].title()} listing titles, "
+                f"tags, and photos"
             ),
-            "priority": "medium",
-        })
-
-    # 4. Color palette task
-    if colors:
-        top_colors = [c["term"].title() for c in colors[:3]]
-        actions.append({
-            "icon": "palette",
-            "task": f"Create color mockups: {', '.join(top_colors)}",
-            "detail": (
-                "These are the top 3 trending colors. Generate AI mockups "
-                "for cotton jersey prints in each colorway."
+            "reason": (
+                f"Proven seller (score {ev['current_score']}, stable) "
+                f"— keep SEO fresh to hold ranking"
             ),
-            "priority": "medium",
-        })
-
-    # 5. Market research task
-    if design_now and len(design_now) > 1:
-        terms = [f["term"].title() for f in design_now[1:3]]
-        actions.append({
-            "icon": "research",
-            "task": f"Check Spoonflower/Etsy for {', '.join(terms)}",
-            "detail": "Search competing listings to identify gaps in available designs.",
-            "priority": "medium",
-        })
-
-    # 6. Pinterest content
-    if patterns:
-        top_pat = patterns[0]["term"].title()
-        actions.append({
-            "icon": "social",
-            "task": f"Pin 3-5 {top_pat} inspiration images",
-            "detail": "Pin trending pattern inspiration to your board. Pinterest drives 1-3 month leading demand.",
             "priority": "low",
         })
 
-    # 7. Pricing review
-    priced = [t for t in (colors + patterns + styles) if t.get("avg_price", 0) > 0]
-    if priced:
+    # === 7. RESEARCH — investigate opportunity gap ===
+    unused_gaps = [
+        g for g in opportunity_gaps
+        if g["term"].lower() not in used_terms
+    ]
+    if unused_gaps:
+        gap = unused_gaps[0]
+        parts = [f"gap strength {gap['gap_strength']}"]
+        gi_val = gap.get("google_interest", 0)
+        mention = gap.get("mention_count", 0)
+        if gi_val and mention:
+            parts.append(
+                f"Google interest {gi_val} vs only {mention} listings"
+            )
         actions.append({
-            "icon": "pricing",
-            "task": "Review pricing vs. market averages",
-            "detail": "Compare your top 5 listings against marketplace avg prices. Adjust if >15% off.",
+            "type": "Research",
+            "icon": "research",
+            "task": (
+                f"Investigate {gap['term'].title()} — "
+                f"high demand, low competition"
+            ),
+            "reason": " — ".join(parts),
             "priority": "low",
         })
 
