@@ -390,10 +390,20 @@ def _run_scrape():
         try:
             logger.info("Fetching Google Trends...")
             google_data = fetch_google_trends()
+            # Check if we got live data or fell back to curated
+            has_history = any(
+                isinstance(v, dict) and "history" in v
+                for v in google_data.values()
+                if not str(v).startswith("_")
+            )
             source_status["Google Trends"] = {
                 "status": "ok" if google_data else "empty",
                 "count": len(google_data),
-                "note": f"{len(google_data)} keywords" if google_data else "Rate limited",
+                "note": (
+                    f"{len(google_data)} keywords (live)"
+                    if has_history
+                    else f"{len(google_data)} keywords (curated fallback)"
+                ) if google_data else "Rate limited",
             }
         except Exception as e:
             source_status["Google Trends"] = {
