@@ -132,6 +132,57 @@ function switchEU(key) {
     targetContent.classList.add('active');
 }
 
+/* ==========================================
+   CHANNEL TOGGLE (B2B / B2C / BOTH)
+   ========================================== */
+
+function switchChannel(channel) {
+    // Update toggle buttons
+    document.querySelectorAll('.channel-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.channel-btn[data-channel="${channel}"]`)?.classList.add('active');
+
+    // Show/hide sections based on data-channel attribute
+    document.querySelectorAll('section[data-channel]').forEach(sec => {
+        const ch = sec.getAttribute('data-channel');
+        if (channel === 'all') {
+            sec.style.display = '';
+        } else if (ch === 'both') {
+            sec.style.display = '';
+        } else if (ch === channel) {
+            sec.style.display = '';
+        } else {
+            sec.style.display = 'none';
+        }
+    });
+
+    // Show/hide nav links
+    document.querySelectorAll('.nav-link[data-nav-channel]').forEach(link => {
+        const ch = link.getAttribute('data-nav-channel');
+        if (channel === 'all') {
+            link.style.display = '';
+        } else if (ch === 'both') {
+            link.style.display = '';
+        } else if (ch === channel) {
+            link.style.display = '';
+        } else {
+            link.style.display = 'none';
+        }
+    });
+
+    // Store preference
+    try { localStorage.setItem('fts_channel', channel); } catch(e) {}
+}
+
+// Restore channel preference on page load
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        const saved = localStorage.getItem('fts_channel');
+        if (saved && ['all', 'b2b', 'b2c'].includes(saved)) {
+            switchChannel(saved);
+        }
+    } catch(e) {}
+});
+
 function esc(s) {
     const d = document.createElement('div');
     d.textContent = s;

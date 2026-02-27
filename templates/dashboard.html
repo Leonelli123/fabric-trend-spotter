@@ -13,6 +13,17 @@
             <h1>Fabric Trend Spotter</h1>
             <p class="subtitle">Spot and forecast fabric trends before they go mainstream</p>
             <div class="header-actions">
+                <div class="channel-toggle">
+                    <button class="channel-btn active" data-channel="all" onclick="switchChannel('all')">Both</button>
+                    <button class="channel-btn" data-channel="b2b" onclick="switchChannel('b2b')">
+                        <span class="channel-label">B2B</span>
+                        <span class="channel-sub">Jydsk Stoflager</span>
+                    </button>
+                    <button class="channel-btn" data-channel="b2c" onclick="switchChannel('b2c')">
+                        <span class="channel-label">B2C</span>
+                        <span class="channel-sub">Fabricly / Etsy</span>
+                    </button>
+                </div>
                 <button id="scrape-btn" class="btn btn-primary" onclick="triggerScrape()">
                     <span class="btn-icon">&#x21bb;</span> Refresh Data
                 </button>
@@ -27,14 +38,15 @@
         </div>
         <!-- Navigation -->
         <nav class="main-nav">
-            <a href="#weekly" class="nav-link active" onclick="scrollToSection('weekly')">This Week</a>
-            <a href="#pipeline" class="nav-link" onclick="scrollToSection('pipeline')">Design Pipeline</a>
-            <a href="#signals" class="nav-link" onclick="scrollToSection('signals')">Market Signals</a>
-            <a href="#etsy" class="nav-link" onclick="scrollToSection('etsy')">Etsy Intel</a>
-            <a href="#wholesale" class="nav-link" onclick="scrollToSection('wholesale')">Wholesale</a>
-            <a href="#gaps" class="nav-link" onclick="scrollToSection('gaps')">Gaps</a>
-            <a href="#calendar" class="nav-link" onclick="scrollToSection('calendar')">Seasonal</a>
-            <a href="#forecasts" class="nav-link" onclick="scrollToSection('forecasts')">Forecasts</a>
+            <a href="#weekly" class="nav-link active" data-nav-channel="both" onclick="scrollToSection('weekly')">This Week</a>
+            <a href="#pipeline" class="nav-link" data-nav-channel="both" onclick="scrollToSection('pipeline')">Design Pipeline</a>
+            <a href="#signals" class="nav-link" data-nav-channel="both" onclick="scrollToSection('signals')">Market Signals</a>
+            <a href="#crosschannel" class="nav-link" data-nav-channel="both" onclick="scrollToSection('crosschannel')">Cross-Channel</a>
+            <a href="#etsy" class="nav-link" data-nav-channel="b2c" onclick="scrollToSection('etsy')">Etsy Intel</a>
+            <a href="#wholesale" class="nav-link" data-nav-channel="b2b" onclick="scrollToSection('wholesale')">Wholesale</a>
+            <a href="#gaps" class="nav-link" data-nav-channel="both" onclick="scrollToSection('gaps')">Gaps</a>
+            <a href="#calendar" class="nav-link" data-nav-channel="both" onclick="scrollToSection('calendar')">Seasonal</a>
+            <a href="#forecasts" class="nav-link" data-nav-channel="both" onclick="scrollToSection('forecasts')">Forecasts</a>
         </nav>
     </header>
 
@@ -59,7 +71,7 @@
 
         <!-- ========== SECTION 1: THIS WEEK'S ACTIONS ========== -->
         {% if action_board and action_board.weekly_actions %}
-        <section id="weekly" class="section">
+        <section id="weekly" class="section" data-channel="both">
             <div class="section-header">
                 <h2>This Week's Actions</h2>
                 <p class="section-subtitle">5-7 specific tasks &mdash; what to do right now</p>
@@ -114,7 +126,7 @@
 
         <!-- ========== SECTION 2: DESIGN PIPELINE ========== -->
         {% if action_board and action_board.design_briefs %}
-        <section id="pipeline" class="section">
+        <section id="pipeline" class="section" data-channel="both">
             <div class="section-header">
                 <h2>Design Pipeline</h2>
                 <p class="section-subtitle">What to design next &mdash; color &times; pattern &times; style, ranked by opportunity</p>
@@ -153,7 +165,7 @@
         {% endif %}
 
         <!-- ========== SECTION 3: MARKET SIGNALS ========== -->
-        <section id="signals" class="section">
+        <section id="signals" class="section" data-channel="both">
             <div class="section-header">
                 <h2>Market Signals</h2>
                 <p class="section-subtitle">What's moving &mdash; trending colors, patterns &amp; aesthetics in one view</p>
@@ -216,7 +228,7 @@
         </section>
 
         <!-- ========== SECTION 4: ETSY INTELLIGENCE (B2C) ========== -->
-        <section id="etsy" class="section">
+        <section id="etsy" class="section" data-channel="b2c">
             <div class="section-header">
                 <h2>Etsy Intelligence</h2>
                 <p class="section-subtitle">B2C market opportunities &mdash; SEO tags, timing, pricing &amp; entry signals</p>
@@ -441,8 +453,183 @@
             {% endif %}
         </section>
 
+        <!-- ========== SECTION 4B: CROSS-CHANNEL INTELLIGENCE ========== -->
+        {% set xc = action_board.cross_channel if action_board and action_board.cross_channel else {} %}
+        {% if xc.pipeline or xc.b2c_to_b2b or xc.b2b_to_b2c or xc.etsy_perf %}
+        <section id="crosschannel" class="section" data-channel="both">
+            <div class="section-header">
+                <h2>Cross-Channel Intelligence</h2>
+                <p class="section-subtitle">Trends flowing between Etsy (B2C) and Wholesale (B2B) &mdash; spot the pipeline</p>
+            </div>
+
+            <div class="eu-tabs">
+                <button class="eu-tab active" data-eu="xc-pipeline" onclick="switchEU('xc-pipeline')">Trend Pipeline</button>
+                <button class="eu-tab" data-eu="xc-b2c2b2b" onclick="switchEU('xc-b2c2b2b')">Etsy &rarr; Wholesale</button>
+                <button class="eu-tab" data-eu="xc-b2b2b2c" onclick="switchEU('xc-b2b2b2c')">Wholesale &rarr; Etsy</button>
+                <button class="eu-tab" data-eu="xc-perf" onclick="switchEU('xc-perf')">Etsy Performance</button>
+            </div>
+
+            <!-- Pipeline Tab -->
+            <div class="eu-content active" id="eu-xc-pipeline">
+                <div class="eu-summary-bar">
+                    <span class="eu-stat">Pinterest &rarr; Etsy US &rarr; Etsy EU &rarr; Wholesale EU &mdash; where is each trend?</span>
+                </div>
+                {% if xc.pipeline %}
+                <div class="pipeline-list">
+                    {% for p in xc.pipeline %}
+                    <div class="xc-card xc-{{ p.urgency }}">
+                        <div class="xc-stage-badge stage-{{ p.stage }}">
+                            {% if p.stage == 'search_only' %}Search{% elif p.stage == 'us_only' %}Etsy US{% elif p.stage == 'etsy_eu' %}Etsy EU{% elif p.stage == 'crossing' %}Crossing{% elif p.stage == 'b2b_first' %}B2B First{% else %}{{ p.stage }}{% endif %}
+                        </div>
+                        <div class="xc-body">
+                            <div class="xc-header">
+                                <span class="xc-term">{{ p.term|title }}</span>
+                                <span class="lifecycle-badge {{ p.lifecycle }}">{{ p.lifecycle|title }}</span>
+                                <span class="action-cat">{{ p.category|replace('_', ' ')|title }}</span>
+                            </div>
+                            <p class="xc-action">{{ p.action }}</p>
+                        </div>
+                        <div class="xc-scores">
+                            <div class="xc-score-item">
+                                <span class="xc-score-label">US</span>
+                                <span class="xc-score-val">{{ p.us_score }}</span>
+                            </div>
+                            {% if p.b2c_eu_score %}
+                            <div class="xc-score-item">
+                                <span class="xc-score-label">EU Etsy</span>
+                                <span class="xc-score-val">{{ p.b2c_eu_score }}</span>
+                            </div>
+                            {% endif %}
+                            {% if p.b2b_score %}
+                            <div class="xc-score-item">
+                                <span class="xc-score-label">B2B</span>
+                                <span class="xc-score-val">{{ p.b2b_score }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state"><p>No pipeline signals yet. Run <strong>Refresh Data</strong> to detect cross-channel trends.</p></div>
+                {% endif %}
+            </div>
+
+            <!-- B2C → B2B Tab -->
+            <div class="eu-content" id="eu-xc-b2c2b2b">
+                <div class="eu-summary-bar">
+                    <span class="eu-stat">Hot on Etsy &mdash; pitch to your wholesale clients before it hits Scandinavia</span>
+                </div>
+                {% if xc.b2c_to_b2b %}
+                <div class="pipeline-list">
+                    {% for item in xc.b2c_to_b2b %}
+                    <div class="xc-card">
+                        <div class="xc-direction">Etsy &rarr; B2B</div>
+                        <div class="xc-body">
+                            <div class="xc-header">
+                                <span class="xc-term">{{ item.term|title }}</span>
+                                <span class="lifecycle-badge {{ item.lifecycle }}">{{ item.lifecycle|title }}</span>
+                            </div>
+                            <p class="xc-action">{{ item.reason }}</p>
+                        </div>
+                        <div class="xc-scores">
+                            <div class="xc-score-item">
+                                <span class="xc-score-label">Etsy</span>
+                                <span class="xc-score-val">{{ item.us_score }}</span>
+                            </div>
+                            <div class="xc-score-item">
+                                <span class="xc-score-label">B2B</span>
+                                <span class="xc-score-val">{{ item.b2b_score }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state"><p>No cross-channel opportunities detected yet.</p></div>
+                {% endif %}
+            </div>
+
+            <!-- B2B → B2C Tab -->
+            <div class="eu-content" id="eu-xc-b2b2b2c">
+                <div class="eu-summary-bar">
+                    <span class="eu-stat">Strong in wholesale &mdash; list on Etsy to capture B2C demand early</span>
+                </div>
+                {% if xc.b2b_to_b2c %}
+                <div class="pipeline-list">
+                    {% for item in xc.b2b_to_b2c %}
+                    <div class="xc-card">
+                        <div class="xc-direction">B2B &rarr; Etsy</div>
+                        <div class="xc-body">
+                            <div class="xc-header">
+                                <span class="xc-term">{{ item.term|title }}</span>
+                                <span class="lifecycle-badge {{ item.lifecycle }}">{{ item.lifecycle|title }}</span>
+                            </div>
+                            <p class="xc-action">{{ item.reason }}</p>
+                        </div>
+                        <div class="xc-scores">
+                            <div class="xc-score-item">
+                                <span class="xc-score-label">B2B ({{ item.top_market }})</span>
+                                <span class="xc-score-val">{{ item.b2b_score }}</span>
+                            </div>
+                            <div class="xc-score-item">
+                                <span class="xc-score-label">Etsy</span>
+                                <span class="xc-score-val">{{ item.us_score }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state"><p>No wholesale-to-Etsy opportunities detected yet.</p></div>
+                {% endif %}
+            </div>
+
+            <!-- Etsy Performance Tab -->
+            <div class="eu-content" id="eu-xc-perf">
+                <div class="eu-summary-bar">
+                    <span class="eu-stat">Which cotton jersey prints perform best on Etsy &mdash; favorites, reviews &amp; pricing</span>
+                </div>
+                {% if xc.etsy_perf %}
+                <div class="etsy-perf-table-wrap">
+                    <table class="etsy-perf-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Trend</th>
+                                <th>Category</th>
+                                <th>Score</th>
+                                <th>Avg Favorites</th>
+                                <th>Avg Reviews</th>
+                                <th>Avg Price</th>
+                                <th>Phase</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in xc.etsy_perf %}
+                            <tr>
+                                <td class="perf-rank">{{ loop.index }}</td>
+                                <td class="perf-term">{{ p.term|title }}</td>
+                                <td><span class="action-cat">{{ p.category|replace('_', ' ')|title }}</span></td>
+                                <td class="perf-score">{{ p.score }}</td>
+                                <td class="perf-fav">{{ p.avg_favorites }}</td>
+                                <td>{{ p.avg_reviews }}</td>
+                                <td>{% if p.avg_price %}${{ "%.2f"|format(p.avg_price) }}{% else %}&mdash;{% endif %}</td>
+                                <td><span class="lifecycle-badge {{ p.lifecycle }}">{{ p.lifecycle|title }}</span></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state"><p>No Etsy performance data yet.</p></div>
+                {% endif %}
+            </div>
+        </section>
+        {% endif %}
+
         <!-- ========== SECTION 5: WHOLESALE PULSE (B2B) ========== -->
-        <section id="wholesale" class="section">
+        <section id="wholesale" class="section" data-channel="b2b">
             <div class="section-header">
                 <h2>Wholesale Pulse</h2>
                 <p class="section-subtitle">What to pitch your B2B clients &mdash; DK, FI &amp; DE wholesale trends</p>
@@ -533,7 +720,7 @@
 
         <!-- ========== SECTION 6: OPPORTUNITY GAPS ========== -->
         {% if action_board and action_board.opportunity_gaps %}
-        <section id="gaps" class="section">
+        <section id="gaps" class="section" data-channel="both">
             <div class="section-header">
                 <h2>Opportunity Gaps</h2>
                 <p class="section-subtitle">High demand + low supply &mdash; undersupplied trends you can fill</p>
@@ -555,7 +742,7 @@
 
         <!-- ========== SECTION 7: SEASONAL CALENDAR ========== -->
         {% if action_board and action_board.seasonal_calendar %}
-        <section id="calendar" class="section">
+        <section id="calendar" class="section" data-channel="both">
             <div class="section-header">
                 <h2>Seasonal Calendar</h2>
                 <p class="section-subtitle">What to prepare for this quarter and the next two</p>
@@ -596,7 +783,7 @@
         {% endif %}
 
         <!-- ========== SECTION 8: FORECASTS (4 Buckets) ========== -->
-        <section id="forecasts" class="section">
+        <section id="forecasts" class="section" data-channel="both">
             <div class="section-header">
                 <h2>Trend Forecasts</h2>
                 <p class="section-subtitle">4 buckets &mdash; Design Now, Watch, Evergreen, Phase Out</p>

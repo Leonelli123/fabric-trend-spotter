@@ -641,6 +641,7 @@ def _build_action_board(result, forecasts, google_data, eu_data=None):
     opportunity_gaps = _build_opportunity_gaps(all_trends, forecasts, google_data)
     seasonal_calendar = _build_seasonal_calendar()
     etsy_intel = _build_etsy_intel(result, forecasts, google_data, eu_data)
+    cross_channel = _build_cross_channel_intel(result, forecasts, google_data, eu_data)
 
     # --- Weekly actions: concrete tasks citing specific data ---
     weekly_actions = _build_weekly_actions(
@@ -656,6 +657,7 @@ def _build_action_board(result, forecasts, google_data, eu_data=None):
         "design_briefs": design_briefs,
         "market_signals": market_signals,
         "etsy_intel": etsy_intel,
+        "cross_channel": cross_channel,
         "opportunity_gaps": opportunity_gaps,
         "seasonal_calendar": seasonal_calendar,
         "buckets": {
@@ -860,9 +862,10 @@ def _build_weekly_actions(design_briefs, design_now, phase_out, evergreen,
         elif gi > 20:
             extra = f", Google interest {gi}/100"
 
+        w_vel = w.get("velocity", 0) or 0
         vel_str = (
-            f"+{w['velocity'] * 100:.0f}%"
-            if w["velocity"] > 0 else "low"
+            f"+{w_vel * 100:.0f}%"
+            if w_vel > 0 else "low"
         )
         actions.append({
             "type": "Watch",
@@ -1008,6 +1011,200 @@ def _build_opportunity_gaps(all_trends, forecasts, google_data):
 
     gaps.sort(key=lambda g: g["gap_strength"], reverse=True)
     return gaps[:10]
+
+
+def _build_cross_channel_intel(result, forecasts, google_data, eu_data=None):
+    """Detect trends flowing through the pipeline and cross-channel opportunities.
+
+    Pipeline: Pinterest → Etsy US → Etsy EU → Wholesale EU
+    Returns:
+      pipeline     — trends with detected pipeline position + suggested action
+      b2c_to_b2b   — Etsy/US trends to pitch to wholesale clients
+      b2b_to_b2c   — wholesale/EU trends to list on Etsy
+      etsy_perf    — Etsy performance metrics (favorites/reviews by trend)
+    """
+    fc_lookup = {f["term"].lower(): f for f in forecasts}
+    eu_countries = eu_data.get("countries", {}) if eu_data else {}
+
+    colors = result.get("colors", [])
+    patterns = result.get("patterns", [])
+    styles = result.get("styles", [])
+    all_trends = colors + patterns + styles
+
+    # Build score lookup for US/global trends
+    us_scores = {t["term"].lower(): t for t in all_trends}
+
+    # Build score lookup for B2B wholesale markets (DK, FI, DE)
+    b2b_markets = ["DK", "FI", "DE"]
+    b2b_scores = {}  # term -> {market: score, ...}
+    for cc in b2b_markets:
+        ci = eu_countries.get(cc, {})
+        for t in ci.get("top_trends", [])[:15]:
+            key = t["term"].lower()
+            b2b_scores.setdefault(key, {})[cc] = t.get("score", 0)
+
+    # Build score lookup for B2C Etsy markets (DE, NL, US implied)
+    b2c_markets = ["DE", "NL"]
+    b2c_eu_scores = {}
+    for cc in b2c_markets:
+        ci = eu_countries.get(cc, {})
+        for t in ci.get("top_trends", [])[:15]:
+            key = t["term"].lower()
+            b2c_eu_scores.setdefault(key, {})[cc] = t.get("score", 0)
+
+    # --- PIPELINE DETECTION ---
+    pipeline = []
+    seen = set()
+    for t in all_trends[:20]:
+        term = t["term"].lower()
+        if term in seen:
+            continue
+        seen.add(term)
+
+        fc = fc_lookup.get(term, {})
+        lc = fc.get("lifecycle", "unknown")
+        if lc == "declining":
+            continue
+
+        us_score = t.get("score", 0)
+        b2b_present = term in b2b_scores
+        b2c_eu_present = term in b2c_eu_scores
+        b2b_max = max(b2b_scores.get(term, {}).values()) if b2b_present else 0
+        b2c_eu_max = max(b2c_eu_scores.get(term, {}).values()) if b2c_eu_present else 0
+
+        # Google interest as leading indicator
+        gi = 0
+        for key, val in google_data.items():
+            if key.startswith("_"):
+                continue
+            if isinstance(val, dict) and term.split()[0] in key.lower():
+                gi = val.get("interest", 0)
+                break
+
+        # Determine pipeline stage
+        if us_score > 40 and not b2c_eu_present and not b2b_present:
+            stage = "us_only"
+            action = f"Hot in US (score {us_score}) but not yet in EU — list on Etsy DE/NL early"
+            urgency = "high"
+        elif us_score > 30 and b2c_eu_present and not b2b_present:
+            stage = "etsy_eu"
+            markets = ", ".join(b2c_eu_scores.get(term, {}).keys())
+            action = f"Selling on Etsy in {markets} — pitch to DK/FI wholesale clients now"
+            urgency = "high"
+        elif b2c_eu_present and b2b_present and b2b_max < us_score * 0.7:
+            stage = "crossing"
+            action = f"Crossing from Etsy to wholesale (B2B score {b2b_max} vs US {us_score}) — get ahead"
+            urgency = "medium"
+        elif b2b_present and not b2c_eu_present and us_score < 30:
+            stage = "b2b_first"
+            action = f"Strong in wholesale but weak on Etsy — list on Etsy to capture B2C demand"
+            urgency = "medium"
+        elif gi > 50 and us_score < 25:
+            stage = "search_only"
+            action = f"Google interest {gi} but low Etsy presence — early mover opportunity"
+            urgency = "medium"
+        else:
+            continue
+
+        pipeline.append({
+            "term": t["term"],
+            "category": t.get("category", ""),
+            "lifecycle": lc,
+            "stage": stage,
+            "us_score": us_score,
+            "b2b_score": b2b_max,
+            "b2c_eu_score": b2c_eu_max,
+            "google_interest": gi,
+            "action": action,
+            "urgency": urgency,
+        })
+
+    pipeline.sort(key=lambda p: p["us_score"], reverse=True)
+
+    # --- B2C → B2B: Etsy trends to pitch wholesale ---
+    b2c_to_b2b = []
+    for t in all_trends[:15]:
+        term = t["term"].lower()
+        fc = fc_lookup.get(term, {})
+        lc = fc.get("lifecycle", "unknown")
+        if lc == "declining":
+            continue
+        us_score = t.get("score", 0)
+        if us_score < 30:
+            continue
+        # Check if NOT strong in wholesale
+        b2b_max = max(b2b_scores.get(term, {}).values()) if term in b2b_scores else 0
+        if b2b_max >= us_score * 0.8:
+            continue  # already strong in wholesale
+        markets_str = ""
+        if term in b2c_eu_scores:
+            markets_str = " + Etsy " + ", ".join(b2c_eu_scores[term].keys())
+        b2c_to_b2b.append({
+            "term": t["term"],
+            "category": t.get("category", ""),
+            "lifecycle": lc,
+            "us_score": us_score,
+            "b2b_score": b2b_max,
+            "reason": (
+                f"{t['term'].title()} scores {us_score} on Etsy US{markets_str} "
+                f"but only {b2b_max} in wholesale — pitch to DK/FI clients"
+            ),
+        })
+    b2c_to_b2b.sort(key=lambda x: x["us_score"] - x["b2b_score"], reverse=True)
+
+    # --- B2B → B2C: Wholesale trends to list on Etsy ---
+    b2b_to_b2c = []
+    for term, market_scores in b2b_scores.items():
+        b2b_max = max(market_scores.values())
+        us_t = us_scores.get(term, {})
+        us_score = us_t.get("score", 0) if us_t else 0
+        fc = fc_lookup.get(term, {})
+        lc = fc.get("lifecycle", "unknown")
+        if lc == "declining" or b2b_max < 30:
+            continue
+        if us_score >= b2b_max * 0.8:
+            continue  # already strong on Etsy
+        top_market = max(market_scores, key=market_scores.get)
+        b2b_to_b2c.append({
+            "term": term,
+            "category": us_t.get("category", "") if us_t else "",
+            "lifecycle": lc,
+            "b2b_score": b2b_max,
+            "us_score": us_score,
+            "top_market": top_market,
+            "reason": (
+                f"{term.title()} scores {b2b_max} in {top_market} wholesale "
+                f"but only {us_score} on Etsy — list early to capture demand"
+            ),
+        })
+    b2b_to_b2c.sort(key=lambda x: x["b2b_score"] - x["us_score"], reverse=True)
+
+    # --- ETSY PERFORMANCE METRICS ---
+    etsy_perf = []
+    for t in all_trends[:15]:
+        favs = t.get("avg_favorites", 0)
+        reviews = t.get("avg_reviews", 0) or t.get("mention_count", 0)
+        price = t.get("avg_price", 0)
+        if favs <= 0 and price <= 0:
+            continue
+        fc = fc_lookup.get(t["term"].lower(), {})
+        etsy_perf.append({
+            "term": t["term"],
+            "category": t.get("category", ""),
+            "score": t.get("score", 0),
+            "avg_favorites": favs,
+            "avg_reviews": reviews,
+            "avg_price": round(price, 2) if price else 0,
+            "lifecycle": fc.get("lifecycle", "unknown"),
+        })
+    etsy_perf.sort(key=lambda x: x["avg_favorites"], reverse=True)
+
+    return {
+        "pipeline": pipeline[:8],
+        "b2c_to_b2b": b2c_to_b2b[:6],
+        "b2b_to_b2c": b2b_to_b2c[:6],
+        "etsy_perf": etsy_perf[:10],
+    }
 
 
 def _build_seasonal_calendar():

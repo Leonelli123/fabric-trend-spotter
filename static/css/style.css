@@ -1573,6 +1573,161 @@ a.pt-pin-title:hover { color: var(--red); }
 .footer-sep { margin: 0 0.5rem; }
 
 /* ==========================================
+   CHANNEL TOGGLE
+   ========================================== */
+
+.channel-toggle {
+    display: inline-flex;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--bg-card);
+}
+.channel-btn {
+    padding: 0.4rem 1rem;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    line-height: 1.3;
+    border-right: 1px solid var(--border);
+}
+.channel-btn:last-child { border-right: none; }
+.channel-btn:hover { background: var(--bg-card-hover); color: var(--text); }
+.channel-btn.active {
+    background: var(--accent);
+    color: white;
+}
+.channel-label { font-size: 0.85rem; font-weight: 700; }
+.channel-sub { font-size: 0.6rem; opacity: 0.8; white-space: nowrap; }
+
+/* ==========================================
+   CROSS-CHANNEL INTELLIGENCE
+   ========================================== */
+
+.pipeline-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.xc-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.8rem;
+    padding: 1rem 1.2rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: border-color 0.2s;
+}
+.xc-card:hover { border-color: var(--accent); }
+.xc-card.xc-high { border-left: 3px solid var(--green); }
+.xc-card.xc-medium { border-left: 3px solid var(--yellow); }
+
+.xc-stage-badge {
+    flex-shrink: 0;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.3rem 0.6rem;
+    border-radius: 4px;
+    text-align: center;
+    min-width: 4.5rem;
+}
+.stage-search_only { background: rgba(168,85,247,0.15); color: var(--purple); }
+.stage-us_only { background: rgba(59,130,246,0.15); color: var(--blue); }
+.stage-etsy_eu { background: rgba(34,197,94,0.15); color: var(--green); }
+.stage-crossing { background: rgba(234,179,8,0.15); color: var(--yellow); }
+.stage-b2b_first { background: rgba(249,115,22,0.15); color: var(--orange); }
+
+.xc-direction {
+    flex-shrink: 0;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.3rem 0.6rem;
+    border-radius: 4px;
+    background: rgba(108,99,255,0.15);
+    color: var(--accent);
+    text-align: center;
+    min-width: 4.5rem;
+}
+
+.xc-body { flex: 1; }
+.xc-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.2rem;
+    flex-wrap: wrap;
+}
+.xc-term { font-weight: 700; font-size: 0.95rem; }
+.xc-action {
+    font-size: 0.78rem;
+    color: var(--accent);
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.xc-scores {
+    display: flex;
+    gap: 0.6rem;
+    flex-shrink: 0;
+}
+.xc-score-item { text-align: center; }
+.xc-score-label {
+    display: block;
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+.xc-score-val {
+    display: block;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--accent);
+}
+
+/* Etsy Performance Table */
+.etsy-perf-table-wrap {
+    overflow-x: auto;
+}
+.etsy-perf-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.etsy-perf-table th {
+    text-align: left;
+    padding: 0.6rem 0.8rem;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    border-bottom: 2px solid var(--border);
+    white-space: nowrap;
+}
+.etsy-perf-table td {
+    padding: 0.6rem 0.8rem;
+    border-bottom: 1px solid rgba(42,46,63,0.4);
+    font-size: 0.85rem;
+}
+.etsy-perf-table tr:hover td { background: var(--bg-card-hover); }
+.perf-rank { color: var(--text-muted); font-weight: 700; width: 2rem; }
+.perf-term { font-weight: 700; }
+.perf-score { font-weight: 700; color: var(--accent); }
+.perf-fav { color: var(--pink); font-weight: 600; }
+
+/* ==========================================
    REPORT EXPORT BAR
    ========================================== */
 
@@ -1835,4 +1990,8 @@ a.pt-pin-title:hover { color: var(--red); }
     .nav-link { font-size: 0.7rem; padding: 0.6rem 0.5rem; }
     .intel-timing-grid { grid-template-columns: 1fr; }
     .report-export-bar { flex-direction: column; align-items: flex-start; }
+    .xc-card { flex-wrap: wrap; }
+    .xc-scores { width: 100%; justify-content: flex-start; margin-top: 0.5rem; }
+    .channel-toggle { width: 100%; }
+    .channel-btn { flex: 1; }
 }
