@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fabric Trend Spotter</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <header>
@@ -887,11 +886,11 @@
         </section>
         {% endif %}
 
-        <!-- ========== SECTION 8: FORECASTS (4 Buckets) ========== -->
+        <!-- ========== SECTION 8: FORECASTS (4 Buckets, 3-5 each) ========== -->
         <section id="forecasts" class="section" data-channel="both">
             <div class="section-header">
                 <h2>Trend Forecasts</h2>
-                <p class="section-subtitle">4 buckets &mdash; Design Now, Watch, Evergreen, Phase Out</p>
+                <p class="section-subtitle">12-20 items max &mdash; the only forecast view you need</p>
             </div>
 
             {% if action_board and action_board.buckets %}
@@ -900,10 +899,10 @@
                     <div class="stage-header">
                         <span class="stage-dot emerging"></span>
                         <h3>Design Now</h3>
-                        <span class="stage-desc">Act on these</span>
+                        <span class="stage-desc">Invest design time</span>
                     </div>
                     <div class="stage-items">
-                        {% for f in action_board.buckets.design_now[:10] %}
+                        {% for f in action_board.buckets.design_now[:5] %}
                         <div class="forecast-chip emerging" title="Score: {{ f.current_score }} &rarr; {{ f.predicted_score }}">
                             <span class="chip-term">{{ f.term|title }}</span>
                             <span class="chip-arrow">&#9650;</span>
@@ -917,9 +916,10 @@
                     <div class="stage-header">
                         <span class="stage-dot peak"></span>
                         <h3>Watch</h3>
+                        <span class="stage-desc">Don't invest yet</span>
                     </div>
                     <div class="stage-items">
-                        {% for f in action_board.buckets.watch[:10] %}
+                        {% for f in action_board.buckets.watch[:5] %}
                         <div class="forecast-chip peak">
                             <span class="chip-term">{{ f.term|title }}</span>
                             <span class="chip-score">{{ f.predicted_score }}</span>
@@ -932,9 +932,10 @@
                     <div class="stage-header">
                         <span class="stage-dot rising"></span>
                         <h3>Evergreen</h3>
+                        <span class="stage-desc">Always keep in rotation</span>
                     </div>
                     <div class="stage-items">
-                        {% for f in action_board.buckets.evergreen[:10] %}
+                        {% for f in action_board.buckets.evergreen[:5] %}
                         <div class="forecast-chip rising">
                             <span class="chip-term">{{ f.term|title }}</span>
                             <span class="chip-score">{{ f.current_score }}</span>
@@ -947,9 +948,10 @@
                     <div class="stage-header">
                         <span class="stage-dot declining"></span>
                         <h3>Phase Out</h3>
+                        <span class="stage-desc">Stop promoting, clear stock</span>
                     </div>
                     <div class="stage-items">
-                        {% for f in action_board.buckets.phase_out[:10] %}
+                        {% for f in action_board.buckets.phase_out[:5] %}
                         <div class="forecast-chip declining">
                             <span class="chip-term">{{ f.term|title }}</span>
                             <span class="chip-score">{{ f.predicted_score }}</span>
@@ -960,26 +962,11 @@
             </div>
             {% endif %}
 
-            {% if not forecasts %}
+            {% if not action_board or not action_board.buckets %}
             <div class="empty-state">
                 <p>No forecasts yet. Click <strong>Refresh Data</strong> to generate predictions.</p>
             </div>
             {% endif %}
-        </section>
-
-        <!-- Stats Footer -->
-        <section class="stats-section">
-            <div class="stats-grid">
-                {% for source, stat in stats.items() %}
-                {% if source not in ('total_snapshots', 'total_images', 'total_forecasts') %}
-                <div class="stat-card">
-                    <div class="stat-source">{{ source|title }}</div>
-                    <div class="stat-count">{{ stat.count }}</div>
-                    <div class="stat-label">listings</div>
-                </div>
-                {% endif %}
-                {% endfor %}
-            </div>
         </section>
 
         <footer class="site-footer">
@@ -992,12 +979,5 @@
     </main>
 
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
-    <script>
-        const fabricData = {{ trends.fabric_types|tojson }};
-        const patternData = {{ trends.patterns|tojson }};
-        const colorData = {{ trends.colors|tojson }};
-        const styleData = {{ trends.styles|tojson }};
-        initCharts(fabricData, patternData, colorData, styleData);
-    </script>
 </body>
 </html>

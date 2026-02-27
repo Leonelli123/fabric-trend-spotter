@@ -50,47 +50,19 @@ def dashboard():
         "colors": get_latest_trends("color", limit=15),
         "styles": get_latest_trends("style", limit=15),
     }
-    forecasts = get_forecasts(limit=20)
-    stats = get_scrape_stats()
 
-    # Get images for visual gallery
-    images = get_trend_images(limit=40)
-
-    # Get segment data
-    segment_data = {}
-    for seg_key in SEGMENTS:
-        seg_trends = get_latest_trends(segment=seg_key, limit=10)
-        if seg_trends:
-            segment_data[seg_key] = {
-                "config": SEGMENTS[seg_key],
-                "trends": seg_trends,
-            }
-
-    # Get European market data from latest snapshots
+    # European market data
     eu_data = scrape_status.get("eu_result", {})
 
-    # Pinterest social/visual trend data
-    pinterest_data = scrape_status.get("pinterest_result", {})
-
-    # Action board and insights
+    # Action board (weekly tasks, briefs, signals, gaps, forecasts)
     action_board = scrape_status.get("action_board", {})
-    insights = scrape_status.get("insights", [])
 
     return render_template(
         "dashboard.html",
         trends=trends,
-        forecasts=forecasts,
-        images=images,
-        stats=stats,
         scrape_status=scrape_status,
-        segments=SEGMENTS,
-        segment_data=segment_data,
         eu_data=eu_data,
-        eu_countries=EUROPEAN_COUNTRIES,
-        eu_regions=EUROPEAN_REGIONS,
-        pinterest_data=pinterest_data,
         action_board=action_board,
-        insights=insights,
     )
 
 

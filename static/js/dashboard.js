@@ -1,47 +1,4 @@
-/* Fabric Trend Spotter - Dashboard JS v3 */
-
-const CHART_COLORS = [
-    '#6c63ff', '#ec4899', '#22c55e', '#eab308', '#f97316',
-    '#3b82f6', '#8b5cf6', '#14b8a6', '#f43f5e', '#a855f7',
-];
-
-/* ==========================================
-   CHARTS
-   ========================================== */
-
-function initCharts(fabricData, patternData, colorData, styleData) {
-    const opts = {
-        responsive: true,
-        maintainAspectRatio: true,
-        plugins: { legend: { display: false } },
-        scales: {
-            y: { beginAtZero: true, grid: { color: 'rgba(42,46,63,0.5)' }, ticks: { color: '#8b8fa3' } },
-            x: { grid: { display: false }, ticks: { color: '#8b8fa3', maxRotation: 45, font: { size: 10 } } },
-        },
-    };
-    createBarChart('fabric-chart', fabricData, opts);
-    createBarChart('pattern-chart', patternData, opts);
-    createBarChart('color-chart', colorData, opts);
-    if (styleData) createBarChart('style-chart', styleData, opts);
-}
-
-function createBarChart(id, data, options) {
-    const canvas = document.getElementById(id);
-    if (!canvas || !data.length) return null;
-    const labels = data.slice(0, 10).map(d => cap(d.term));
-    const scores = data.slice(0, 10).map(d => d.score);
-    const colors = scores.map((_, i) => CHART_COLORS[i % CHART_COLORS.length]);
-    return new Chart(canvas, {
-        type: 'bar',
-        data: {
-            labels,
-            datasets: [{ data: scores, backgroundColor: colors.map(c => c + '40'), borderColor: colors, borderWidth: 2, borderRadius: 6 }],
-        },
-        options,
-    });
-}
-
-function cap(s) { return s.replace(/\b\w/g, l => l.toUpperCase()); }
+/* Fabric Trend Spotter - Dashboard JS v4 */
 
 /* ==========================================
    SCRAPE
