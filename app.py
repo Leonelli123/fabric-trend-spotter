@@ -1,10 +1,6 @@
 """Flask web application for the Fabric Trend Spotter dashboard."""
 
 import logging
-import json
-import hashlib
-import hmac
-import base64
 import threading
 from datetime import datetime
 from flask import Flask, render_template, jsonify, request
@@ -16,7 +12,7 @@ from scrapers import (
     scrape_etsy, scrape_amazon, scrape_spoonflower,
     fetch_google_trends, fetch_european_trends,
     get_seed_listings, get_european_seed_listings,
-    fetch_instagram_trends, analyze_instagram_data, ig_is_configured,
+    scrape_pinterest, analyze_pinterest_data,
 )
 from analysis import analyze_trends, analyze_european_trends, run_forecasts
 from database import save_listings
@@ -71,8 +67,8 @@ def dashboard():
     # Get European market data from latest snapshots
     eu_data = scrape_status.get("eu_result", {})
 
-    # Instagram social data
-    ig_data = scrape_status.get("ig_result", {})
+    # Pinterest social/visual trend data
+    pinterest_data = scrape_status.get("pinterest_result", {})
 
     return render_template(
         "dashboard.html",
@@ -86,8 +82,7 @@ def dashboard():
         eu_data=eu_data,
         eu_countries=EUROPEAN_COUNTRIES,
         eu_regions=EUROPEAN_REGIONS,
-        ig_data=ig_data,
-        ig_configured=ig_is_configured(),
+        pinterest_data=pinterest_data,
     )
 
 
@@ -174,72 +169,25 @@ def api_european_trends():
 
 @app.route("/privacy")
 def privacy_policy():
-    """Privacy policy page (required for Meta app review)."""
+    """Privacy policy page."""
     return render_template("privacy.html", current_date=datetime.now().strftime("%B %d, %Y"))
 
 
 @app.route("/terms")
 def terms_of_service():
-    """Terms of Service page (required for Meta app review)."""
+    """Terms of Service page."""
     return render_template("terms.html", current_date=datetime.now().strftime("%B %d, %Y"))
 
 
-@app.route("/deauthorize", methods=["POST"])
-def deauthorize_callback():
-    """Meta deauthorize callback - called when a user removes the app.
-
-    Meta sends a signed_request POST parameter. We don't store user data,
-    so we just acknowledge the request and return a confirmation.
-    """
-    signed_request = request.form.get("signed_request", "")
-    if signed_request:
-        logger.info("Received deauthorize callback from Meta")
-    return jsonify({"status": "ok", "message": "No user data to remove"})
-
-
-@app.route("/data-deletion", methods=["POST", "GET"])
-def data_deletion():
-    """Meta data deletion callback / status page.
-
-    POST: Meta sends a signed_request when user requests data deletion.
-          We return a confirmation_code and a status URL.
-    GET:  Status check page - shows deletion was completed (we store no user data).
-    """
-    if request.method == "GET":
-        code = request.args.get("code", "none")
-        return render_template(
-            "data_deletion_status.html",
-            confirmation_code=code,
-            current_date=datetime.now().strftime("%B %d, %Y"),
-        )
-
-    # POST from Meta
-    signed_request = request.form.get("signed_request", "")
-    confirmation_code = "FTS-DEL-" + hashlib.sha256(
-        (signed_request + datetime.now().isoformat()).encode()
-    ).hexdigest()[:12].upper()
-
-    logger.info("Data deletion request received, code: %s", confirmation_code)
-
-    # Return the response Meta expects
-    return jsonify({
-        "url": request.url_root.rstrip("/") + f"/data-deletion?code={confirmation_code}",
-        "confirmation_code": confirmation_code,
-    })
-
-
-@app.route("/api/instagram-trends")
-def api_instagram_trends():
-    """API endpoint for Instagram hashtag trend data."""
-    ig_data = scrape_status.get("ig_result", {})
-    if not ig_data:
+@app.route("/api/pinterest-trends")
+def api_pinterest_trends():
+    """API endpoint for Pinterest fabric trend data."""
+    pinterest_data = scrape_status.get("pinterest_result", {})
+    if not pinterest_data:
         return jsonify({
-            "configured": ig_is_configured(),
-            "message": "No Instagram data yet. Run a scrape to fetch hashtag trends."
-            if ig_is_configured()
-            else "Instagram API not configured. Set INSTAGRAM_ACCESS_TOKEN and INSTAGRAM_BUSINESS_ID.",
+            "message": "No Pinterest data yet. Click Refresh Data to scrape Pinterest trends.",
         })
-    return jsonify(ig_data)
+    return jsonify(pinterest_data)
 
 
 @app.route("/api/status")
@@ -284,6 +232,7 @@ def _run_scrape():
             ("Etsy", scrape_etsy),
             ("Amazon", scrape_amazon),
             ("Spoonflower", scrape_spoonflower),
+            ("Pinterest", scrape_pinterest),
         ]:
             try:
                 logger.info("Attempting %s...", name)
@@ -346,43 +295,25 @@ def _run_scrape():
         emerging = [f for f in forecasts if f["lifecycle"] == "emerging"]
         rising = [f for f in forecasts if f["lifecycle"] == "rising"]
 
-        # Step 6: Instagram Social Trends (optional - requires Meta app approval)
-        ig_result = {}
+        # Step 6: Pinterest Social/Visual Trends
+        pinterest_result = {}
         try:
-            if ig_is_configured():
-                logger.info("Fetching Instagram hashtag trends...")
-                raw_ig = fetch_instagram_trends()
-                if raw_ig:
-                    ig_result = analyze_instagram_data(raw_ig)
-                    scrape_status["ig_result"] = ig_result
-                    source_status["Instagram"] = {
-                        "status": "ok",
-                        "count": ig_result.get("total_hashtags_tracked", 0),
-                        "note": f"{ig_result.get('total_hashtags_tracked', 0)} hashtags",
-                    }
-                    logger.info(
-                        "Instagram: %d hashtags analyzed",
-                        ig_result.get("total_hashtags_tracked", 0),
-                    )
-                else:
-                    source_status["Instagram"] = {
-                        "status": "empty",
-                        "count": 0,
-                        "note": "No data returned (rate limited?)",
-                    }
+            # Get Pinterest listings from the scraper step above
+            pinterest_listings = [l for l in all_listings if l.get("source") == "pinterest"]
+            if pinterest_listings:
+                logger.info("Analyzing %d Pinterest pins...", len(pinterest_listings))
+                pinterest_result = analyze_pinterest_data(pinterest_listings)
+                scrape_status["pinterest_result"] = pinterest_result
+                logger.info(
+                    "Pinterest analysis: %d pins, %d fabric signals, %d pattern signals",
+                    pinterest_result.get("total_pins_analyzed", 0),
+                    len(pinterest_result.get("fabric_signals", [])),
+                    len(pinterest_result.get("pattern_signals", [])),
+                )
             else:
-                source_status["Instagram"] = {
-                    "status": "empty",
-                    "count": 0,
-                    "note": "Not configured (set INSTAGRAM_ACCESS_TOKEN)",
-                }
+                logger.info("No Pinterest data to analyze (scraper may have been blocked)")
         except Exception as e:
-            source_status["Instagram"] = {
-                "status": "error",
-                "count": 0,
-                "note": str(e)[:100],
-            }
-            logger.warning("Instagram failed: %s", e)
+            logger.warning("Pinterest analysis failed: %s", e)
 
         # Step 7: European Markets
         logger.info("Loading European market data...")
@@ -441,7 +372,7 @@ def _run_scrape():
             "emerging_count": len(emerging),
             "rising_count": len(rising),
             "segments_analyzed": len(result.get("segment_trends", {})),
-            "ig_hashtags": ig_result.get("total_hashtags_tracked", 0),
+            "pinterest_pins": pinterest_result.get("total_pins_analyzed", 0),
             "source_status": source_status,
             "ok_sources": ok_sources,
             "failed_sources": failed_sources,

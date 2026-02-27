@@ -317,7 +317,7 @@ def get_scrape_stats():
     """Get statistics about data collection."""
     conn = get_db()
     stats = {}
-    for source in ["etsy", "amazon", "spoonflower", "seed", "eu_seed"]:
+    for source in ["etsy", "amazon", "spoonflower", "pinterest", "seed", "eu_seed"]:
         row = conn.execute(
             """SELECT COUNT(*) as count, MAX(scraped_at) as last_scrape
                FROM listings WHERE source = ?""",

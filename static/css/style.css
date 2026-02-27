@@ -842,10 +842,10 @@ a.gallery-title:hover { color: var(--accent); }
 }
 
 /* ==========================================
-   Instagram Social Trends
+   Pinterest & Social Trends
    ========================================== */
 
-.ig-summary-bar {
+.pt-summary-bar {
     display: flex;
     gap: 1.5rem;
     margin-bottom: 1.25rem;
@@ -854,92 +854,116 @@ a.gallery-title:hover { color: var(--accent); }
     border-radius: 8px;
     border: 1px solid var(--border);
 }
-.ig-stat {
+.pt-stat {
     color: var(--text-muted);
     font-size: 0.85rem;
 }
 
-.ig-section { margin-bottom: 2rem; }
-.ig-section h3 {
+.pt-section { margin-bottom: 2rem; }
+.pt-section h3 {
     font-size: 1rem;
     margin-bottom: 1rem;
     color: var(--text);
 }
 
-.ig-hashtag-grid {
+.pt-pin-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 0.8rem;
     margin-bottom: 2rem;
 }
 
-.ig-hashtag-card {
+.pt-pin-card {
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 1rem;
+    overflow: hidden;
     transition: all 0.2s;
 }
-.ig-hashtag-card:hover {
-    border-color: var(--pink);
-    box-shadow: 0 4px 15px rgba(236, 72, 153, 0.1);
+.pt-pin-card:hover {
+    border-color: var(--red);
+    box-shadow: 0 4px 15px rgba(230, 0, 35, 0.1);
+    transform: translateY(-2px);
 }
 
-.ig-hashtag-name {
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: var(--pink);
-    margin-bottom: 0.6rem;
+.pt-pin-img-wrap {
+    aspect-ratio: 4/3;
+    overflow: hidden;
+    background: var(--border);
 }
+.pt-pin-img-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s;
+}
+.pt-pin-card:hover .pt-pin-img-wrap img { transform: scale(1.05); }
 
-.ig-hashtag-stats {
-    display: flex;
-    gap: 1rem;
-}
-.ig-stat-item { text-align: center; flex: 1; }
-.ig-stat-value {
-    display: block;
-    font-size: 1.1rem;
-    font-weight: 700;
+.pt-pin-info { padding: 0.8rem; }
+
+.pt-pin-title {
+    font-size: 0.8rem;
+    font-weight: 600;
     color: var(--text);
-}
-.ig-stat-label {
+    text-decoration: none;
     display: block;
-    font-size: 0.65rem;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+a.pt-pin-title:hover { color: var(--red); }
+
+.pt-pin-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.4rem;
 }
 
-.ig-trends-grid {
+.pt-saves {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--red);
+}
+
+.pt-tag {
+    font-size: 0.65rem;
+    padding: 0.1rem 0.4rem;
+    background: rgba(230, 0, 35, 0.1);
+    color: var(--red);
+    border-radius: 4px;
+}
+
+.pt-trends-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 1.5rem;
 }
 
-.ig-trend-col {
+.pt-trend-col {
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 1rem;
 }
-.ig-trend-col h4 {
+.pt-trend-col h4 {
     margin-bottom: 0.75rem;
     font-size: 0.95rem;
     color: var(--text);
 }
 
-.ig-signal-item {
+.pt-signal-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 0.4rem 0;
     border-bottom: 1px solid rgba(42, 46, 63, 0.3);
 }
-.ig-signal-item:last-child { border-bottom: none; }
-.ig-signal-term { font-size: 0.9rem; }
-.ig-signal-score {
-    background: var(--pink);
+.pt-signal-item:last-child { border-bottom: none; }
+.pt-signal-term { font-size: 0.9rem; }
+.pt-signal-score {
+    background: var(--red);
     color: white;
     padding: 0.15rem 0.5rem;
     border-radius: 4px;
@@ -947,72 +971,11 @@ a.gallery-title:hover { color: var(--accent); }
     font-weight: 600;
 }
 
-/* Instagram Setup Guide */
-.ig-setup-guide {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 2rem;
-}
-.ig-setup-guide h3 {
-    font-size: 1.2rem;
-    margin-bottom: 0.5rem;
-}
-.ig-setup-guide > p {
-    color: var(--text-muted);
-    margin-bottom: 1.5rem;
-}
-
-.ig-setup-steps {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-}
-
-.ig-step {
-    display: flex;
-    align-items: flex-start;
-    gap: 1rem;
-    padding: 1rem;
-    background: rgba(0, 0, 0, 0.15);
-    border-radius: 8px;
-}
-
-.ig-step-num {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: var(--pink);
-    color: white;
-    font-weight: 700;
-    font-size: 0.9rem;
-    flex-shrink: 0;
-}
-
-.ig-step strong { display: block; margin-bottom: 0.2rem; }
-.ig-step p {
-    color: var(--text-muted);
-    font-size: 0.85rem;
-    margin: 0;
-}
-.ig-step code {
-    background: rgba(108, 99, 255, 0.15);
-    color: var(--accent);
-    padding: 0.1rem 0.4rem;
-    border-radius: 4px;
-    font-size: 0.8rem;
-}
-
-.ig-privacy-note {
+.empty-detail {
     font-size: 0.8rem;
     color: var(--text-muted);
+    margin-top: 0.5rem;
 }
-.ig-privacy-note a { color: var(--accent); text-decoration: none; }
-.ig-privacy-note a:hover { text-decoration: underline; }
 
 /* Footer */
 .site-footer {
@@ -1037,7 +1000,7 @@ a.gallery-title:hover { color: var(--accent); }
     .lifecycle-pipeline { flex-direction: column; }
     .pipeline-arrow { transform: rotate(90deg); align-self: center; }
     .eu-trends-grid { grid-template-columns: 1fr; }
-    .ig-trends-grid { grid-template-columns: 1fr; }
+    .pt-trends-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 600px) {

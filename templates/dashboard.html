@@ -29,7 +29,7 @@
         <nav class="main-nav">
             <a href="#forecasts" class="nav-link active" onclick="scrollToSection('forecasts')">Forecasts</a>
             <a href="#european" class="nav-link" onclick="scrollToSection('european')">European Markets</a>
-            <a href="#instagram" class="nav-link" onclick="scrollToSection('instagram')">Instagram Trends</a>
+            <a href="#pinterest" class="nav-link" onclick="scrollToSection('pinterest')">Pinterest Trends</a>
             <a href="#gallery" class="nav-link" onclick="scrollToSection('gallery')">Visual Gallery</a>
             <a href="#segments" class="nav-link" onclick="scrollToSection('segments')">Market Segments</a>
             <a href="#trends" class="nav-link" onclick="scrollToSection('trends')">Trend Rankings</a>
@@ -364,38 +364,44 @@
             {% endif %}
         </section>
 
-        <!-- ========== SECTION 3: INSTAGRAM SOCIAL TRENDS ========== -->
-        <section id="instagram" class="section">
+        <!-- ========== SECTION 3: PINTEREST & SOCIAL TRENDS ========== -->
+        <section id="pinterest" class="section">
             <div class="section-header">
-                <h2>Instagram Social Trends</h2>
-                <p class="section-subtitle">Fabric hashtag activity from Instagram &mdash; engagement, top posts &amp; trend signals</p>
+                <h2>Pinterest Trends</h2>
+                <p class="section-subtitle">Visual fabric trends from Pinterest &mdash; the leading indicator for craft, sewing &amp; textile trends</p>
             </div>
 
-            {% if ig_data and ig_data.top_hashtags %}
-            <div class="ig-summary-bar">
-                <span class="ig-stat">{{ ig_data.total_hashtags_tracked }} hashtags tracked</span>
-                <span class="ig-stat">Last fetched: {{ ig_data.fetched_at[:16] if ig_data.fetched_at else 'N/A' }}</span>
+            {% if pinterest_data and pinterest_data.top_pins %}
+            <div class="pt-summary-bar">
+                <span class="pt-stat">{{ pinterest_data.total_pins_analyzed }} pins analyzed</span>
+                <span class="pt-stat">Last fetched: {{ pinterest_data.fetched_at[:16] if pinterest_data.fetched_at else 'N/A' }}</span>
             </div>
 
-            <!-- Top Hashtags -->
-            <div class="ig-section">
-                <h3>Top Hashtags by Engagement</h3>
-                <div class="ig-hashtag-grid">
-                    {% for h in ig_data.top_hashtags %}
-                    <div class="ig-hashtag-card">
-                        <div class="ig-hashtag-name">{{ h.hashtag }}</div>
-                        <div class="ig-hashtag-stats">
-                            <div class="ig-stat-item">
-                                <span class="ig-stat-value">{{ h.engagement|round(1) }}</span>
-                                <span class="ig-stat-label">Engagement</span>
-                            </div>
-                            <div class="ig-stat-item">
-                                <span class="ig-stat-value">{{ h.recent_count }}</span>
-                                <span class="ig-stat-label">Recent</span>
-                            </div>
-                            <div class="ig-stat-item">
-                                <span class="ig-stat-value">{{ h.top_count }}</span>
-                                <span class="ig-stat-label">Top Posts</span>
+            <!-- Top Pins -->
+            <div class="pt-section">
+                <h3>Top Pins by Saves</h3>
+                <div class="pt-pin-grid">
+                    {% for pin in pinterest_data.top_pins[:12] %}
+                    <div class="pt-pin-card">
+                        {% if pin.image_url %}
+                        <div class="pt-pin-img-wrap">
+                            <img src="{{ pin.image_url }}" alt="{{ pin.title }}" loading="lazy"
+                                 onerror="this.parentElement.style.display='none'">
+                        </div>
+                        {% endif %}
+                        <div class="pt-pin-info">
+                            {% if pin.url %}
+                            <a href="{{ pin.url }}" target="_blank" rel="noopener" class="pt-pin-title">{{ pin.title }}</a>
+                            {% else %}
+                            <span class="pt-pin-title">{{ pin.title }}</span>
+                            {% endif %}
+                            <div class="pt-pin-meta">
+                                {% if pin.saves > 0 %}
+                                <span class="pt-saves">{{ pin.saves }} saves</span>
+                                {% endif %}
+                                {% for tag in pin.tags[:3] %}
+                                <span class="pt-tag">{{ tag }}</span>
+                                {% endfor %}
                             </div>
                         </div>
                     </div>
@@ -403,84 +409,47 @@
                 </div>
             </div>
 
-            <!-- Trend Signals from Instagram -->
-            <div class="ig-trends-grid">
-                {% if ig_data.fabric_signals %}
-                <div class="ig-trend-col">
-                    <h4>Fabric Signals from Instagram</h4>
-                    {% for s in ig_data.fabric_signals[:8] %}
-                    <div class="ig-signal-item">
-                        <span class="ig-signal-term">{{ s.term|title }}</span>
-                        <span class="ig-signal-score">{{ s.ig_score }}</span>
+            <!-- Trend Signals from Pinterest -->
+            <div class="pt-trends-grid">
+                {% if pinterest_data.fabric_signals %}
+                <div class="pt-trend-col">
+                    <h4>Fabric Signals from Pinterest</h4>
+                    {% for s in pinterest_data.fabric_signals[:8] %}
+                    <div class="pt-signal-item">
+                        <span class="pt-signal-term">{{ s.term|title }}</span>
+                        <span class="pt-signal-score">{{ s.pinterest_score }}</span>
                     </div>
                     {% endfor %}
                 </div>
                 {% endif %}
-                {% if ig_data.pattern_signals %}
-                <div class="ig-trend-col">
-                    <h4>Pattern Signals from Instagram</h4>
-                    {% for s in ig_data.pattern_signals[:8] %}
-                    <div class="ig-signal-item">
-                        <span class="ig-signal-term">{{ s.term|title }}</span>
-                        <span class="ig-signal-score">{{ s.ig_score }}</span>
+                {% if pinterest_data.pattern_signals %}
+                <div class="pt-trend-col">
+                    <h4>Pattern Signals from Pinterest</h4>
+                    {% for s in pinterest_data.pattern_signals[:8] %}
+                    <div class="pt-signal-item">
+                        <span class="pt-signal-term">{{ s.term|title }}</span>
+                        <span class="pt-signal-score">{{ s.pinterest_score }}</span>
                     </div>
                     {% endfor %}
                 </div>
                 {% endif %}
-                {% if ig_data.color_signals %}
-                <div class="ig-trend-col">
-                    <h4>Color Signals from Instagram</h4>
-                    {% for s in ig_data.color_signals[:8] %}
-                    <div class="ig-signal-item">
-                        <span class="ig-signal-term">{{ s.term|title }}</span>
-                        <span class="ig-signal-score">{{ s.ig_score }}</span>
+                {% if pinterest_data.color_signals %}
+                <div class="pt-trend-col">
+                    <h4>Color Signals from Pinterest</h4>
+                    {% for s in pinterest_data.color_signals[:8] %}
+                    <div class="pt-signal-item">
+                        <span class="pt-signal-term">{{ s.term|title }}</span>
+                        <span class="pt-signal-score">{{ s.pinterest_score }}</span>
                     </div>
                     {% endfor %}
                 </div>
                 {% endif %}
             </div>
 
-            {% elif ig_configured %}
-            <div class="empty-state">
-                <p>Instagram API is configured. Click <strong>Refresh Data</strong> to fetch hashtag trends.</p>
-            </div>
             {% else %}
-            <div class="ig-setup-guide">
-                <h3>Instagram Integration Setup</h3>
-                <p>Connect your Instagram Business account to track fabric hashtag trends in real-time.</p>
-                <div class="ig-setup-steps">
-                    <div class="ig-step">
-                        <span class="ig-step-num">1</span>
-                        <div>
-                            <strong>Create Meta Developer App</strong>
-                            <p>Go to <code>developers.facebook.com</code> and create a Business app</p>
-                        </div>
-                    </div>
-                    <div class="ig-step">
-                        <span class="ig-step-num">2</span>
-                        <div>
-                            <strong>Get App Approved</strong>
-                            <p>Submit for review with instagram_basic + pages_show_list permissions</p>
-                        </div>
-                    </div>
-                    <div class="ig-step">
-                        <span class="ig-step-num">3</span>
-                        <div>
-                            <strong>Set Environment Variables</strong>
-                            <p>Add <code>INSTAGRAM_ACCESS_TOKEN</code> and <code>INSTAGRAM_BUSINESS_ID</code> to your Render deployment</p>
-                        </div>
-                    </div>
-                    <div class="ig-step">
-                        <span class="ig-step-num">4</span>
-                        <div>
-                            <strong>Refresh Data</strong>
-                            <p>Click Refresh Data to start tracking 40+ fabric hashtags automatically</p>
-                        </div>
-                    </div>
-                </div>
-                <p class="ig-privacy-note">
-                    We only read public hashtag data. See our <a href="/privacy">Privacy Policy</a> for details.
-                </p>
+            <div class="empty-state">
+                <p>No Pinterest data yet. Click <strong>Refresh Data</strong> to scrape fabric trends from Pinterest.</p>
+                <p class="empty-detail">Pinterest is a leading indicator for fabric/textile trends &mdash; visual trends often appear here 1-3 months before marketplace listings increase.</p>
             </div>
             {% endif %}
         </section>
@@ -723,6 +692,7 @@
                 <button class="filter-btn" onclick="filterListings('etsy')">Etsy</button>
                 <button class="filter-btn" onclick="filterListings('amazon')">Amazon</button>
                 <button class="filter-btn" onclick="filterListings('spoonflower')">Spoonflower</button>
+                <button class="filter-btn" onclick="filterListings('pinterest')">Pinterest</button>
             </div>
             <div id="listings-container" class="listings-grid"></div>
         </section>

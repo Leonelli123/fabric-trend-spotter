@@ -201,6 +201,30 @@ def _detect_signals(item, google_data):
             "lead_months": 1,
         })
 
+    # Signal 7: Pinterest presence (visual trend leading indicator)
+    pinterest_count = sources.get("pinterest", 0)
+    if pinterest_count >= 5:
+        signals.append({
+            "source": "pinterest",
+            "type": "visual_trend",
+            "description": (
+                f"'{item['term']}' found in {pinterest_count} Pinterest pins "
+                f"(strong visual trend signal)"
+            ),
+            "strength": "strong",
+            "lead_months": 2,
+        })
+    elif pinterest_count >= 2:
+        signals.append({
+            "source": "pinterest",
+            "type": "visual_trend",
+            "description": (
+                f"'{item['term']}' appearing on Pinterest ({pinterest_count} pins)"
+            ),
+            "strength": "moderate",
+            "lead_months": 3,
+        })
+
     # Signal 6: Segment-specific relevance
     for seg_key, seg_config in SEGMENTS.items():
         priority_terms = (
@@ -305,6 +329,13 @@ def _calculate_confidence(history, signals, item):
     # Google data available
     if item.get("google_interest", 0) > 0:
         confidence += 8
+
+    # Pinterest data available (visual trends are strong fabric signals)
+    pinterest_count = item.get("by_source", {}).get("pinterest", 0)
+    if pinterest_count >= 5:
+        confidence += 6
+    elif pinterest_count >= 2:
+        confidence += 3
 
     # Data quality from the analysis layer
     tier = item.get("confidence_tier", "moderate")
