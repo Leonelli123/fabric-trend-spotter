@@ -387,26 +387,211 @@ main { max-width: 1400px; margin: 0 auto; padding: 1.5rem 2rem; }
     line-height: 1.4;
 }
 
-/* Unified Actions */
-.unified-actions-section {
-    margin-bottom: 2rem;
-    margin-top: 2rem;
+/* ==========================================
+   THIS WEEK'S ACTIONS
+   ========================================== */
+
+.weekly-tasks {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
 }
 
-.bucket-badge {
+.weekly-task {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.8rem;
+    padding: 1rem 1.2rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: border-color 0.2s;
+}
+.weekly-task:hover { border-color: var(--accent); }
+.weekly-task.priority-high { border-left: 3px solid var(--green); }
+.weekly-task.priority-medium { border-left: 3px solid var(--yellow); }
+.weekly-task.priority-low { border-left: 3px solid var(--text-muted); }
+
+.task-number {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--accent);
+    width: 1.5rem;
+    flex-shrink: 0;
+    text-align: center;
+}
+
+.task-icon {
+    font-size: 1.1rem;
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border-radius: 8px;
+    background: rgba(108,99,255,0.1);
+    color: var(--accent);
+}
+
+.task-body h4 { font-size: 0.95rem; margin-bottom: 0.2rem; }
+.task-body p { font-size: 0.8rem; color: var(--text-muted); line-height: 1.5; }
+
+.task-priority {
     flex-shrink: 0;
     font-size: 0.6rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    padding: 0.25rem 0.5rem;
+    padding: 0.2rem 0.5rem;
     border-radius: 4px;
     align-self: center;
 }
-.bucket-badge.bucket-design_now { background: rgba(20,184,166,0.15); color: var(--teal); }
-.bucket-badge.bucket-evergreen { background: rgba(34,197,94,0.15); color: var(--green); }
-.bucket-badge.bucket-watch { background: rgba(234,179,8,0.15); color: var(--yellow); }
-.bucket-badge.bucket-phase_out { background: rgba(239,68,68,0.15); color: var(--red); }
+.task-priority.high { background: rgba(34,197,94,0.15); color: var(--green); }
+.task-priority.medium { background: rgba(234,179,8,0.15); color: var(--yellow); }
+.task-priority.low { background: rgba(139,143,163,0.15); color: var(--text-muted); }
+
+/* ==========================================
+   MARKET SIGNALS
+   ========================================== */
+
+.signals-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+}
+
+.signal-col {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+}
+
+.signal-col-title {
+    font-size: 0.95rem;
+    margin-bottom: 0.8rem;
+}
+
+.signal-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid rgba(42,46,63,0.3);
+}
+.signal-row:last-child { border-bottom: none; }
+
+.signal-rank { color: var(--text-muted); font-size: 0.75rem; width: 1.8rem; flex-shrink: 0; }
+.signal-term { flex: 1; font-size: 0.9rem; font-weight: 600; }
+.signal-score-val { font-weight: 700; color: var(--accent); font-size: 0.85rem; }
+.signal-vel { font-size: 0.75rem; font-weight: 700; }
+.signal-vel.up { color: var(--green); }
+.signal-vel.down { color: var(--red); }
+
+/* ==========================================
+   OPPORTUNITY GAPS
+   ========================================== */
+
+.gaps-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.gap-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1rem 1.2rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--teal);
+    border-radius: var(--radius);
+}
+.gap-card:hover { border-color: var(--teal); }
+
+.gap-strength {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--teal);
+    min-width: 2.5rem;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.gap-body h4 { font-size: 0.95rem; margin-bottom: 0.2rem; }
+.gap-body p { font-size: 0.8rem; color: var(--text-muted); line-height: 1.5; }
+
+/* ==========================================
+   SEASONAL CALENDAR
+   ========================================== */
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+}
+
+.calendar-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.2rem;
+}
+.calendar-card.calendar-current {
+    border-color: var(--accent);
+    box-shadow: 0 0 20px var(--accent-glow);
+}
+
+.cal-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.cal-quarter {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.cal-now-badge {
+    font-size: 0.6rem;
+    font-weight: 700;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    background: var(--accent);
+    color: white;
+}
+
+.cal-next-badge {
+    font-size: 0.6rem;
+    font-weight: 700;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    background: rgba(234,179,8,0.2);
+    color: var(--yellow);
+}
+
+.cal-focus {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 0.8rem;
+    line-height: 1.4;
+}
+
+.cal-prep {
+    font-size: 0.75rem;
+    color: var(--green);
+    font-weight: 600;
+    margin-top: 0.8rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--border);
+}
 
 /* Seasonal */
 .seasonal-card {
@@ -1366,23 +1551,29 @@ a.pt-pin-title:hover { color: var(--red); }
 /* Responsive */
 @media (max-width: 1200px) {
     .charts-section.charts-4col { grid-template-columns: repeat(2, 1fr); }
-    .pt-trends-grid { grid-template-columns: repeat(2, 1fr); }
+    .signals-grid { grid-template-columns: repeat(2, 1fr); }
+    .calendar-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 1000px) {
     .charts-section, .charts-section.charts-4col { grid-template-columns: 1fr; }
-    .segment-grid { grid-template-columns: 1fr; }
     .lifecycle-pipeline { flex-direction: column; }
     .pipeline-arrow { transform: rotate(90deg); align-self: center; }
     .eu-trends-grid { grid-template-columns: 1fr; }
-    .pt-trends-grid { grid-template-columns: 1fr; }
+    .signals-grid { grid-template-columns: 1fr; }
+    .calendar-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 600px) {
     .forecast-cards { grid-template-columns: 1fr; }
     .briefs-grid { grid-template-columns: 1fr; }
-    .gallery-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
     header { padding: 1rem; }
     main { padding: 1rem; }
     .eu-tabs { gap: 0.25rem; }
     .eu-tab { font-size: 0.75rem; padding: 0.4rem 0.6rem; }
+    .weekly-task { flex-wrap: wrap; }
+    .task-priority { margin-left: auto; }
+    .action-summary-bar { flex-wrap: wrap; }
+    .summary-top { width: 100%; }
+    .main-nav { gap: 0; }
+    .nav-link { font-size: 0.7rem; padding: 0.6rem 0.5rem; }
 }

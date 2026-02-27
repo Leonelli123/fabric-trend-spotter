@@ -438,25 +438,32 @@ def _run_scrape():
 
 
 def _build_action_board(result, forecasts, google_data):
-    """Build unified action board with design briefs and 4-bucket forecasts.
+    """Build the 7-section dashboard data for a 2-person cotton jersey print company.
 
-    Phase 1 redesign: replaces 5 role tabs with a single prioritized list,
-    adds cross-referenced Design Briefs (color × pattern × style), and
-    simplifies lifecycle to 4 buckets.
+    Sections:
+      1. weekly_actions  — 5-7 concrete tasks for this week
+      2. design_briefs   — prioritized color × pattern × style combos
+      3. market_signals  — trending colors, patterns, styles combined
+      4. etsy_intel      — B2C market opportunities (US/UK/DE/NL)
+      5. wholesale_pulse — B2B wholesale trends (DK/FI/DE)
+      6. opportunity_gaps — high demand + low supply
+      7. seasonal_calendar — what to prepare for next month/quarter
+    Also: summary stats and 4-bucket forecasts.
     """
     from datetime import datetime
+    import calendar
 
     fabrics = result.get("fabric_types", [])
     patterns = result.get("patterns", [])
     colors = result.get("colors", [])
     styles = result.get("styles", [])
+    all_trends = fabrics + patterns + colors + styles
 
-    # Map forecasts into 4 simplified buckets
-    design_now = []   # emerging + rising = act on these
-    watch = []        # stable / new with low confidence
-    phase_out = []    # declining
-    evergreen = []    # peak + high-confidence stable (proven demand)
-
+    # --- 4-bucket forecasts (kept from Phase 1) ---
+    design_now = []
+    watch = []
+    phase_out = []
+    evergreen = []
     for f in forecasts:
         lc = f["lifecycle"]
         if lc in ("emerging", "rising"):
@@ -470,9 +477,8 @@ def _build_action_board(result, forecasts, google_data):
         else:
             watch.append(f)
 
-    # --- Summary stats ---
     summary = {
-        "total_trends_tracked": len(fabrics) + len(patterns) + len(colors) + len(styles),
+        "total_trends_tracked": len(all_trends),
         "design_now_count": len(design_now),
         "watch_count": len(watch),
         "phase_out_count": len(phase_out),
@@ -483,137 +489,277 @@ def _build_action_board(result, forecasts, google_data):
         "top_style": styles[0]["term"] if styles else "N/A",
     }
 
-    # --- Design Briefs: cross-reference colors × patterns × styles ---
+    # --- 1. This Week's Actions (5-7 concrete tasks) ---
+    weekly_actions = _build_weekly_actions(
+        design_now, phase_out, evergreen, colors, patterns, styles, forecasts, google_data
+    )
+
+    # --- 2. Design Pipeline (design briefs) ---
     design_briefs = _generate_design_briefs(
         colors, patterns, styles, fabrics, forecasts, google_data
     )
 
-    # --- Unified action list (all actions in one flat list, sorted by priority) ---
-    actions = []
+    # --- 3. Market Signals (top movers across all categories) ---
+    market_signals = _build_market_signals(colors, patterns, styles, forecasts)
 
-    # Actions from Design Now bucket
-    for f in design_now[:6]:
-        actions.append({
-            "action": "order" if f["lifecycle"] == "rising" else "sample",
-            "priority": "high" if f["lifecycle"] == "rising" else "medium",
-            "term": f["term"],
-            "category": f["category"],
-            "bucket": "design_now",
-            "reason": (
-                f"{'Rising' if f['lifecycle'] == 'rising' else 'Emerging'} "
-                f"(velocity +{f['velocity']*100:.0f}%) — score "
-                f"{f['current_score']} heading to {f['predicted_score']}. "
-                f"Confidence: {f['confidence']}%."
-            ),
-            "sort_score": f["predicted_score"] - f["current_score"] + f["current_score"] * 0.3,
-        })
+    # --- 5. Opportunity Gaps ---
+    opportunity_gaps = _build_opportunity_gaps(all_trends, forecasts, google_data)
 
-    # Promote evergreen items (high demand, proven)
-    for f in evergreen[:4]:
-        actions.append({
-            "action": "promote",
-            "priority": "medium",
-            "term": f["term"],
-            "category": f["category"],
-            "bucket": "evergreen",
-            "reason": (
-                f"Proven demand (score {f['current_score']}). "
-                f"Reliable seller — keep in stock and promote."
-            ),
-            "sort_score": f["current_score"] * 0.5,
-        })
-
-    # Phase out warnings
-    for f in phase_out[:4]:
-        actions.append({
-            "action": "reduce",
-            "priority": "high",
-            "term": f["term"],
-            "category": f["category"],
-            "bucket": "phase_out",
-            "reason": (
-                f"Declining (velocity {f['velocity']*100:.0f}%). "
-                f"Don't reorder — sell through remaining stock."
-            ),
-            "sort_score": abs(f["velocity"]) * 100,
-        })
-
-    # Premium pricing opportunities
-    priced = [t for t in fabrics + patterns + colors + styles if t.get("avg_price", 0) > 20]
-    priced.sort(key=lambda x: x.get("avg_price", 0), reverse=True)
-    for t in priced[:2]:
-        actions.append({
-            "action": "premium",
-            "priority": "medium",
-            "term": t["term"],
-            "category": t.get("category", ""),
-            "bucket": "evergreen",
-            "avg_price": t["avg_price"],
-            "reason": f"Commands ${t['avg_price']:.2f}/unit avg — premium positioning opportunity.",
-            "sort_score": t["avg_price"],
-        })
-
-    # Sort: high priority first, then by sort_score descending
-    priority_order = {"high": 0, "medium": 1, "low": 2}
-    actions.sort(key=lambda a: (priority_order.get(a["priority"], 1), -a.get("sort_score", 0)))
-
-    # --- Seasonal context ---
-    month = datetime.now().month
-    if month in (12, 1, 2):
-        season = "Winter/Early Spring"
-        seasonal_colors = ["ivory", "cream", "burgundy", "forest green", "navy",
-                          "charcoal", "brown", "mocha"]
-        seasonal_fabrics = ["wool", "flannel", "velvet", "fleece", "corduroy"]
-    elif month in (3, 4, 5):
-        season = "Spring/Summer Prep"
-        seasonal_colors = ["blush pink", "lavender", "sage green", "baby blue",
-                          "coral", "yellow", "mint"]
-        seasonal_fabrics = ["cotton", "lawn", "linen", "voile", "chiffon"]
-    elif month in (6, 7, 8):
-        season = "Summer/Fall Prep"
-        seasonal_colors = ["terracotta", "rust", "olive", "mustard", "burnt orange",
-                          "forest green", "teal"]
-        seasonal_fabrics = ["linen", "rayon", "jersey", "cotton", "gauze"]
-    else:
-        season = "Fall/Winter Prep"
-        seasonal_colors = ["burgundy", "navy", "charcoal", "emerald", "brown",
-                          "plum", "rust"]
-        seasonal_fabrics = ["velvet", "wool", "flannel", "corduroy", "fleece"]
-
-    seasonal = {
-        "season": season,
-        "recommended_colors": seasonal_colors,
-        "recommended_fabrics": seasonal_fabrics,
-        "reason": f"Based on seasonal buying patterns for {season}.",
-    }
-
-    # --- Macro trends ---
-    macro_trends = []
-    macro_terms = ["sustainable", "organic", "minimalist", "quiet luxury",
-                   "natural", "eco", "biodegradable", "linen", "hemp", "bamboo"]
-    for t in styles + fabrics:
-        if t["term"].lower() in macro_terms and t.get("score", 0) > 10:
-            macro_trends.append({
-                "term": t["term"],
-                "score": t["score"],
-                "category": t.get("category", "style"),
-                "horizon": "6-12 months",
-            })
+    # --- 6. Seasonal Calendar ---
+    seasonal_calendar = _build_seasonal_calendar()
 
     return {
         "generated_at": datetime.now().isoformat(),
         "summary": summary,
-        "actions": actions,
+        "weekly_actions": weekly_actions,
         "design_briefs": design_briefs,
+        "market_signals": market_signals,
+        "opportunity_gaps": opportunity_gaps,
+        "seasonal_calendar": seasonal_calendar,
         "buckets": {
             "design_now": design_now,
             "watch": watch,
             "phase_out": phase_out,
             "evergreen": evergreen,
         },
-        "seasonal": seasonal,
-        "macro_trends": macro_trends,
     }
+
+
+def _build_weekly_actions(design_now, phase_out, evergreen, colors, patterns, styles, forecasts, google_data):
+    """Generate 5-7 concrete, specific tasks for this week."""
+    actions = []
+
+    # 1. Top design brief to work on
+    if design_now:
+        top = design_now[0]
+        actions.append({
+            "icon": "design",
+            "task": f"Design new {top['term'].title()} print",
+            "detail": (
+                f"{top['term'].title()} ({top['category'].replace('_', ' ')}) is "
+                f"{'rising' if top['lifecycle'] == 'rising' else 'emerging'} at "
+                f"+{top['velocity']*100:.0f}% velocity. Create 2-3 print variations."
+            ),
+            "priority": "high",
+        })
+
+    # 2. Phase out action
+    if phase_out:
+        declining = phase_out[0]
+        actions.append({
+            "icon": "clearance",
+            "task": f"Discount {declining['term'].title()} listings",
+            "detail": (
+                f"{declining['term'].title()} is declining ({declining['velocity']*100:.0f}% velocity). "
+                f"Mark down 15-20% to clear remaining stock."
+            ),
+            "priority": "high",
+        })
+
+    # 3. Listing optimization for evergreen
+    if evergreen:
+        ev = evergreen[0]
+        actions.append({
+            "icon": "optimize",
+            "task": f"Refresh {ev['term'].title()} listing SEO",
+            "detail": (
+                f"Proven seller (score {ev['current_score']}). Update titles, tags, "
+                f"and photos to maintain visibility."
+            ),
+            "priority": "medium",
+        })
+
+    # 4. Color palette task
+    if colors:
+        top_colors = [c["term"].title() for c in colors[:3]]
+        actions.append({
+            "icon": "palette",
+            "task": f"Create color mockups: {', '.join(top_colors)}",
+            "detail": (
+                "These are the top 3 trending colors. Generate AI mockups "
+                "for cotton jersey prints in each colorway."
+            ),
+            "priority": "medium",
+        })
+
+    # 5. Market research task
+    if design_now and len(design_now) > 1:
+        terms = [f["term"].title() for f in design_now[1:3]]
+        actions.append({
+            "icon": "research",
+            "task": f"Check Spoonflower/Etsy for {', '.join(terms)}",
+            "detail": "Search competing listings to identify gaps in available designs.",
+            "priority": "medium",
+        })
+
+    # 6. Pinterest content
+    if patterns:
+        top_pat = patterns[0]["term"].title()
+        actions.append({
+            "icon": "social",
+            "task": f"Pin 3-5 {top_pat} inspiration images",
+            "detail": "Pin trending pattern inspiration to your board. Pinterest drives 1-3 month leading demand.",
+            "priority": "low",
+        })
+
+    # 7. Pricing review
+    priced = [t for t in (colors + patterns + styles) if t.get("avg_price", 0) > 0]
+    if priced:
+        actions.append({
+            "icon": "pricing",
+            "task": "Review pricing vs. market averages",
+            "detail": "Compare your top 5 listings against marketplace avg prices. Adjust if >15% off.",
+            "priority": "low",
+        })
+
+    return actions[:7]
+
+
+def _build_market_signals(colors, patterns, styles, forecasts):
+    """Combine top colors, patterns, and styles into a unified signal view."""
+    fc_lookup = {f["term"].lower(): f for f in forecasts}
+
+    signals = {"colors": [], "patterns": [], "styles": []}
+
+    for c in colors[:8]:
+        fc = fc_lookup.get(c["term"].lower(), {})
+        signals["colors"].append({
+            "term": c["term"],
+            "score": c.get("score", 0),
+            "lifecycle": fc.get("lifecycle", c.get("lifecycle", "unknown")),
+            "velocity": fc.get("velocity", 0),
+            "mention_count": c.get("mention_count", 0),
+        })
+
+    for p in patterns[:8]:
+        fc = fc_lookup.get(p["term"].lower(), {})
+        signals["patterns"].append({
+            "term": p["term"],
+            "score": p.get("score", 0),
+            "lifecycle": fc.get("lifecycle", p.get("lifecycle", "unknown")),
+            "velocity": fc.get("velocity", 0),
+            "mention_count": p.get("mention_count", 0),
+        })
+
+    for s in styles[:6]:
+        fc = fc_lookup.get(s["term"].lower(), {})
+        signals["styles"].append({
+            "term": s["term"],
+            "score": s.get("score", 0),
+            "lifecycle": fc.get("lifecycle", s.get("lifecycle", "unknown")),
+            "velocity": fc.get("velocity", 0),
+            "mention_count": s.get("mention_count", 0),
+        })
+
+    return signals
+
+
+def _build_opportunity_gaps(all_trends, forecasts, google_data):
+    """Find trends with high search demand but low marketplace supply."""
+    gaps = []
+    fc_lookup = {f["term"].lower(): f for f in forecasts}
+
+    for t in all_trends:
+        google_interest = t.get("google_interest", 0)
+        mention_count = t.get("mention_count", 0)
+        score = t.get("score", 0)
+        fc = fc_lookup.get(t["term"].lower(), {})
+
+        # Gap = high search interest relative to listing count
+        if google_interest > 0 and mention_count > 0:
+            supply_ratio = mention_count / max(google_interest, 1)
+            gap_strength = google_interest - (mention_count * 3)
+        elif score > 15 and mention_count < 5:
+            # High trend score but very few listings
+            supply_ratio = 0.1
+            gap_strength = score * 2
+        else:
+            continue
+
+        if gap_strength <= 0 and supply_ratio > 0.5:
+            continue
+
+        lifecycle = fc.get("lifecycle", t.get("lifecycle", "unknown"))
+        if lifecycle == "declining":
+            continue  # don't flag declining trends as gaps
+
+        gaps.append({
+            "term": t["term"],
+            "category": t.get("category", ""),
+            "score": score,
+            "google_interest": google_interest,
+            "mention_count": mention_count,
+            "gap_strength": round(max(gap_strength, score * 0.5), 1),
+            "lifecycle": lifecycle,
+            "reason": (
+                f"Score {score} with only {mention_count} listings"
+                + (f" vs. Google interest {google_interest}" if google_interest else "")
+                + " — undersupplied opportunity."
+            ),
+        })
+
+    gaps.sort(key=lambda g: g["gap_strength"], reverse=True)
+    return gaps[:10]
+
+
+def _build_seasonal_calendar():
+    """Build a seasonal preparation calendar with current + next 2 quarters."""
+    from datetime import datetime
+    import calendar as cal_mod
+
+    now = datetime.now()
+    month = now.month
+
+    # Season definitions with design-lead-time context
+    seasons = {
+        "Q1 (Jan-Mar)": {
+            "label": "Winter / Early Spring",
+            "design_focus": "Valentine's prints, spring florals, Easter pastels",
+            "colors": ["blush pink", "lavender", "sage green", "baby blue", "cream", "coral"],
+            "patterns": ["floral", "botanical", "watercolor", "ditsy", "gingham"],
+            "fabrics": ["cotton", "lawn", "jersey", "voile"],
+            "prep_note": "Design spring collections NOW. Lead time: 4-6 weeks to Etsy listing.",
+        },
+        "Q2 (Apr-Jun)": {
+            "label": "Spring / Summer",
+            "design_focus": "Summer brights, tropical, nautical, outdoor living",
+            "colors": ["coral", "teal", "mustard", "emerald", "burnt orange", "seafoam"],
+            "patterns": ["tropical", "geometric", "stripe", "abstract", "tie dye"],
+            "fabrics": ["linen", "cotton", "jersey", "gauze", "rayon"],
+            "prep_note": "Peak Etsy buying season. Maximize listings and paid ads.",
+        },
+        "Q3 (Jul-Sep)": {
+            "label": "Summer / Fall Prep",
+            "design_focus": "Back-to-school, fall warmth, Halloween, harvest themes",
+            "colors": ["terracotta", "rust", "olive", "burgundy", "forest green", "ochre"],
+            "patterns": ["plaid", "botanical", "folk art", "vintage", "cottagecore"],
+            "fabrics": ["flannel", "cotton", "jersey", "corduroy"],
+            "prep_note": "Design fall/winter prints. Wholesale buyers order now for Q4.",
+        },
+        "Q4 (Oct-Dec)": {
+            "label": "Fall / Holiday Season",
+            "design_focus": "Holiday gifting, Christmas, cozy winter, New Year",
+            "colors": ["navy", "burgundy", "forest green", "ivory", "charcoal", "gold"],
+            "patterns": ["plaid", "damask", "celestial", "minimalist", "geometric"],
+            "fabrics": ["velvet", "flannel", "fleece", "jersey", "minky"],
+            "prep_note": "Highest sales volume. Focus on fulfillment speed and stock levels.",
+        },
+    }
+
+    # Determine current and next quarters
+    current_q = (month - 1) // 3  # 0-indexed
+    q_keys = list(seasons.keys())
+    calendar_items = []
+    for i in range(3):
+        q_idx = (current_q + i) % 4
+        key = q_keys[q_idx]
+        item = dict(seasons[key])
+        item["quarter"] = key
+        item["is_current"] = (i == 0)
+        item["is_next"] = (i == 1)
+        calendar_items.append(item)
+
+    return calendar_items
 
 
 def _generate_design_briefs(colors, patterns, styles, fabrics, forecasts, google_data):

@@ -27,14 +27,14 @@
         </div>
         <!-- Navigation -->
         <nav class="main-nav">
-            <a href="#actions" class="nav-link active" onclick="scrollToSection('actions')">Action Board</a>
+            <a href="#weekly" class="nav-link active" onclick="scrollToSection('weekly')">This Week</a>
+            <a href="#pipeline" class="nav-link" onclick="scrollToSection('pipeline')">Design Pipeline</a>
+            <a href="#signals" class="nav-link" onclick="scrollToSection('signals')">Market Signals</a>
+            <a href="#etsy" class="nav-link" onclick="scrollToSection('etsy')">Etsy Intel</a>
+            <a href="#wholesale" class="nav-link" onclick="scrollToSection('wholesale')">Wholesale</a>
+            <a href="#gaps" class="nav-link" onclick="scrollToSection('gaps')">Gaps</a>
+            <a href="#calendar" class="nav-link" onclick="scrollToSection('calendar')">Seasonal</a>
             <a href="#forecasts" class="nav-link" onclick="scrollToSection('forecasts')">Forecasts</a>
-            <a href="#european" class="nav-link" onclick="scrollToSection('european')">European Markets</a>
-            <a href="#pinterest" class="nav-link" onclick="scrollToSection('pinterest')">Pinterest Trends</a>
-            <a href="#gallery" class="nav-link" onclick="scrollToSection('gallery')">Visual Gallery</a>
-            <a href="#segments" class="nav-link" onclick="scrollToSection('segments')">Market Segments</a>
-            <a href="#trends" class="nav-link" onclick="scrollToSection('trends')">Trend Rankings</a>
-            <a href="#data" class="nav-link" onclick="scrollToSection('data')">Raw Data</a>
         </nav>
     </header>
 
@@ -57,23 +57,12 @@
         </div>
         {% endif %}
 
-        <!-- Data Quality Legend -->
-        {% if trends.fabric_types or trends.patterns or trends.colors %}
-        <div class="quality-legend">
-            <span class="ql-title">Confidence tiers:</span>
-            <span class="tier-badge tier-verified">Verified</span> 3+ sources, 8+ listings
-            <span class="tier-badge tier-strong">Strong</span> 2+ sources or 8+ quality listings
-            <span class="tier-badge tier-moderate">Moderate</span> Meets minimum, some corroboration
-            <span class="tier-badge tier-weak">Weak</span> Limited evidence (treat with caution)
-        </div>
-        {% endif %}
-
-        <!-- ========== SECTION 0: ACTION BOARD (Unified) ========== -->
-        {% if action_board %}
-        <section id="actions" class="section">
+        <!-- ========== SECTION 1: THIS WEEK'S ACTIONS ========== -->
+        {% if action_board and action_board.weekly_actions %}
+        <section id="weekly" class="section">
             <div class="section-header">
-                <h2>Action Board</h2>
-                <p class="section-subtitle">Everything you need to act on &mdash; prioritized and unified</p>
+                <h2>This Week's Actions</h2>
+                <p class="section-subtitle">5-7 specific tasks &mdash; what to do right now</p>
             </div>
 
             <!-- Summary Bar -->
@@ -82,7 +71,7 @@
             <div class="action-summary-bar">
                 <div class="summary-stat">
                     <span class="summary-number">{{ summary.total_trends_tracked }}</span>
-                    <span class="summary-label">Trends tracked</span>
+                    <span class="summary-label">Tracked</span>
                 </div>
                 <div class="summary-stat emerging">
                     <span class="summary-number">{{ summary.design_now_count }}</span>
@@ -92,16 +81,11 @@
                     <span class="summary-number">{{ summary.evergreen_count }}</span>
                     <span class="summary-label">Evergreen</span>
                 </div>
-                <div class="summary-stat peak">
-                    <span class="summary-number">{{ summary.watch_count }}</span>
-                    <span class="summary-label">Watch</span>
-                </div>
                 <div class="summary-stat declining">
                     <span class="summary-number">{{ summary.phase_out_count }}</span>
                     <span class="summary-label">Phase Out</span>
                 </div>
                 <div class="summary-top">
-                    <span class="top-item">Top fabric: <strong>{{ summary.top_fabric|title }}</strong></span>
                     <span class="top-item">Top pattern: <strong>{{ summary.top_pattern|title }}</strong></span>
                     <span class="top-item">Top color: <strong>{{ summary.top_color|title }}</strong></span>
                     <span class="top-item">Top style: <strong>{{ summary.top_style|title }}</strong></span>
@@ -109,142 +93,387 @@
             </div>
             {% endif %}
 
-            <!-- ===== DESIGN BRIEFS ===== -->
-            {% if action_board.design_briefs %}
-            <div class="design-briefs-section">
-                <h3 class="subsection-title">Design Briefs</h3>
-                <p class="section-subtitle">Cross-referenced color &times; pattern &times; style combinations &mdash; sorted by opportunity</p>
-                <div class="briefs-grid">
-                    {% for brief in action_board.design_briefs %}
-                    <div class="brief-card brief-{{ brief.priority }}">
-                        <div class="brief-header">
-                            <span class="brief-priority {{ brief.priority }}">{{ brief.priority|upper }}</span>
-                            <span class="brief-score">{{ brief.opportunity_score }}</span>
-                        </div>
-                        <div class="brief-combo">
-                            <span class="brief-chip brief-color">{{ brief.color|title }}</span>
-                            <span class="brief-x">&times;</span>
-                            <span class="brief-chip brief-pattern">{{ brief.pattern|title }}</span>
-                            {% if brief.style %}
-                            <span class="brief-x">&mdash;</span>
-                            <span class="brief-chip brief-style">{{ brief.style|title }}</span>
-                            {% endif %}
-                        </div>
-                        <div class="brief-meta">
-                            <span class="brief-lc {{ brief.color_lifecycle }}">{{ brief.color|title }}: {{ brief.color_lifecycle }}</span>
-                            <span class="brief-lc {{ brief.pattern_lifecycle }}">{{ brief.pattern|title }}: {{ brief.pattern_lifecycle }}</span>
-                        </div>
-                        {% if brief.signals %}
-                        <div class="brief-signals">
-                            {% for sig in brief.signals[:3] %}
-                            <span class="brief-signal">{{ sig }}</span>
-                            {% endfor %}
-                        </div>
-                        {% endif %}
+            <div class="weekly-tasks">
+                {% for task in action_board.weekly_actions %}
+                <div class="weekly-task priority-{{ task.priority }}">
+                    <div class="task-number">{{ loop.index }}</div>
+                    <div class="task-icon task-icon-{{ task.icon }}">
+                        {% if task.icon == 'design' %}&#9998;{% elif task.icon == 'clearance' %}&#9888;{% elif task.icon == 'optimize' %}&#9881;{% elif task.icon == 'palette' %}&#127912;{% elif task.icon == 'research' %}&#128269;{% elif task.icon == 'social' %}&#128204;{% elif task.icon == 'pricing' %}${% endif %}
                     </div>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endif %}
-
-            <!-- ===== UNIFIED ACTION LIST ===== -->
-            {% if action_board.actions %}
-            <div class="unified-actions-section">
-                <h3 class="subsection-title">Actions</h3>
-                <p class="section-subtitle">All recommendations in one list &mdash; what to order, promote, sample, or phase out</p>
-                {% for item in action_board.actions %}
-                <div class="action-card action-{{ item.action }} bucket-{{ item.bucket }}">
-                    <div class="action-badge {{ item.priority }}">
-                        {% if item.action == 'order' %}ORDER{% elif item.action == 'sample' %}SAMPLE{% elif item.action == 'reduce' %}PHASE OUT{% elif item.action == 'promote' %}PROMOTE{% elif item.action == 'premium' %}PREMIUM{% endif %}
+                    <div class="task-body">
+                        <h4>{{ task.task }}</h4>
+                        <p>{{ task.detail }}</p>
                     </div>
-                    <div class="action-body">
-                        <h4>{{ item.term|title }} <span class="action-cat">{{ item.category|replace('_', ' ')|title }}</span></h4>
-                        <p>{{ item.reason }}</p>
-                    </div>
-                    <span class="bucket-badge bucket-{{ item.bucket }}">
-                        {% if item.bucket == 'design_now' %}Design Now{% elif item.bucket == 'evergreen' %}Evergreen{% elif item.bucket == 'phase_out' %}Phase Out{% elif item.bucket == 'watch' %}Watch{% endif %}
-                    </span>
+                    <span class="task-priority {{ task.priority }}">{{ task.priority|upper }}</span>
                 </div>
                 {% endfor %}
             </div>
-            {% endif %}
-
-            <!-- ===== SEASONAL CONTEXT ===== -->
-            {% if action_board.seasonal %}
-            {% set season = action_board.seasonal %}
-            <div class="seasonal-card">
-                <h3>{{ season.season }}</h3>
-                <p class="seasonal-reason">{{ season.reason }}</p>
-                <div class="seasonal-grid">
-                    <div class="seasonal-col">
-                        <h4>Recommended Colors</h4>
-                        <div class="seasonal-chips">
-                            {% for c in season.recommended_colors %}
-                            <span class="seasonal-chip color-chip">{{ c|title }}</span>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    <div class="seasonal-col">
-                        <h4>Recommended Fabrics</h4>
-                        <div class="seasonal-chips">
-                            {% for f in season.recommended_fabrics %}
-                            <span class="seasonal-chip fabric-chip">{{ f|title }}</span>
-                            {% endfor %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
-
-            <!-- Macro Trends -->
-            {% if action_board.macro_trends %}
-            <div class="horizon-section">
-                <h4>Macro Trends (6-12 months)</h4>
-                <div class="horizon-chips">
-                    {% for t in action_board.macro_trends %}
-                    <span class="horizon-chip macro" title="Score: {{ t.score }}">{{ t.term|title }}</span>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endif %}
         </section>
+        {% endif %}
 
-        <!-- Insights Cards -->
-        {% if insights %}
-        <section id="insights" class="section">
+        <!-- ========== SECTION 2: DESIGN PIPELINE ========== -->
+        {% if action_board and action_board.design_briefs %}
+        <section id="pipeline" class="section">
             <div class="section-header">
-                <h2>Key Insights</h2>
-                <p class="section-subtitle">Data-driven observations from your trend analysis</p>
+                <h2>Design Pipeline</h2>
+                <p class="section-subtitle">What to design next &mdash; color &times; pattern &times; style, ranked by opportunity</p>
             </div>
-            <div class="insights-grid">
-                {% for insight in insights %}
-                <div class="insight-card insight-{{ insight.type }}">
-                    <div class="insight-icon">
-                        {% if insight.type == 'rising' %}&#9650;{% elif insight.type == 'hot' %}&#9733;{% elif insight.type == 'opportunity' %}&#9672;{% elif insight.type == 'price' %}${% endif %}
+            <div class="briefs-grid">
+                {% for brief in action_board.design_briefs %}
+                <div class="brief-card brief-{{ brief.priority }}">
+                    <div class="brief-header">
+                        <span class="brief-priority {{ brief.priority }}">{{ brief.priority|upper }}</span>
+                        <span class="brief-score">{{ brief.opportunity_score }}</span>
                     </div>
-                    <div class="insight-body">
-                        <h4>{{ insight.title }}</h4>
-                        <p class="insight-detail">{{ insight.detail }}</p>
-                        <p class="insight-action">{{ insight.action }}</p>
+                    <div class="brief-combo">
+                        <span class="brief-chip brief-color">{{ brief.color|title }}</span>
+                        <span class="brief-x">&times;</span>
+                        <span class="brief-chip brief-pattern">{{ brief.pattern|title }}</span>
+                        {% if brief.style %}
+                        <span class="brief-x">&mdash;</span>
+                        <span class="brief-chip brief-style">{{ brief.style|title }}</span>
+                        {% endif %}
                     </div>
-                    {% if insight.confidence_tier %}
-                    <span class="tier-badge tier-{{ insight.confidence_tier }}">{{ insight.confidence_tier|title }}</span>
+                    <div class="brief-meta">
+                        <span class="brief-lc {{ brief.color_lifecycle }}">{{ brief.color|title }}: {{ brief.color_lifecycle }}</span>
+                        <span class="brief-lc {{ brief.pattern_lifecycle }}">{{ brief.pattern|title }}: {{ brief.pattern_lifecycle }}</span>
+                    </div>
+                    {% if brief.signals %}
+                    <div class="brief-signals">
+                        {% for sig in brief.signals[:3] %}
+                        <span class="brief-signal">{{ sig }}</span>
+                        {% endfor %}
+                    </div>
                     {% endif %}
                 </div>
                 {% endfor %}
             </div>
         </section>
         {% endif %}
+
+        <!-- ========== SECTION 3: MARKET SIGNALS ========== -->
+        <section id="signals" class="section">
+            <div class="section-header">
+                <h2>Market Signals</h2>
+                <p class="section-subtitle">What's moving &mdash; trending colors, patterns &amp; aesthetics in one view</p>
+            </div>
+
+            {% if action_board and action_board.market_signals %}
+            <div class="signals-grid">
+                <!-- Colors -->
+                <div class="signal-col">
+                    <h4 class="signal-col-title">Trending Colors</h4>
+                    {% for s in action_board.market_signals.colors %}
+                    <div class="signal-row">
+                        <span class="signal-rank">#{{ loop.index }}</span>
+                        <span class="signal-term">{{ s.term|title }}</span>
+                        <span class="lifecycle-badge {{ s.lifecycle }}">{{ s.lifecycle|title }}</span>
+                        <span class="signal-score-val">{{ s.score }}</span>
+                        {% if s.velocity > 0.05 %}
+                        <span class="signal-vel up">+{{ "%.0f"|format(s.velocity * 100) }}%</span>
+                        {% elif s.velocity < -0.05 %}
+                        <span class="signal-vel down">{{ "%.0f"|format(s.velocity * 100) }}%</span>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                <!-- Patterns -->
+                <div class="signal-col">
+                    <h4 class="signal-col-title">Trending Patterns</h4>
+                    {% for s in action_board.market_signals.patterns %}
+                    <div class="signal-row">
+                        <span class="signal-rank">#{{ loop.index }}</span>
+                        <span class="signal-term">{{ s.term|title }}</span>
+                        <span class="lifecycle-badge {{ s.lifecycle }}">{{ s.lifecycle|title }}</span>
+                        <span class="signal-score-val">{{ s.score }}</span>
+                        {% if s.velocity > 0.05 %}
+                        <span class="signal-vel up">+{{ "%.0f"|format(s.velocity * 100) }}%</span>
+                        {% elif s.velocity < -0.05 %}
+                        <span class="signal-vel down">{{ "%.0f"|format(s.velocity * 100) }}%</span>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                <!-- Styles -->
+                <div class="signal-col">
+                    <h4 class="signal-col-title">Trending Aesthetics</h4>
+                    {% for s in action_board.market_signals.styles %}
+                    <div class="signal-row">
+                        <span class="signal-rank">#{{ loop.index }}</span>
+                        <span class="signal-term">{{ s.term|title }}</span>
+                        <span class="lifecycle-badge {{ s.lifecycle }}">{{ s.lifecycle|title }}</span>
+                        <span class="signal-score-val">{{ s.score }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if not action_board or not action_board.market_signals %}
+            <div class="empty-state"><p>No market signal data yet. Click <strong>Refresh Data</strong> to start.</p></div>
+            {% endif %}
+        </section>
+
+        <!-- ========== SECTION 4: ETSY INTELLIGENCE (B2C) ========== -->
+        <section id="etsy" class="section">
+            <div class="section-header">
+                <h2>Etsy Intelligence</h2>
+                <p class="section-subtitle">B2C market opportunities &mdash; what to list on Etsy in US, UK, DE &amp; NL</p>
+            </div>
+
+            {% if eu_data and eu_data.countries %}
+            <div class="eu-tabs">
+                <button class="eu-tab active" data-eu="etsy-us" onclick="switchEU('etsy-us')">US / Global Etsy</button>
+                {% for cc in ['DE', 'NL'] %}
+                {% if cc in eu_data.countries %}
+                <button class="eu-tab" data-eu="etsy-{{ cc }}" onclick="switchEU('etsy-{{ cc }}')">
+                    {{ eu_data.countries[cc].flag }} {{ eu_data.countries[cc].name }}
+                </button>
+                {% endif %}
+                {% endfor %}
+            </div>
+
+            <!-- US / Global view uses main trend data -->
+            <div class="eu-content active" id="eu-etsy-us">
+                <div class="eu-summary-bar">
+                    <span class="eu-stat">Global Etsy / US market</span>
+                    <span class="eu-stat">Based on {{ trends.patterns|length + trends.colors|length }} trend signals</span>
+                </div>
+                <div class="eu-trends-grid">
+                    <div class="eu-trend-col">
+                        <h4>Top Patterns to List</h4>
+                        {% for t in trends.patterns[:6] %}
+                        <div class="eu-trend-item">
+                            <span class="rank">#{{ loop.index }}</span>
+                            <span class="eu-term">{{ t.term|title }}</span>
+                            <span class="eu-score">{{ t.score }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="eu-trend-col">
+                        <h4>Top Colors to List</h4>
+                        {% for t in trends.colors[:6] %}
+                        <div class="eu-trend-item">
+                            <span class="rank">#{{ loop.index }}</span>
+                            <span class="eu-term">{{ t.term|title }}</span>
+                            <span class="eu-score">{{ t.score }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="eu-trend-col">
+                        <h4>Top Styles</h4>
+                        {% for t in trends.styles[:6] %}
+                        <div class="eu-trend-item">
+                            <span class="rank">#{{ loop.index }}</span>
+                            <span class="eu-term">{{ t.term|title }}</span>
+                            <span class="eu-score">{{ t.score }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            {% for cc in ['DE', 'NL'] %}
+            {% if cc in eu_data.countries %}
+            {% set ci = eu_data.countries[cc] %}
+            <div class="eu-content" id="eu-etsy-{{ cc }}">
+                <div class="eu-country-header">
+                    <span class="eu-flag-large">{{ ci.flag }}</span>
+                    <div>
+                        <h3>{{ ci.name }} Etsy Market</h3>
+                        <span class="eu-meta">{{ ci.listing_count }} listings &middot; {{ ci.currency }}</span>
+                    </div>
+                </div>
+                {% if ci.top_trends %}
+                <div class="eu-trends-grid">
+                    <div class="eu-trend-col">
+                        <h4>Top Patterns</h4>
+                        {% for t in ci.patterns[:6] %}
+                        <div class="eu-trend-item">
+                            <span class="rank">#{{ loop.index }}</span>
+                            <span class="eu-term">{{ t.term|title }}</span>
+                            <span class="eu-score">{{ t.score }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="eu-trend-col">
+                        <h4>Top Colors</h4>
+                        {% for t in ci.colors[:6] %}
+                        <div class="eu-trend-item">
+                            <span class="rank">#{{ loop.index }}</span>
+                            <span class="eu-term">{{ t.term|title }}</span>
+                            <span class="eu-score">{{ t.score }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="eu-trend-col">
+                        <h4>Local Marketplaces</h4>
+                        <div class="eu-marketplaces" style="flex-direction:column;">
+                            {% for mp in ci.local_marketplaces %}
+                            <span class="eu-mp-tag">{{ mp }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+            {% endfor %}
+
+            {% else %}
+            <div class="empty-state"><p>No Etsy market data yet. Click <strong>Refresh Data</strong> to load.</p></div>
+            {% endif %}
+        </section>
+
+        <!-- ========== SECTION 5: WHOLESALE PULSE (B2B) ========== -->
+        <section id="wholesale" class="section">
+            <div class="section-header">
+                <h2>Wholesale Pulse</h2>
+                <p class="section-subtitle">What to pitch your B2B clients &mdash; DK, FI &amp; DE wholesale trends</p>
+            </div>
+
+            {% if eu_data and eu_data.countries %}
+            <div class="eu-tabs">
+                {% for cc in ['DK', 'FI', 'DE'] %}
+                {% if cc in eu_data.countries %}
+                <button class="eu-tab {% if loop.first %}active{% endif %}" data-eu="ws-{{ cc }}" onclick="switchEU('ws-{{ cc }}')">
+                    {{ eu_data.countries[cc].flag }} {{ eu_data.countries[cc].name }}
+                </button>
+                {% endif %}
+                {% endfor %}
+            </div>
+
+            {% for cc in ['DK', 'FI', 'DE'] %}
+            {% if cc in eu_data.countries %}
+            {% set ci = eu_data.countries[cc] %}
+            <div class="eu-content {% if loop.first %}active{% endif %}" id="eu-ws-{{ cc }}">
+                <div class="eu-country-header">
+                    <span class="eu-flag-large">{{ ci.flag }}</span>
+                    <div>
+                        <h3>{{ ci.name }} Wholesale Market</h3>
+                        <span class="eu-meta">{{ ci.listing_count }} listings &middot; {{ ci.currency }}</span>
+                    </div>
+                </div>
+                <div class="eu-marketplaces">
+                    <span class="eu-mp-label">Key wholesale contacts:</span>
+                    {% for mp in ci.local_marketplaces %}
+                    <span class="eu-mp-tag">{{ mp }}</span>
+                    {% endfor %}
+                </div>
+                {% if ci.top_trends %}
+                <div class="eu-trends-grid">
+                    <div class="eu-trend-col">
+                        <h4>Top Patterns to Pitch</h4>
+                        {% for t in ci.patterns[:6] %}
+                        <div class="eu-trend-item">
+                            <span class="rank">#{{ loop.index }}</span>
+                            <span class="eu-term">{{ t.term|title }}</span>
+                            <span class="eu-score">{{ t.score }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="eu-trend-col">
+                        <h4>Top Colors</h4>
+                        {% for t in ci.colors[:6] %}
+                        <div class="eu-trend-item">
+                            <span class="rank">#{{ loop.index }}</span>
+                            <span class="eu-term">{{ t.term|title }}</span>
+                            <span class="eu-score">{{ t.score }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="eu-trend-col">
+                        <h4>Top Fabrics</h4>
+                        {% for t in ci.fabric_types[:6] %}
+                        <div class="eu-trend-item">
+                            <span class="rank">#{{ loop.index }}</span>
+                            <span class="eu-term">{{ t.term|title }}</span>
+                            <span class="eu-score">{{ t.score }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+            {% endfor %}
+
+            {% else %}
+            <div class="empty-state"><p>No wholesale data yet. Click <strong>Refresh Data</strong> to load European market trends.</p></div>
+            {% endif %}
+        </section>
+
+        <!-- ========== SECTION 6: OPPORTUNITY GAPS ========== -->
+        {% if action_board and action_board.opportunity_gaps %}
+        <section id="gaps" class="section">
+            <div class="section-header">
+                <h2>Opportunity Gaps</h2>
+                <p class="section-subtitle">High demand + low supply &mdash; undersupplied trends you can fill</p>
+            </div>
+            <div class="gaps-list">
+                {% for gap in action_board.opportunity_gaps %}
+                <div class="gap-card">
+                    <div class="gap-strength">{{ gap.gap_strength }}</div>
+                    <div class="gap-body">
+                        <h4>{{ gap.term|title }} <span class="action-cat">{{ gap.category|replace('_', ' ')|title }}</span></h4>
+                        <p>{{ gap.reason }}</p>
+                    </div>
+                    <span class="lifecycle-badge {{ gap.lifecycle }}">{{ gap.lifecycle|title }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
         {% endif %}
 
-        <!-- ========== SECTION 1: TREND FORECASTS (4 Buckets) ========== -->
+        <!-- ========== SECTION 7: SEASONAL CALENDAR ========== -->
+        {% if action_board and action_board.seasonal_calendar %}
+        <section id="calendar" class="section">
+            <div class="section-header">
+                <h2>Seasonal Calendar</h2>
+                <p class="section-subtitle">What to prepare for this quarter and the next two</p>
+            </div>
+            <div class="calendar-grid">
+                {% for q in action_board.seasonal_calendar %}
+                <div class="calendar-card {% if q.is_current %}calendar-current{% endif %}">
+                    <div class="cal-header">
+                        <span class="cal-quarter">{{ q.quarter }}</span>
+                        {% if q.is_current %}<span class="cal-now-badge">NOW</span>{% endif %}
+                        {% if q.is_next %}<span class="cal-next-badge">NEXT</span>{% endif %}
+                    </div>
+                    <h4>{{ q.label }}</h4>
+                    <p class="cal-focus">{{ q.design_focus }}</p>
+                    <div class="seasonal-grid">
+                        <div class="seasonal-col">
+                            <h4>Colors</h4>
+                            <div class="seasonal-chips">
+                                {% for c in q.colors %}
+                                <span class="seasonal-chip color-chip">{{ c|title }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="seasonal-col">
+                            <h4>Patterns</h4>
+                            <div class="seasonal-chips">
+                                {% for p in q.patterns %}
+                                <span class="seasonal-chip fabric-chip">{{ p|title }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    <p class="cal-prep">{{ q.prep_note }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        <!-- ========== SECTION 8: FORECASTS (4 Buckets) ========== -->
         <section id="forecasts" class="section">
             <div class="section-header">
                 <h2>Trend Forecasts</h2>
-                <p class="section-subtitle">4 clear buckets &mdash; Design Now, Watch, Evergreen, Phase Out</p>
+                <p class="section-subtitle">4 buckets &mdash; Design Now, Watch, Evergreen, Phase Out</p>
             </div>
 
-            <!-- 4-Bucket Pipeline -->
             {% if action_board and action_board.buckets %}
             <div class="lifecycle-pipeline">
                 <div class="pipeline-stage" data-stage="design_now">
@@ -255,7 +484,7 @@
                     </div>
                     <div class="stage-items">
                         {% for f in action_board.buckets.design_now[:10] %}
-                        <div class="forecast-chip emerging" title="Score: {{ f.current_score }} &rarr; {{ f.predicted_score }} | Confidence: {{ f.confidence }}%">
+                        <div class="forecast-chip emerging" title="Score: {{ f.current_score }} &rarr; {{ f.predicted_score }}">
                             <span class="chip-term">{{ f.term|title }}</span>
                             <span class="chip-arrow">&#9650;</span>
                             <span class="chip-score">{{ f.predicted_score }}</span>
@@ -268,13 +497,11 @@
                     <div class="stage-header">
                         <span class="stage-dot peak"></span>
                         <h3>Watch</h3>
-                        <span class="stage-desc">Monitor these</span>
                     </div>
                     <div class="stage-items">
                         {% for f in action_board.buckets.watch[:10] %}
-                        <div class="forecast-chip peak" title="Score: {{ f.current_score }} &rarr; {{ f.predicted_score }} | Confidence: {{ f.confidence }}%">
+                        <div class="forecast-chip peak">
                             <span class="chip-term">{{ f.term|title }}</span>
-                            <span class="chip-arrow">&#9654;</span>
                             <span class="chip-score">{{ f.predicted_score }}</span>
                         </div>
                         {% endfor %}
@@ -285,13 +512,11 @@
                     <div class="stage-header">
                         <span class="stage-dot rising"></span>
                         <h3>Evergreen</h3>
-                        <span class="stage-desc">Proven sellers</span>
                     </div>
                     <div class="stage-items">
                         {% for f in action_board.buckets.evergreen[:10] %}
-                        <div class="forecast-chip rising" title="Score: {{ f.current_score }} | Confidence: {{ f.confidence }}%">
+                        <div class="forecast-chip rising">
                             <span class="chip-term">{{ f.term|title }}</span>
-                            <span class="chip-arrow">&#9679;</span>
                             <span class="chip-score">{{ f.current_score }}</span>
                         </div>
                         {% endfor %}
@@ -302,13 +527,11 @@
                     <div class="stage-header">
                         <span class="stage-dot declining"></span>
                         <h3>Phase Out</h3>
-                        <span class="stage-desc">Sell through</span>
                     </div>
                     <div class="stage-items">
                         {% for f in action_board.buckets.phase_out[:10] %}
-                        <div class="forecast-chip declining" title="Score: {{ f.current_score }} &rarr; {{ f.predicted_score }} | Confidence: {{ f.confidence }}%">
+                        <div class="forecast-chip declining">
                             <span class="chip-term">{{ f.term|title }}</span>
-                            <span class="chip-arrow">&#9660;</span>
                             <span class="chip-score">{{ f.predicted_score }}</span>
                         </div>
                         {% endfor %}
@@ -317,601 +540,11 @@
             </div>
             {% endif %}
 
-            <!-- Forecast Detail Cards (top movers) -->
-            <div class="forecast-cards">
-                {% for f in forecasts[:8] %}
-                {% set bucket = 'design_now' if f.lifecycle in ('emerging', 'rising') else ('phase_out' if f.lifecycle == 'declining' else ('evergreen' if f.lifecycle == 'peak' and f.current_score >= 30 else 'watch')) %}
-                <div class="forecast-card {{ f.lifecycle }}">
-                    <div class="fc-top">
-                        <span class="fc-lifecycle {{ f.lifecycle }}">
-                            {% if bucket == 'design_now' %}Design Now{% elif bucket == 'evergreen' %}Evergreen{% elif bucket == 'phase_out' %}Phase Out{% else %}Watch{% endif %}
-                        </span>
-                        <span class="fc-confidence conf-{{ 'high' if f.confidence >= 60 else ('mid' if f.confidence >= 35 else 'low') }}">
-                            {% if f.confidence >= 60 %}&#9679;&#9679;&#9679;{% elif f.confidence >= 35 %}&#9679;&#9679;&#9675;{% else %}&#9679;&#9675;&#9675;{% endif %}
-                            {{ f.confidence }}%
-                        </span>
-                    </div>
-                    <h4 class="fc-term">{{ f.term|title }}</h4>
-                    <div class="fc-category">{{ f.category|replace('_', ' ')|title }}</div>
-                    <div class="fc-scores">
-                        <div class="fc-score-now">
-                            <span class="fc-label">Now</span>
-                            <span class="fc-value">{{ f.current_score }}</span>
-                        </div>
-                        <div class="fc-arrow {% if f.predicted_score > f.current_score %}up{% elif f.predicted_score < f.current_score %}down{% endif %}">
-                            {% if f.predicted_score > f.current_score %}&#9650;{% elif f.predicted_score < f.current_score %}&#9660;{% else %}&#9654;{% endif %}
-                        </div>
-                        <div class="fc-score-pred">
-                            <span class="fc-label">Predicted</span>
-                            <span class="fc-value">{{ f.predicted_score }}</span>
-                        </div>
-                    </div>
-                    <div class="fc-velocity">
-                        Velocity: <strong>{{ "%.1f"|format(f.velocity * 100) }}%</strong> /period
-                    </div>
-                    {% if f.signals %}
-                    <div class="fc-signals">
-                        {% for sig in f.signals[:3] if sig is mapping %}
-                        <div class="signal-pill {{ sig.strength }}">{{ sig.description }}</div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-                </div>
-                {% endfor %}
-            </div>
-
             {% if not forecasts %}
             <div class="empty-state">
-                <p>No forecasts yet. Click <strong>Refresh Data</strong> to scrape listings and generate predictions.</p>
+                <p>No forecasts yet. Click <strong>Refresh Data</strong> to generate predictions.</p>
             </div>
             {% endif %}
-        </section>
-
-        <!-- ========== SECTION 2: EUROPEAN MARKETS ========== -->
-        <section id="european" class="section">
-            <div class="section-header">
-                <h2>European Markets</h2>
-                <p class="section-subtitle">Fabric trends across 10 European countries &mdash; by country, region, and overall</p>
-            </div>
-
-            {% if eu_data and eu_data.countries %}
-            <!-- EU Country Tabs -->
-            <div class="eu-tabs">
-                <button class="eu-tab active" data-eu="overall" onclick="switchEU('overall')">
-                    Overall EU
-                </button>
-                {% for region_key, region_info in eu_regions.items() %}
-                <button class="eu-tab eu-tab-region" data-eu="region-{{ region_key }}" onclick="switchEU('region-{{ region_key }}')">
-                    {{ region_info.label }}
-                </button>
-                {% endfor %}
-                {% for cc, info in eu_data.countries.items() %}
-                <button class="eu-tab" data-eu="{{ cc }}" onclick="switchEU('{{ cc }}')">
-                    {{ info.flag }} {{ info.name }}
-                </button>
-                {% endfor %}
-            </div>
-
-            <!-- Overall EU View -->
-            <div class="eu-content active" id="eu-overall">
-                <div class="eu-summary-bar">
-                    <span class="eu-stat">{{ eu_data.total_listings }} listings</span>
-                    <span class="eu-stat">{{ eu_data.total_countries }} countries</span>
-                </div>
-                {% if eu_data.overall.fabric_types %}
-                <div class="eu-trends-grid">
-                    <div class="eu-trend-col">
-                        <h4>Top Fabrics (All Europe)</h4>
-                        {% for t in eu_data.overall.fabric_types[:8] %}
-                        <div class="eu-trend-item">
-                            <span class="rank">#{{ loop.index }}</span>
-                            <span class="eu-term">{{ t.term|title }}</span>
-                            <span class="eu-score">{{ t.score }}</span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    <div class="eu-trend-col">
-                        <h4>Top Patterns (All Europe)</h4>
-                        {% for t in eu_data.overall.patterns[:8] %}
-                        <div class="eu-trend-item">
-                            <span class="rank">#{{ loop.index }}</span>
-                            <span class="eu-term">{{ t.term|title }}</span>
-                            <span class="eu-score">{{ t.score }}</span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    <div class="eu-trend-col">
-                        <h4>Top Colors (All Europe)</h4>
-                        {% for t in eu_data.overall.colors[:8] %}
-                        <div class="eu-trend-item">
-                            <span class="rank">#{{ loop.index }}</span>
-                            <span class="eu-term">{{ t.term|title }}</span>
-                            <span class="eu-score">{{ t.score }}</span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endif %}
-            </div>
-
-            <!-- Region Views -->
-            {% for region_key, region_info in eu_data.get('regions', {}).items() %}
-            <div class="eu-content" id="eu-region-{{ region_key }}">
-                <div class="eu-summary-bar">
-                    <span class="eu-stat">{{ region_info.label }}</span>
-                    <span class="eu-stat">{{ region_info.listing_count }} listings</span>
-                    <span class="eu-stat">Countries: {{ region_info.countries|join(', ') }}</span>
-                </div>
-                {% if region_info.top_trends %}
-                <div class="eu-trends-grid">
-                    <div class="eu-trend-col">
-                        <h4>Top Fabrics</h4>
-                        {% for t in region_info.fabric_types[:6] %}
-                        <div class="eu-trend-item">
-                            <span class="rank">#{{ loop.index }}</span>
-                            <span class="eu-term">{{ t.term|title }}</span>
-                            <span class="eu-score">{{ t.score }}</span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    <div class="eu-trend-col">
-                        <h4>Top Patterns</h4>
-                        {% for t in region_info.patterns[:6] %}
-                        <div class="eu-trend-item">
-                            <span class="rank">#{{ loop.index }}</span>
-                            <span class="eu-term">{{ t.term|title }}</span>
-                            <span class="eu-score">{{ t.score }}</span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    <div class="eu-trend-col">
-                        <h4>Top Colors</h4>
-                        {% for t in region_info.colors[:6] %}
-                        <div class="eu-trend-item">
-                            <span class="rank">#{{ loop.index }}</span>
-                            <span class="eu-term">{{ t.term|title }}</span>
-                            <span class="eu-score">{{ t.score }}</span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endif %}
-            </div>
-            {% endfor %}
-
-            <!-- Per-Country Views -->
-            {% for cc, country_info in eu_data.countries.items() %}
-            <div class="eu-content" id="eu-{{ cc }}">
-                <div class="eu-country-header">
-                    <span class="eu-flag-large">{{ country_info.flag }}</span>
-                    <div>
-                        <h3>{{ country_info.name }}</h3>
-                        <span class="eu-meta">{{ country_info.listing_count }} listings &middot; Currency: {{ country_info.currency }}</span>
-                    </div>
-                </div>
-                <div class="eu-marketplaces">
-                    <span class="eu-mp-label">Local marketplaces:</span>
-                    {% for mp in country_info.local_marketplaces %}
-                    <span class="eu-mp-tag">{{ mp }}</span>
-                    {% endfor %}
-                </div>
-                {% if country_info.top_trends %}
-                <div class="eu-trends-grid">
-                    <div class="eu-trend-col">
-                        <h4>Top Fabrics</h4>
-                        {% for t in country_info.fabric_types[:6] %}
-                        <div class="eu-trend-item">
-                            <span class="rank">#{{ loop.index }}</span>
-                            <span class="eu-term">{{ t.term|title }}</span>
-                            <span class="eu-score">{{ t.score }}</span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    <div class="eu-trend-col">
-                        <h4>Top Patterns</h4>
-                        {% for t in country_info.patterns[:6] %}
-                        <div class="eu-trend-item">
-                            <span class="rank">#{{ loop.index }}</span>
-                            <span class="eu-term">{{ t.term|title }}</span>
-                            <span class="eu-score">{{ t.score }}</span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    <div class="eu-trend-col">
-                        <h4>Top Colors</h4>
-                        {% for t in country_info.colors[:6] %}
-                        <div class="eu-trend-item">
-                            <span class="rank">#{{ loop.index }}</span>
-                            <span class="eu-term">{{ t.term|title }}</span>
-                            <span class="eu-score">{{ t.score }}</span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endif %}
-            </div>
-            {% endfor %}
-
-            {% else %}
-            <div class="empty-state">
-                <p>No European market data yet. Click <strong>Refresh Data</strong> to load trends from 10 European countries.</p>
-            </div>
-            {% endif %}
-        </section>
-
-        <!-- ========== SECTION 3: PINTEREST & SOCIAL TRENDS ========== -->
-        <section id="pinterest" class="section">
-            <div class="section-header">
-                <h2>Pinterest Trends</h2>
-                <p class="section-subtitle">Visual fabric trends from Pinterest &mdash; the leading indicator for craft, sewing &amp; textile trends</p>
-            </div>
-
-            {% if pinterest_data and pinterest_data.top_pins %}
-            <div class="pt-summary-bar">
-                <span class="pt-stat">{{ pinterest_data.total_pins_analyzed }} pins analyzed</span>
-                <span class="pt-stat">Last fetched: {{ pinterest_data.fetched_at[:16] if pinterest_data.fetched_at else 'N/A' }}</span>
-            </div>
-
-            <!-- Top Pins -->
-            <div class="pt-section">
-                <h3>Top Pins by Saves</h3>
-                <div class="pt-pin-grid">
-                    {% for pin in pinterest_data.top_pins[:12] %}
-                    <div class="pt-pin-card">
-                        {% if pin.image_url %}
-                        <div class="pt-pin-img-wrap">
-                            <img src="{{ pin.image_url }}" alt="{{ pin.title }}" loading="lazy"
-                                 onerror="this.parentElement.style.display='none'">
-                        </div>
-                        {% endif %}
-                        <div class="pt-pin-info">
-                            {% if pin.url %}
-                            <a href="{{ pin.url }}" target="_blank" rel="noopener" class="pt-pin-title">{{ pin.title }}</a>
-                            {% else %}
-                            <span class="pt-pin-title">{{ pin.title }}</span>
-                            {% endif %}
-                            <div class="pt-pin-meta">
-                                {% if pin.saves > 0 %}
-                                <span class="pt-saves">{{ pin.saves }} saves</span>
-                                {% endif %}
-                                {% for tag in pin.tags[:3] %}
-                                <span class="pt-tag">{{ tag }}</span>
-                                {% endfor %}
-                            </div>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-
-            <!-- Trend Signals from Pinterest -->
-            <div class="pt-trends-grid">
-                {% if pinterest_data.fabric_signals %}
-                <div class="pt-trend-col">
-                    <h4>Fabric Signals from Pinterest</h4>
-                    {% for s in pinterest_data.fabric_signals[:8] %}
-                    <div class="pt-signal-item">
-                        <span class="pt-signal-term">{{ s.term|title }}</span>
-                        <span class="pt-signal-score">{{ s.pinterest_score }}</span>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% endif %}
-                {% if pinterest_data.pattern_signals %}
-                <div class="pt-trend-col">
-                    <h4>Pattern Signals from Pinterest</h4>
-                    {% for s in pinterest_data.pattern_signals[:8] %}
-                    <div class="pt-signal-item">
-                        <span class="pt-signal-term">{{ s.term|title }}</span>
-                        <span class="pt-signal-score">{{ s.pinterest_score }}</span>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% endif %}
-                {% if pinterest_data.color_signals %}
-                <div class="pt-trend-col">
-                    <h4>Color Signals from Pinterest</h4>
-                    {% for s in pinterest_data.color_signals[:8] %}
-                    <div class="pt-signal-item">
-                        <span class="pt-signal-term">{{ s.term|title }}</span>
-                        <span class="pt-signal-score">{{ s.pinterest_score }}</span>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% endif %}
-                {% if pinterest_data.style_signals %}
-                <div class="pt-trend-col">
-                    <h4>Style Signals from Pinterest</h4>
-                    {% for s in pinterest_data.style_signals[:8] %}
-                    <div class="pt-signal-item">
-                        <span class="pt-signal-term">{{ s.term|title }}</span>
-                        <span class="pt-signal-score">{{ s.pinterest_score }}</span>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% endif %}
-            </div>
-
-            {% else %}
-            <div class="empty-state">
-                <p>No Pinterest data yet. Click <strong>Refresh Data</strong> to scrape fabric trends from Pinterest.</p>
-                <p class="empty-detail">Pinterest is a leading indicator for fabric/textile trends &mdash; visual trends often appear here 1-3 months before marketplace listings increase.</p>
-            </div>
-            {% endif %}
-        </section>
-
-        <!-- ========== SECTION 4: VISUAL GALLERY ========== -->
-        <section id="gallery" class="section">
-            <div class="section-header">
-                <h2>Visual Trend Gallery</h2>
-                <p class="section-subtitle">See what's trending &mdash; fabric is visual</p>
-            </div>
-
-            <div class="gallery-filters">
-                <button class="filter-btn active" onclick="filterGallery('all')">All</button>
-                <button class="filter-btn" onclick="filterGallery('fabric_type')">Fabrics</button>
-                <button class="filter-btn" onclick="filterGallery('pattern')">Patterns</button>
-                <button class="filter-btn" onclick="filterGallery('color')">Colors</button>
-                <button class="filter-btn" onclick="filterGallery('style')">Styles</button>
-            </div>
-
-            <div id="gallery-grid" class="gallery-grid">
-                {% for img in images %}
-                <div class="gallery-item" data-category="{{ img.category }}" data-term="{{ img.term }}">
-                    <div class="gallery-img-wrap">
-                        <img src="{{ img.image_url }}" alt="{{ img.listing_title }}" loading="lazy"
-                             onerror="this.parentElement.parentElement.style.display='none'">
-                        <div class="gallery-overlay">
-                            <span class="gallery-term">{{ img.term|title }}</span>
-                            <span class="gallery-cat">{{ img.category|replace('_', ' ')|title }}</span>
-                        </div>
-                    </div>
-                    <div class="gallery-info">
-                        {% if img.listing_url %}
-                        <a href="{{ img.listing_url }}" target="_blank" rel="noopener" class="gallery-title">{{ img.listing_title[:60] }}</a>
-                        {% else %}
-                        <span class="gallery-title">{{ img.listing_title[:60] }}</span>
-                        {% endif %}
-                        <div class="gallery-meta">
-                            <span class="gallery-source">{{ img.source|title }}</span>
-                            {% if img.price %}
-                            <span class="gallery-price">${{ "%.2f"|format(img.price) }}</span>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-
-            {% if not images %}
-            <div class="empty-state">
-                <p>No images yet. Run a scrape to populate the visual gallery.</p>
-            </div>
-            {% endif %}
-        </section>
-
-        <!-- ========== SECTION 3: MARKET SEGMENTS ========== -->
-        <section id="segments" class="section">
-            <div class="section-header">
-                <h2>Market Segments</h2>
-                <p class="section-subtitle">Trends tailored to your target audience</p>
-            </div>
-
-            <div class="segment-tabs">
-                {% for seg_key, seg_conf in segments.items() %}
-                <button class="segment-tab {% if loop.first %}active{% endif %}"
-                        data-segment="{{ seg_key }}" onclick="switchSegment('{{ seg_key }}')">
-                    <span class="seg-icon">
-                        {% if seg_conf.icon == 'grid' %}&#9638;{% endif %}
-                        {% if seg_conf.icon == 'scissors' %}&#9986;{% endif %}
-                        {% if seg_conf.icon == 'home' %}&#8962;{% endif %}
-                        {% if seg_conf.icon == 'sparkles' %}&#10024;{% endif %}
-                        {% if seg_conf.icon == 'palette' %}&#127912;{% endif %}
-                    </span>
-                    {{ seg_conf.label }}
-                </button>
-                {% endfor %}
-            </div>
-
-            {% for seg_key, seg_info in segment_data.items() %}
-            <div class="segment-content {% if loop.first %}active{% endif %}" id="seg-{{ seg_key }}">
-                <div class="segment-grid">
-                    <div class="segment-col">
-                        <h4>Top Trends for {{ seg_info.config.label }}</h4>
-                        <div class="segment-trend-list">
-                            {% for t in seg_info.trends[:8] %}
-                            <div class="segment-trend-item">
-                                <span class="rank">#{{ loop.index }}</span>
-                                <span class="st-term">{{ t.term|title }}</span>
-                                <span class="st-cat badge-{{ t.category }}">{{ t.category|replace('_', ' ') }}</span>
-                                <span class="st-score">{{ t.score }}</span>
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    <div class="segment-col">
-                        <h4>Segment Insights</h4>
-                        <div class="segment-keywords">
-                            <p class="seg-label">Tracked Keywords</p>
-                            <div class="keyword-cloud">
-                                {% for kw in seg_info.config.keywords %}
-                                <span class="keyword-tag">{{ kw }}</span>
-                                {% endfor %}
-                            </div>
-                        </div>
-                        <div class="segment-keywords">
-                            <p class="seg-label">Priority Fabrics</p>
-                            <div class="keyword-cloud">
-                                {% for fb in seg_info.config.priority_fabrics %}
-                                <span class="keyword-tag fabric">{{ fb }}</span>
-                                {% endfor %}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
-
-            {% if not segment_data %}
-            <div class="empty-state">
-                <p>No segment data yet. Run a scrape to see trends broken down by market segment.</p>
-            </div>
-            {% endif %}
-        </section>
-
-        <!-- ========== SECTION 4: TREND RANKINGS ========== -->
-        <section id="trends" class="section">
-            <div class="section-header">
-                <h2>Trend Rankings</h2>
-                <p class="section-subtitle">Complete rankings with scores, prices &amp; signals</p>
-            </div>
-
-            <!-- Charts Row -->
-            <div class="charts-section charts-4col">
-                <div class="chart-card">
-                    <h3>Top Fabric Types</h3>
-                    <canvas id="fabric-chart"></canvas>
-                </div>
-                <div class="chart-card">
-                    <h3>Top Patterns</h3>
-                    <canvas id="pattern-chart"></canvas>
-                </div>
-                <div class="chart-card">
-                    <h3>Top Colors</h3>
-                    <canvas id="color-chart"></canvas>
-                </div>
-                <div class="chart-card">
-                    <h3>Top Styles</h3>
-                    <canvas id="style-chart"></canvas>
-                </div>
-            </div>
-
-            <!-- Trend Tables -->
-            <div class="tables-wrapper">
-                <div class="table-tabs">
-                    <button class="tab active" data-tab="fabrics" onclick="switchTab('fabrics')">Fabric Types</button>
-                    <button class="tab" data-tab="patterns" onclick="switchTab('patterns')">Patterns</button>
-                    <button class="tab" data-tab="colors" onclick="switchTab('colors')">Colors</button>
-                    <button class="tab" data-tab="styles" onclick="switchTab('styles')">Styles</button>
-                </div>
-
-                <div id="tab-fabrics" class="tab-content active">
-                    <table class="trend-table">
-                        <thead>
-                            <tr>
-                                <th>#</th><th>Fabric Type</th><th>Score</th>
-                                <th>Confidence</th><th>Listings</th><th>Sources</th><th>Avg Price</th><th>Lifecycle</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for t in trends.fabric_types %}
-                            <tr>
-                                <td>{{ loop.index }}</td>
-                                <td class="term-name">{{ t.term|title }}</td>
-                                <td><span class="score-badge">{{ t.score }}</span></td>
-                                <td><span class="tier-badge tier-{{ t.confidence_tier|default('moderate') }}">{{ t.confidence_tier|default('moderate')|title }}</span></td>
-                                <td>{{ t.mention_count }}</td>
-                                <td>{{ t.source_count|default(1) }}</td>
-                                <td>{{ "$%.2f"|format(t.avg_price) if t.avg_price else "N/A" }}</td>
-                                <td><span class="lifecycle-badge {{ t.lifecycle }}">{{ t.lifecycle|title }}</span></td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
-                <div id="tab-patterns" class="tab-content">
-                    <table class="trend-table">
-                        <thead>
-                            <tr>
-                                <th>#</th><th>Pattern</th><th>Score</th>
-                                <th>Confidence</th><th>Listings</th><th>Sources</th><th>Avg Price</th><th>Lifecycle</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for t in trends.patterns %}
-                            <tr>
-                                <td>{{ loop.index }}</td>
-                                <td class="term-name">{{ t.term|title }}</td>
-                                <td><span class="score-badge">{{ t.score }}</span></td>
-                                <td><span class="tier-badge tier-{{ t.confidence_tier|default('moderate') }}">{{ t.confidence_tier|default('moderate')|title }}</span></td>
-                                <td>{{ t.mention_count }}</td>
-                                <td>{{ t.source_count|default(1) }}</td>
-                                <td>{{ "$%.2f"|format(t.avg_price) if t.avg_price else "N/A" }}</td>
-                                <td><span class="lifecycle-badge {{ t.lifecycle }}">{{ t.lifecycle|title }}</span></td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
-                <div id="tab-colors" class="tab-content">
-                    <table class="trend-table">
-                        <thead>
-                            <tr>
-                                <th>#</th><th>Color</th><th>Score</th>
-                                <th>Confidence</th><th>Listings</th><th>Sources</th><th>Avg Price</th><th>Lifecycle</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for t in trends.colors %}
-                            <tr>
-                                <td>{{ loop.index }}</td>
-                                <td class="term-name">{{ t.term|title }}</td>
-                                <td><span class="score-badge">{{ t.score }}</span></td>
-                                <td><span class="tier-badge tier-{{ t.confidence_tier|default('moderate') }}">{{ t.confidence_tier|default('moderate')|title }}</span></td>
-                                <td>{{ t.mention_count }}</td>
-                                <td>{{ t.source_count|default(1) }}</td>
-                                <td>{{ "$%.2f"|format(t.avg_price) if t.avg_price else "N/A" }}</td>
-                                <td><span class="lifecycle-badge {{ t.lifecycle }}">{{ t.lifecycle|title }}</span></td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
-                <div id="tab-styles" class="tab-content">
-                    <table class="trend-table">
-                        <thead>
-                            <tr>
-                                <th>#</th><th>Style / Aesthetic</th><th>Score</th>
-                                <th>Confidence</th><th>Listings</th><th>Sources</th><th>Avg Price</th><th>Lifecycle</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for t in trends.styles %}
-                            <tr>
-                                <td>{{ loop.index }}</td>
-                                <td class="term-name">{{ t.term|title }}</td>
-                                <td><span class="score-badge">{{ t.score }}</span></td>
-                                <td><span class="tier-badge tier-{{ t.confidence_tier|default('moderate') }}">{{ t.confidence_tier|default('moderate')|title }}</span></td>
-                                <td>{{ t.mention_count }}</td>
-                                <td>{{ t.source_count|default(1) }}</td>
-                                <td>{{ "$%.2f"|format(t.avg_price) if t.avg_price else "N/A" }}</td>
-                                <td><span class="lifecycle-badge {{ t.lifecycle }}">{{ t.lifecycle|title }}</span></td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </section>
-
-        <!-- ========== SECTION 5: RAW DATA ========== -->
-        <section id="data" class="section">
-            <div class="section-header">
-                <h2>Raw Listings</h2>
-                <p class="section-subtitle">Browse scraped listings from all sources</p>
-            </div>
-            <div class="listing-filters">
-                <button class="filter-btn active" onclick="filterListings('all')">All Sources</button>
-                <button class="filter-btn" onclick="filterListings('seed')">Baseline Data</button>
-                <button class="filter-btn" onclick="filterListings('etsy')">Etsy</button>
-                <button class="filter-btn" onclick="filterListings('amazon')">Amazon</button>
-                <button class="filter-btn" onclick="filterListings('spoonflower')">Spoonflower</button>
-                <button class="filter-btn" onclick="filterListings('pinterest')">Pinterest</button>
-            </div>
-            <div id="listings-container" class="listings-grid"></div>
         </section>
 
         <!-- Stats Footer -->
@@ -926,16 +559,6 @@
                 </div>
                 {% endif %}
                 {% endfor %}
-                <div class="stat-card">
-                    <div class="stat-source">Images</div>
-                    <div class="stat-count">{{ stats.total_images }}</div>
-                    <div class="stat-label">collected</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-source">Forecasts</div>
-                    <div class="stat-count">{{ stats.total_forecasts }}</div>
-                    <div class="stat-label">predictions</div>
-                </div>
             </div>
         </section>
 

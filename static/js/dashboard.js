@@ -1,4 +1,4 @@
-/* Fabric Trend Spotter - Dashboard JS v2 */
+/* Fabric Trend Spotter - Dashboard JS v3 */
 
 const CHART_COLORS = [
     '#6c63ff', '#ec4899', '#22c55e', '#eab308', '#f97316',
@@ -116,101 +116,20 @@ function scrollToSection(id) {
 }
 
 /* ==========================================
-   TABS
-   ========================================== */
-
-function switchTab(tabName) {
-    document.querySelectorAll('.table-tabs .tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-    document.querySelector(`[data-tab="${tabName}"]`)?.classList.add('active');
-    document.getElementById(`tab-${tabName}`)?.classList.add('active');
-}
-
-/* ==========================================
-   EUROPEAN MARKETS
+   ETSY / WHOLESALE TABS
    ========================================== */
 
 function switchEU(key) {
-    document.querySelectorAll('.eu-tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.eu-content').forEach(c => c.classList.remove('active'));
-    document.querySelector(`[data-eu="${key}"]`)?.classList.add('active');
-    document.getElementById(`eu-${key}`)?.classList.add('active');
-}
-
-/* ==========================================
-   SEGMENTS
-   ========================================== */
-
-function switchSegment(seg) {
-    document.querySelectorAll('.segment-tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.segment-content').forEach(c => c.classList.remove('active'));
-    document.querySelector(`[data-segment="${seg}"]`)?.classList.add('active');
-    document.getElementById(`seg-${seg}`)?.classList.add('active');
-}
-
-/* ==========================================
-   ACTION BOARD (unified - no role tabs needed)
-   ========================================== */
-
-/* ==========================================
-   GALLERY FILTER
-   ========================================== */
-
-function filterGallery(category) {
-    document.querySelectorAll('.gallery-filters .filter-btn').forEach(b => b.classList.remove('active'));
-    event.target.classList.add('active');
-
-    document.querySelectorAll('.gallery-item').forEach(item => {
-        if (category === 'all' || item.dataset.category === category) {
-            item.style.display = '';
-        } else {
-            item.style.display = 'none';
-        }
-    });
-}
-
-/* ==========================================
-   LISTINGS
-   ========================================== */
-
-async function loadListings(source) {
-    const container = document.getElementById('listings-container');
-    if (!container) return;
-    let url = '/api/listings?limit=60';
-    if (source && source !== 'all') url += '&source=' + source;
-
-    try {
-        const resp = await fetch(url);
-        const listings = await resp.json();
-        if (!listings.length) {
-            container.innerHTML = '<div class="empty-state"><p>No listings yet. Run a scrape first.</p></div>';
-            return;
-        }
-        container.innerHTML = listings.map(l => `
-            <div class="listing-card">
-                <div class="listing-source">${esc(l.source)}</div>
-                <div class="listing-title">
-                    ${l.url ? `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.title)}</a>` : esc(l.title)}
-                </div>
-                <div class="listing-meta">
-                    ${l.price ? `<span>$${l.price.toFixed(2)}</span>` : ''}
-                    ${l.favorites ? `<span>${l.favorites} favs</span>` : ''}
-                    ${l.reviews ? `<span>${l.reviews} reviews</span>` : ''}
-                </div>
-                <div class="listing-tags">
-                    ${(JSON.parse(l.tags || '[]')).slice(0, 5).map(t => `<span class="listing-tag">${esc(t)}</span>`).join('')}
-                </div>
-            </div>
-        `).join('');
-    } catch (err) {
-        container.innerHTML = `<div class="empty-state"><p>Error: ${err.message}</p></div>`;
+    // Scope tab switching to the parent section so Etsy and Wholesale tabs are independent
+    const targetContent = document.getElementById(`eu-${key}`);
+    if (!targetContent) return;
+    const section = targetContent.closest('section');
+    if (section) {
+        section.querySelectorAll('.eu-tab').forEach(t => t.classList.remove('active'));
+        section.querySelectorAll('.eu-content').forEach(c => c.classList.remove('active'));
     }
-}
-
-function filterListings(source) {
-    document.querySelectorAll('.listing-filters .filter-btn').forEach(b => b.classList.remove('active'));
-    event.target.classList.add('active');
-    loadListings(source);
+    document.querySelector(`[data-eu="${key}"]`)?.classList.add('active');
+    targetContent.classList.add('active');
 }
 
 function esc(s) {
@@ -218,15 +137,3 @@ function esc(s) {
     d.textContent = s;
     return d.innerHTML;
 }
-
-/* Load listings on scroll to section */
-const observer = new IntersectionObserver((entries) => {
-    entries.forEach(e => {
-        if (e.isIntersecting && e.target.id === 'data') loadListings('all');
-    });
-}, { threshold: 0.1 });
-
-document.addEventListener('DOMContentLoaded', () => {
-    const dataSection = document.getElementById('data');
-    if (dataSection) observer.observe(dataSection);
-});
