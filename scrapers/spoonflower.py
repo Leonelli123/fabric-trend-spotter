@@ -1,168 +1,190 @@
-"""Spoonflower scraper for trending fabric designs."""
+"""Spoonflower scraper using Pythias search API.
+
+Spoonflower migrated to a Next.js client-side rendered site. The old
+HTML scraping approach no longer works. This version calls their
+internal Pythias search API directly.
+"""
 
 import logging
-from bs4 import BeautifulSoup
-from scrapers.base import get_session, fetch_page, extract_price
+import time
+from config import FABRIC_TYPES, PATTERN_TYPES, COLOR_TERMS, STYLE_TERMS
 
 logger = logging.getLogger(__name__)
 
-SPOONFLOWER_BASE = "https://www.spoonflower.com"
-TRENDING_URLS = [
-    "/fabric/best-selling",
-    "/fabric/new",
-    "/fabric?sort=bestSelling&on=fabric",
+PYTHIAS_URL = "https://pythias.spoonflower.com/search/v3/designs"
+
+# Topic filters available on Spoonflower
+TOPIC_FILTERS = [
+    "animals", "geometric", "abstract", "stripes", "plaid",
+    "holiday", "vintage", "nature", "floral", "botanical",
 ]
 
-SEARCH_QUERIES = [
-    "floral", "geometric", "botanical", "abstract", "vintage",
-    "modern", "minimalist", "cottagecore", "tropical",
+# Sort options to get different signals
+SORT_OPTIONS = [
+    ("bestSelling", "m"),   # best sellers = strongest demand signal
 ]
 
 
 def scrape_spoonflower():
-    """Scrape Spoonflower for trending fabric designs."""
-    session = get_session()
-    listings = []
+    """Scrape Spoonflower for trending fabric designs via their search API."""
+    import requests
 
-    # Scrape trending/bestselling pages
-    for path in TRENDING_URLS:
-        url = SPOONFLOWER_BASE + path
-        logger.info("Scraping Spoonflower: %s", url)
-        resp = fetch_page(session, url)
-        if not resp:
-            continue
-        listings.extend(_parse_spoonflower_page(resp.text))
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Referer": "https://www.spoonflower.com/",
+        "Origin": "https://www.spoonflower.com",
+    })
 
-    # Search for specific design trends
-    for query in SEARCH_QUERIES:
-        search_url = f"{SPOONFLOWER_BASE}/fabric"
-        logger.info("Searching Spoonflower for: %s", query)
-        resp = fetch_page(session, search_url, params={
-            "search": query,
-            "sort": "bestSelling",
-            "on": "fabric",
+    all_designs = {}  # keyed by designId to deduplicate
+    consecutive_failures = 0
+
+    # Fetch bestselling and most favorited
+    for sort_key, test_variant in SORT_OPTIONS:
+        if consecutive_failures >= 3:
+            break
+        designs = _fetch_designs(session, {
+            "sort": sort_key,
+            "page_locale": "en",
+            "testVariant": test_variant,
+            "page_size": "48",
+            "page_offset": "1",
         })
-        if not resp:
+        if designs is None:
+            consecutive_failures += 1
             continue
-        listings.extend(_parse_spoonflower_page(resp.text))
+        consecutive_failures = 0
+        for d in designs:
+            all_designs[d["designId"]] = d
+        time.sleep(1)
 
-    logger.info("Scraped %d Spoonflower listings", len(listings))
-    return listings
+    # Fetch by topic filters for broader coverage
+    for topic in TOPIC_FILTERS:
+        if consecutive_failures >= 3:
+            break
+        designs = _fetch_designs(session, {
+            "sort": "bestSelling",
+            "topic": topic,
+            "page_locale": "en",
+            "testVariant": "m",
+            "page_size": "24",
+            "page_offset": "1",
+        })
+        if designs is None:
+            consecutive_failures += 1
+            continue
+        consecutive_failures = 0
+        for d in designs:
+            all_designs[d["designId"]] = d
+        time.sleep(0.8)
 
-
-def _parse_spoonflower_page(html):
-    """Parse a Spoonflower page for fabric listings."""
-    soup = BeautifulSoup(html, "html.parser")
+    # Convert to standard listing format
     listings = []
+    for design in all_designs.values():
+        listing = _design_to_listing(design)
+        if listing:
+            listings.append(listing)
 
-    # Spoonflower design cards
-    cards = soup.select(
-        ".design-card, [data-testid='design-card'], "
-        ".product-card, .fabric-card, .design-thumbnail"
-    )
-
-    for card in cards[:30]:
-        try:
-            title_el = card.select_one(
-                ".design-card__title, .product-title, h3, h2, a[title]"
-            )
-            title = ""
-            if title_el:
-                title = title_el.get("title") or title_el.get_text(strip=True)
-            if not title:
-                continue
-
-            link_el = card.select_one("a[href]")
-            url = ""
-            if link_el:
-                href = link_el.get("href", "")
-                url = href if href.startswith("http") else SPOONFLOWER_BASE + href
-
-            price_el = card.select_one("[class*='price'], .design-card__price")
-            price = extract_price(price_el.get_text()) if price_el else None
-
-            img_el = card.select_one("img[src]")
-            image_url = img_el.get("src", "") if img_el else ""
-
-            tags = _extract_tags_from_title(title)
-
-            # Spoonflower designs often have the designer name
-            designer_el = card.select_one(
-                ".design-card__designer, .designer-name, [class*='designer']"
-            )
-            designer = designer_el.get_text(strip=True) if designer_el else ""
-            if designer:
-                tags.append(f"designer:{designer}")
-
-            listings.append({
-                "source": "spoonflower",
-                "title": title,
-                "url": url,
-                "price": price,
-                "currency": "USD",
-                "favorites": 0,
-                "reviews": 0,
-                "rating": None,
-                "image_url": image_url,
-                "tags": tags,
-            })
-        except Exception as e:
-            logger.debug("Error parsing Spoonflower card: %s", e)
-
-    # Fallback: try JSON data embedded in the page
-    import json
-    for script in soup.select("script"):
-        if script.string and "designs" in (script.string or ""):
-            try:
-                # Some Spoonflower pages embed JSON data
-                text = script.string
-                start = text.find("{")
-                end = text.rfind("}") + 1
-                if start >= 0 and end > start:
-                    data = json.loads(text[start:end])
-                    designs = _find_designs_in_json(data)
-                    for d in designs[:30]:
-                        listings.append({
-                            "source": "spoonflower",
-                            "title": d.get("name", d.get("title", "")),
-                            "url": d.get("url", ""),
-                            "price": d.get("price"),
-                            "currency": "USD",
-                            "favorites": d.get("favorites", 0),
-                            "reviews": 0,
-                            "rating": None,
-                            "image_url": d.get("image", ""),
-                            "tags": _extract_tags_from_title(
-                                d.get("name", d.get("title", ""))
-                            ),
-                        })
-            except (json.JSONDecodeError, ValueError):
-                pass
-
+    logger.info("Scraped %d unique Spoonflower designs", len(listings))
     return listings
 
 
-def _find_designs_in_json(data, results=None):
-    """Recursively find design objects in nested JSON."""
-    if results is None:
-        results = []
-    if isinstance(data, dict):
-        if "designId" in data or ("name" in data and "fabric" in str(data)):
-            results.append(data)
-        for v in data.values():
-            _find_designs_in_json(v, results)
-    elif isinstance(data, list):
-        for item in data:
-            _find_designs_in_json(item, results)
-    return results
+def _fetch_designs(session, params):
+    """Fetch designs from the Pythias API."""
+    try:
+        resp = session.get(PYTHIAS_URL, params=params, timeout=15)
+        if resp.status_code != 200:
+            logger.warning("Spoonflower API returned %d", resp.status_code)
+            return None
+        data = resp.json()
+        results = data.get("page_results", [])
+        sort = params.get("sort", "?")
+        topic = params.get("topic", "all")
+        logger.info("Spoonflower %s/%s: %d designs", sort, topic, len(results))
+        return results
+    except Exception as e:
+        logger.warning("Spoonflower API error: %s", e)
+        return None
 
 
-def _extract_tags_from_title(title):
-    """Extract relevant keywords from a listing title."""
-    title_lower = title.lower()
+def _design_to_listing(design):
+    """Convert a Spoonflower API design object to a standard listing."""
+    name = design.get("name", "")
+    if not name or len(name) < 3:
+        return None
+
+    design_id = design.get("designId", "")
+    slug = design.get("slug", "")
+    url = f"https://www.spoonflower.com/en/fabric/{slug}" if slug else ""
+
+    # Build image URL from thumbnail
+    thumbnail = design.get("thumbnail", "")
+    image_url = f"https://images.spoonflower.com/thumbnail/{thumbnail}" if thumbnail else ""
+
+    # Extract engagement signals
+    favorites = design.get("numFavorites", 0) or 0
+    orders = design.get("orders", 0) or 0
+
+    # Extract designer info
+    user = design.get("user", {})
+    designer = user.get("screenName", "")
+
+    # Extract tags from design tags + name
+    tags = _extract_tags(name, design.get("tags", []))
+    if designer:
+        tags.append(f"designer:{designer}")
+
+    return {
+        "source": "spoonflower",
+        "title": name,
+        "url": url,
+        "price": None,  # API doesn't return prices (fabric priced on checkout)
+        "currency": "USD",
+        "favorites": favorites,
+        "reviews": orders,  # use orders as a proxy for reviews/demand
+        "rating": None,
+        "image_url": image_url,
+        "tags": tags,
+    }
+
+
+def _extract_tags(title, api_tags):
+    """Extract trend-relevant tags from title and Spoonflower's own tags."""
     tags = []
-    from config import FABRIC_TYPES, PATTERN_TYPES, COLOR_TERMS
-    for term in FABRIC_TYPES + PATTERN_TYPES + COLOR_TERMS:
-        if term.lower() in title_lower:
+    combined = (title + " " + " ".join(api_tags or [])).lower()
+
+    for term in FABRIC_TYPES + PATTERN_TYPES + COLOR_TERMS + STYLE_TERMS:
+        if term.lower() in combined:
             tags.append(term)
-    return tags
+
+    # Also extract common Spoonflower-specific themes
+    theme_map = {
+        "cottagecore": "cottagecore",
+        "boho": "bohemian",
+        "whimsical": "whimsical",
+        "vintage": "vintage",
+        "retro": "retro",
+        "modern": "modern",
+        "minimalist": "minimalist",
+        "maximalist": "maximalist",
+        "folk": "folk art",
+        "tropical": "tropical",
+        "botanical": "botanical",
+        "celestial": "celestial",
+        "watercolor": "watercolor",
+        "ditsy": "ditsy",
+        "toile": "toile",
+    }
+    for keyword, tag in theme_map.items():
+        if keyword in combined and tag not in tags:
+            tags.append(tag)
+
+    # Remove duplicates while preserving order
+    seen = set()
+    unique_tags = []
+    for t in tags:
+        if t not in seen:
+            seen.add(t)
+            unique_tags.append(t)
+    return unique_tags

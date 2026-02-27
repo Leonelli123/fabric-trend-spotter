@@ -72,6 +72,10 @@ def dashboard():
     # Pinterest social/visual trend data
     pinterest_data = scrape_status.get("pinterest_result", {})
 
+    # Action board and insights
+    action_board = scrape_status.get("action_board", {})
+    insights = scrape_status.get("insights", [])
+
     return render_template(
         "dashboard.html",
         trends=trends,
@@ -85,6 +89,8 @@ def dashboard():
         eu_countries=EUROPEAN_COUNTRIES,
         eu_regions=EUROPEAN_REGIONS,
         pinterest_data=pinterest_data,
+        action_board=action_board,
+        insights=insights,
     )
 
 
@@ -319,12 +325,20 @@ def _run_scrape():
         )
         result = analyze_trends(all_listings, google_data)
 
+        # Store insights for dashboard action board
+        scrape_status["insights"] = result.get("insights", [])
+
         # Step 5: Run forecasting
         logger.info("Running trend forecasts...")
         forecasts = run_forecasts(result, google_data)
 
         emerging = [f for f in forecasts if f["lifecycle"] == "emerging"]
         rising = [f for f in forecasts if f["lifecycle"] == "rising"]
+
+        # Generate action board recommendations
+        scrape_status["action_board"] = _build_action_board(
+            result, forecasts, google_data
+        )
 
         # Step 6: Pinterest Social/Visual Trends
         pinterest_result = {}
@@ -421,6 +435,220 @@ def _run_scrape():
         scrape_status["error"] = str(e)
     finally:
         scrape_status["running"] = False
+
+
+def _build_action_board(result, forecasts, google_data):
+    """Build role-specific actionable recommendations from analysis data."""
+    from datetime import datetime
+
+    board = {
+        "generated_at": datetime.now().isoformat(),
+        "buyer": [],       # What to order / reduce
+        "designer": [],    # Color palettes, style directions
+        "marketing": [],   # Campaign themes, content angles
+        "ceo": [],         # Strategic overview
+        "sales": [],       # What to promote, pricing
+        "macro_trends": [],    # 6-12 month horizon
+        "seasonal": [],        # 3-6 month / seasonal
+        "short_term": [],      # 1-3 month / viral
+    }
+
+    fabrics = result.get("fabric_types", [])
+    patterns = result.get("patterns", [])
+    colors = result.get("colors", [])
+    styles = result.get("styles", [])
+
+    emerging_fc = [f for f in forecasts if f["lifecycle"] == "emerging"]
+    rising_fc = [f for f in forecasts if f["lifecycle"] == "rising"]
+    peak_fc = [f for f in forecasts if f["lifecycle"] == "peak"]
+    declining_fc = [f for f in forecasts if f["lifecycle"] == "declining"]
+
+    # --- BUYER RECOMMENDATIONS ("Indkober") ---
+    # What to order NOW
+    for f in rising_fc[:3]:
+        board["buyer"].append({
+            "action": "order",
+            "priority": "high",
+            "term": f["term"],
+            "category": f["category"],
+            "reason": (
+                f"Rising trend (velocity +{f['velocity']*100:.0f}%) with score "
+                f"{f['current_score']} heading to {f['predicted_score']}. "
+                f"Confidence: {f['confidence']}%."
+            ),
+        })
+    for f in emerging_fc[:3]:
+        board["buyer"].append({
+            "action": "sample",
+            "priority": "medium",
+            "term": f["term"],
+            "category": f["category"],
+            "reason": (
+                f"Emerging trend - order samples now, plan production in 60 days. "
+                f"Score {f['current_score']} predicted to reach {f['predicted_score']}."
+            ),
+        })
+    for f in declining_fc[:3]:
+        board["buyer"].append({
+            "action": "reduce",
+            "priority": "high",
+            "term": f["term"],
+            "category": f["category"],
+            "reason": (
+                f"Declining (velocity {f['velocity']*100:.0f}%). "
+                f"Don't reorder - sell through remaining stock."
+            ),
+        })
+
+    # --- DESIGNER RECOMMENDATIONS ---
+    # Top color palette
+    top_colors = [c["term"] for c in colors[:6]]
+    if top_colors:
+        board["designer"].append({
+            "action": "color_palette",
+            "priority": "high",
+            "terms": top_colors,
+            "reason": "Current top-trending color palette across all sources.",
+        })
+    # Rising patterns
+    rising_patterns = [f for f in rising_fc + emerging_fc if f["category"] == "pattern"]
+    for p in rising_patterns[:3]:
+        board["designer"].append({
+            "action": "pattern_direction",
+            "priority": "medium",
+            "term": p["term"],
+            "reason": f"Pattern gaining momentum ({p['lifecycle']}). Design new collections around this.",
+        })
+    # Style directions
+    top_styles = [s["term"] for s in styles[:5]]
+    if top_styles:
+        board["designer"].append({
+            "action": "style_direction",
+            "priority": "high",
+            "terms": top_styles,
+            "reason": "Dominant aesthetics driving consumer preference right now.",
+        })
+
+    # --- MARKETING RECOMMENDATIONS ---
+    for f in (rising_fc + emerging_fc)[:3]:
+        board["marketing"].append({
+            "action": "content_theme",
+            "priority": "high",
+            "term": f["term"],
+            "category": f["category"],
+            "reason": (
+                "Create content around '{}' - {}.".format(
+                    f["term"],
+                    "strong Google search demand" if f.get("google_trending_up") else "rising marketplace demand"
+                )
+            ),
+        })
+    if styles:
+        board["marketing"].append({
+            "action": "campaign_aesthetic",
+            "priority": "medium",
+            "terms": [s["term"] for s in styles[:3]],
+            "reason": "Align visual branding and campaigns with these trending aesthetics.",
+        })
+
+    # --- CEO / STRATEGIC OVERVIEW ---
+    board["ceo"].append({
+        "action": "market_summary",
+        "total_trends_tracked": len(fabrics) + len(patterns) + len(colors) + len(styles),
+        "emerging_count": len(emerging_fc),
+        "rising_count": len(rising_fc),
+        "peak_count": len(peak_fc),
+        "declining_count": len(declining_fc),
+        "top_fabric": fabrics[0]["term"] if fabrics else "N/A",
+        "top_pattern": patterns[0]["term"] if patterns else "N/A",
+        "top_color": colors[0]["term"] if colors else "N/A",
+        "top_style": styles[0]["term"] if styles else "N/A",
+    })
+
+    # --- SALES RECOMMENDATIONS ---
+    # What's hot to promote
+    for f in peak_fc[:3]:
+        board["sales"].append({
+            "action": "promote",
+            "priority": "high",
+            "term": f["term"],
+            "category": f["category"],
+            "reason": f"At peak demand (score {f['current_score']}). Push hard now before decline.",
+        })
+    for f in rising_fc[:2]:
+        board["sales"].append({
+            "action": "upsell",
+            "priority": "medium",
+            "term": f["term"],
+            "reason": f"Growing demand - use as upsell/cross-sell opportunity.",
+        })
+    # Premium pricing opportunities
+    priced = [t for t in fabrics + patterns + colors + styles if t.get("avg_price", 0) > 20]
+    priced.sort(key=lambda x: x.get("avg_price", 0), reverse=True)
+    for t in priced[:2]:
+        board["sales"].append({
+            "action": "premium",
+            "priority": "medium",
+            "term": t["term"],
+            "avg_price": t["avg_price"],
+            "reason": f"Commands ${t['avg_price']:.2f}/unit avg - premium positioning opportunity.",
+        })
+
+    # --- TREND HORIZONS ---
+    # Macro trends (slow-moving, high-confidence, style-driven)
+    macro_terms = ["sustainable", "organic", "minimalist", "quiet luxury",
+                   "natural", "eco", "biodegradable", "linen", "hemp", "bamboo"]
+    for t in styles + fabrics:
+        if t["term"].lower() in macro_terms and t.get("score", 0) > 10:
+            board["macro_trends"].append({
+                "term": t["term"],
+                "score": t["score"],
+                "category": "style" if t in styles else "fabric_type",
+                "horizon": "6-12 months",
+                "reason": "Long-term consumer shift, not seasonal.",
+            })
+
+    # Seasonal (current month context)
+    month = datetime.now().month
+    if month in (12, 1, 2):
+        season = "Winter/Early Spring"
+        seasonal_colors = ["ivory", "cream", "burgundy", "forest green", "navy",
+                          "charcoal", "brown", "mocha"]
+        seasonal_fabrics = ["wool", "flannel", "velvet", "fleece", "corduroy"]
+    elif month in (3, 4, 5):
+        season = "Spring/Summer Prep"
+        seasonal_colors = ["blush pink", "lavender", "sage green", "baby blue",
+                          "coral", "yellow", "mint"]
+        seasonal_fabrics = ["cotton", "lawn", "linen", "voile", "chiffon"]
+    elif month in (6, 7, 8):
+        season = "Summer/Fall Prep"
+        seasonal_colors = ["terracotta", "rust", "olive", "mustard", "burnt orange",
+                          "forest green", "teal"]
+        seasonal_fabrics = ["linen", "rayon", "jersey", "cotton", "gauze"]
+    else:
+        season = "Fall/Winter Prep"
+        seasonal_colors = ["burgundy", "navy", "charcoal", "emerald", "brown",
+                          "plum", "rust"]
+        seasonal_fabrics = ["velvet", "wool", "flannel", "corduroy", "fleece"]
+
+    board["seasonal"].append({
+        "season": season,
+        "recommended_colors": seasonal_colors,
+        "recommended_fabrics": seasonal_fabrics,
+        "reason": f"Based on seasonal buying patterns for {season}.",
+    })
+
+    # Short-term (viral / fast-moving)
+    for f in emerging_fc[:5]:
+        if f.get("velocity", 0) > 0.1:
+            board["short_term"].append({
+                "term": f["term"],
+                "category": f["category"],
+                "velocity": f["velocity"],
+                "reason": f"Fast-moving trend, act within 1-3 months.",
+            })
+
+    return board
 
 
 if __name__ == "__main__":
