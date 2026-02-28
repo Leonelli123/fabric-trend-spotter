@@ -121,14 +121,34 @@ class WooConnector:
             "average_rating": raw.get("average_rating", "0"),
             "rating_count": raw.get("rating_count", 0),
             "permalink": raw.get("permalink", ""),
-            # Fabric-specific extraction
-            "color": _extract_attribute(attrs, ["color", "colour", "farve", "farbe"]),
-            "pattern": _extract_attribute(attrs, ["pattern", "mønster", "muster", "print"]),
-            "fabric_type": _extract_attribute(attrs, [
-                "fabric", "material", "stof", "materiale", "stoff",
+            # Fabric-specific extraction (supports DK/DE/EN attribute names)
+            "color": _extract_attribute(attrs, [
+                "farve", "vare farve", "color", "colour", "farbe",
             ]),
-            "weight_gsm": _extract_attribute(attrs, ["weight", "gsm", "vægt", "gewicht"]),
-            "width_cm": _extract_attribute(attrs, ["width", "bredde", "breite"]),
+            "pattern": _extract_attribute(attrs, [
+                "mønster", "pattern", "print", "muster", "design",
+            ]),
+            "fabric_type": _extract_attribute(attrs, [
+                "materialer", "materiale", "material", "fabric", "stof", "stoff",
+            ]),
+            "jersey_or_woven": _extract_attribute(attrs, [
+                "jersey / fast", "jersey/fast", "type",
+            ]),
+            "properties": _extract_attribute(attrs, [
+                "egenskaber", "properties", "eigenschaften",
+            ]),
+            "certification": _extract_attribute(attrs, [
+                "certifikat", "certification", "zertifikat",
+            ]),
+            "weight_gsm": _extract_attribute(attrs, [
+                "weight", "gsm", "vægt", "gewicht", "gram",
+            ]),
+            "width_cm": _extract_attribute(attrs, [
+                "width", "bredde", "breite",
+            ]),
+            "length_options": _extract_attribute(attrs, [
+                "længde", "length", "länge",
+            ]),
         }
 
     # ------------------------------------------------------------------
