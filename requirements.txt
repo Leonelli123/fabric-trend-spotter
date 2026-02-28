@@ -4,3 +4,4 @@ requests==2.32.3
 beautifulsoup4==4.12.3
 apscheduler==3.10.4
 pytrends==4.9.2
+# WooCommerce Inventory Intelligence (uses requests + basic auth, no extra deps needed)

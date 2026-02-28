@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory Intelligence — Fabric Trend Spotter</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* Inventory Intelligence specific styles */
+        .inv-container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .inv-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .inv-header h1 { font-size: 24px; font-weight: 700; color: #1a1a2e; }
+        .inv-header .subtitle { font-size: 14px; color: #666; margin-top: 4px; }
+        .inv-nav { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+        .inv-nav a {
+            padding: 8px 16px; border-radius: 6px; text-decoration: none;
+            font-size: 13px; font-weight: 500; color: #555; background: #f5f5f5;
+            border: 1px solid #e0e0e0; transition: all 0.2s;
+        }
+        .inv-nav a:hover, .inv-nav a.active { background: #1a1a2e; color: white; border-color: #1a1a2e; }
+        .inv-nav a.urgent { background: #fff3f3; color: #d32f2f; border-color: #ffcdd2; }
+        .inv-nav a.urgent:hover { background: #d32f2f; color: white; }
+
+        /* Health Score */
+        .health-card {
+            background: white; border-radius: 12px; padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 20px;
+            display: flex; align-items: center; gap: 24px;
+        }
+        .health-score {
+            width: 100px; height: 100px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 32px; font-weight: 800; color: white; flex-shrink: 0;
+        }
+        .health-score.green { background: linear-gradient(135deg, #43a047, #66bb6a); }
+        .health-score.yellow { background: linear-gradient(135deg, #f9a825, #fbc02d); }
+        .health-score.orange { background: linear-gradient(135deg, #ef6c00, #ff9800); }
+        .health-score.red { background: linear-gradient(135deg, #c62828, #e53935); }
+        .health-meta h2 { margin: 0 0 8px; font-size: 20px; }
+        .health-meta .metrics { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 12px; }
+        .health-meta .metric { text-align: center; }
+        .health-meta .metric-value { font-size: 22px; font-weight: 700; color: #1a1a2e; }
+        .health-meta .metric-label { font-size: 11px; color: #888; text-transform: uppercase; }
+
+        /* KPI Grid */
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .kpi-card {
+            background: white; border-radius: 10px; padding: 18px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+        }
+        .kpi-card .kpi-value { font-size: 28px; font-weight: 800; color: #1a1a2e; }
+        .kpi-card .kpi-label { font-size: 12px; color: #888; text-transform: uppercase; margin-top: 4px; }
+        .kpi-card .kpi-sub { font-size: 12px; color: #666; margin-top: 6px; }
+        .kpi-card.danger .kpi-value { color: #d32f2f; }
+        .kpi-card.success .kpi-value { color: #2e7d32; }
+        .kpi-card.warning .kpi-value { color: #e65100; }
+
+        /* Section */
+        .inv-section {
+            background: white; border-radius: 12px; padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 24px;
+        }
+        .inv-section h2 { font-size: 18px; margin: 0 0 16px; color: #1a1a2e; border-bottom: 2px solid #f0f0f0; padding-bottom: 8px; }
+        .inv-section h3 { font-size: 15px; margin: 16px 0 10px; color: #333; }
+
+        /* Priority List */
+        .priority-list { list-style: none; padding: 0; }
+        .priority-item {
+            display: flex; align-items: flex-start; gap: 12px;
+            padding: 12px 0; border-bottom: 1px solid #f5f5f5;
+        }
+        .priority-badge {
+            padding: 3px 10px; border-radius: 4px; font-size: 11px;
+            font-weight: 700; text-transform: uppercase; white-space: nowrap;
+        }
+        .priority-badge.today { background: #ffebee; color: #c62828; }
+        .priority-badge.this_week { background: #fff3e0; color: #e65100; }
+        .priority-badge.planning { background: #e3f2fd; color: #1565c0; }
+        .priority-title { font-weight: 600; font-size: 14px; }
+        .priority-action { font-size: 13px; color: #555; margin-top: 4px; }
+
+        /* Product Action Table */
+        .product-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .product-table th {
+            text-align: left; padding: 10px 8px; font-size: 11px;
+            text-transform: uppercase; color: #888; border-bottom: 2px solid #eee;
+        }
+        .product-table td { padding: 10px 8px; border-bottom: 1px solid #f5f5f5; }
+        .product-table tr:hover td { background: #fafafa; }
+        .action-badge {
+            display: inline-block; padding: 3px 8px; border-radius: 4px;
+            font-size: 11px; font-weight: 600; text-transform: uppercase;
+        }
+        .action-badge.reorder_now { background: #e8f5e9; color: #2e7d32; }
+        .action-badge.reorder_soon { background: #f1f8e9; color: #558b2f; }
+        .action-badge.discount_now { background: #ffebee; color: #c62828; }
+        .action-badge.discount_light { background: #fff3e0; color: #e65100; }
+        .action-badge.hold { background: #f5f5f5; color: #616161; }
+        .action-badge.watch { background: #e3f2fd; color: #1565c0; }
+        .action-badge.remove { background: #fce4ec; color: #880e4f; }
+        .action-badge.seasonal_hold { background: #f3e5f5; color: #6a1b9a; }
+        .action-badge.promote { background: #e0f7fa; color: #00695c; }
+
+        /* Direction indicators */
+        .dir-up { color: #2e7d32; }
+        .dir-down { color: #c62828; }
+        .dir-flat { color: #888; }
+
+        /* Strategy cards */
+        .strategy-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+        .strategy-card {
+            background: #fafafa; border-radius: 8px; padding: 16px;
+            border-left: 4px solid #1a1a2e;
+        }
+        .strategy-card.critical { border-left-color: #d32f2f; }
+        .strategy-card.warning { border-left-color: #ff9800; }
+        .strategy-card.insight { border-left-color: #1976d2; }
+        .strategy-card.planning { border-left-color: #7b1fa2; }
+        .strategy-card h4 { margin: 0 0 8px; font-size: 14px; }
+        .strategy-card p { margin: 0 0 8px; font-size: 13px; color: #555; }
+        .strategy-card .action-text { font-size: 13px; color: #1a1a2e; font-weight: 500; }
+
+        /* Attribute bars */
+        .attr-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .attr-name { width: 120px; font-size: 13px; font-weight: 500; text-transform: capitalize; }
+        .attr-bar {
+            flex: 1; height: 24px; background: #f0f0f0; border-radius: 4px;
+            overflow: hidden; position: relative;
+        }
+        .attr-bar-fill {
+            height: 100%; border-radius: 4px;
+            background: linear-gradient(90deg, #1a1a2e, #3a3a5e);
+            transition: width 0.5s ease;
+        }
+        .attr-bar-label {
+            position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+            font-size: 11px; font-weight: 600; color: #555;
+        }
+
+        /* Cash flow meter */
+        .cash-meter {
+            height: 20px; background: #f0f0f0; border-radius: 10px;
+            overflow: hidden; margin: 8px 0;
+        }
+        .cash-meter-fill {
+            height: 100%; border-radius: 10px;
+            transition: width 0.5s ease;
+        }
+        .cash-meter-fill.green { background: linear-gradient(90deg, #43a047, #66bb6a); }
+        .cash-meter-fill.yellow { background: linear-gradient(90deg, #f9a825, #fbc02d); }
+        .cash-meter-fill.orange { background: linear-gradient(90deg, #ef6c00, #ff9800); }
+        .cash-meter-fill.red { background: linear-gradient(90deg, #c62828, #e53935); }
+
+        /* Seasonal calendar */
+        .seasonal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+        .month-card {
+            background: #fafafa; border-radius: 8px; padding: 12px;
+            border: 1px solid #eee; font-size: 12px;
+        }
+        .month-card.current { border-color: #1a1a2e; background: #f0f0ff; }
+        .month-card .month-name { font-weight: 700; font-size: 14px; margin-bottom: 6px; }
+        .month-card .month-rev { font-size: 18px; font-weight: 700; color: #1a1a2e; }
+        .month-card .month-tags { margin-top: 6px; }
+        .month-tag {
+            display: inline-block; padding: 2px 6px; border-radius: 3px;
+            font-size: 10px; margin: 2px; background: #e8f5e9; color: #2e7d32;
+        }
+        .month-tag.low { background: #ffebee; color: #c62828; }
+
+        /* Discount tiers */
+        .discount-tier { margin-bottom: 16px; }
+        .discount-tier h4 { font-size: 14px; margin: 0 0 8px; }
+        .discount-tier .tier-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 12px; background: #fafafa; border-radius: 6px; margin-bottom: 4px;
+            font-size: 13px;
+        }
+        .discount-tier .old-price { text-decoration: line-through; color: #999; }
+        .discount-tier .new-price { font-weight: 700; color: #d32f2f; }
+        .discount-tier .capital { font-size: 12px; color: #888; }
+
+        /* Projection chart (CSS-only simple bar chart) */
+        .proj-bars { display: flex; align-items: flex-end; gap: 4px; height: 150px; margin: 16px 0; }
+        .proj-bar {
+            flex: 1; background: linear-gradient(180deg, #3a3a5e, #1a1a2e);
+            border-radius: 4px 4px 0 0; min-width: 20px; position: relative;
+            transition: height 0.5s ease;
+        }
+        .proj-bar-label {
+            position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%);
+            font-size: 9px; color: #888; white-space: nowrap;
+        }
+        .proj-bar-value {
+            position: absolute; top: -18px; left: 50%; transform: translateX(-50%);
+            font-size: 10px; font-weight: 600; color: #333; white-space: nowrap;
+        }
+
+        /* Setup prompt */
+        .setup-card {
+            background: linear-gradient(135deg, #f5f5ff, #fff);
+            border: 2px dashed #c5c5e0; border-radius: 16px; padding: 40px;
+            text-align: center; margin: 40px 0;
+        }
+        .setup-card h2 { font-size: 22px; margin-bottom: 16px; }
+        .setup-card p { font-size: 14px; color: #666; max-width: 600px; margin: 0 auto 20px; }
+        .setup-card code {
+            display: block; background: #1a1a2e; color: #a5d6a7; padding: 16px;
+            border-radius: 8px; text-align: left; font-size: 13px;
+            max-width: 600px; margin: 16px auto; white-space: pre-line;
+        }
+        .setup-card .note { font-size: 12px; color: #888; margin-top: 16px; }
+
+        /* Loading state */
+        .loading-overlay {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255,255,255,0.85); z-index: 1000;
+            justify-content: center; align-items: center;
+        }
+        .loading-overlay.active { display: flex; }
+        .loading-spinner {
+            text-align: center; font-size: 16px; color: #1a1a2e;
+        }
+        .loading-spinner::before {
+            content: ""; display: block; width: 48px; height: 48px;
+            margin: 0 auto 16px; border: 4px solid #eee;
+            border-top-color: #1a1a2e; border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Back link */
+        .back-link {
+            display: inline-flex; align-items: center; gap: 6px;
+            color: #1a1a2e; text-decoration: none; font-size: 13px;
+            margin-bottom: 16px; opacity: 0.7;
+        }
+        .back-link:hover { opacity: 1; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .health-card { flex-direction: column; text-align: center; }
+            .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+            .strategy-grid { grid-template-columns: 1fr; }
+            .inv-nav { overflow-x: auto; flex-wrap: nowrap; }
+        }
+    </style>
+</head>
+<body>
+    <div class="inv-container">
+        <a href="/" class="back-link">&larr; Back to Trend Dashboard</a>
+
+        <div class="inv-header">
+            <div>
+                <h1>Inventory Intelligence</h1>
+                <div class="subtitle">Your WooCommerce data, analyzed. What to buy, discount, hold, or cut.</div>
+            </div>
+            <div>
+                {% if woo_configured %}
+                <button id="refreshBtn" onclick="refreshData()" class="btn-primary"
+                    style="padding: 10px 20px; border-radius: 8px; border: none; background: #1a1a2e; color: white; cursor: pointer; font-weight: 600;">
+                    Refresh Data
+                </button>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if not woo_configured %}
+        <!-- Setup Instructions -->
+        <div class="setup-card">
+            <h2>Connect Your WooCommerce Store</h2>
+            <p>
+                This tool analyzes your real sales data to tell you what to buy,
+                what to discount, and where your cash is tied up. Connect your
+                WooCommerce store to get started.
+            </p>
+            <p style="font-weight: 600; font-size: 15px;">Setup in 3 steps:</p>
+            <p style="text-align: left; max-width: 600px; margin: 0 auto;">
+                <strong>1.</strong> In WooCommerce &rarr; Settings &rarr; Advanced &rarr; REST API, create a new key with <strong>Read</strong> permissions.<br><br>
+                <strong>2.</strong> Set these environment variables:
+            </p>
+            <code>export WOOCOMMERCE_URL="https://your-shop.com"
+export WOOCOMMERCE_KEY="ck_your_consumer_key"
+export WOOCOMMERCE_SECRET="cs_your_consumer_secret"</code>
+            <p><strong>3.</strong> Restart the app and click <strong>Refresh Data</strong>.</p>
+            <p class="note">
+                Read-only access. We never modify your store data.
+                All analysis runs locally.
+            </p>
+        </div>
+        {% else %}
+
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="loading-overlay">
+            <div class="loading-spinner">Analyzing your store data...</div>
+        </div>
+
+        <!-- Dashboard content (populated by JS) -->
+        <div id="dashboardContent">
+            {% if woo_cache.analysis %}
+            <p style="color: #888; font-size: 13px;">
+                Last refresh: {{ woo_cache.last_refresh[:16] if woo_cache.last_refresh else 'Never' }}
+                — Click Refresh to update
+            </p>
+            {% else %}
+            <div class="setup-card" style="border-style: solid; border-color: #e0e0e0;">
+                <h2>Ready to Analyze</h2>
+                <p>Your WooCommerce store is connected. Click <strong>Refresh Data</strong> to pull products and orders and generate your first analysis.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Dashboard sections (filled by JavaScript) -->
+        <div id="healthSection"></div>
+        <div id="kpiSection"></div>
+        <div id="navSection"></div>
+        <div id="prioritySection"></div>
+        <div id="strategicSection"></div>
+        <div id="productSection"></div>
+        <div id="attributeSection"></div>
+        <div id="discountSection"></div>
+        <div id="buyingSection"></div>
+        <div id="seasonalSection"></div>
+        <div id="geographySection"></div>
+        <div id="projectionSection"></div>
+
+        {% endif %}
+    </div>
+
+    <script>
+    let pollTimer = null;
+
+    function refreshData() {
+        const btn = document.getElementById('refreshBtn');
+        btn.disabled = true;
+        btn.textContent = 'Analyzing...';
+        document.getElementById('loadingOverlay').classList.add('active');
+
+        fetch('/api/inventory/refresh', { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'started') {
+                    pollTimer = setInterval(checkStatus, 2000);
+                } else {
+                    alert(data.message || 'Could not start analysis');
+                    btn.disabled = false;
+                    btn.textContent = 'Refresh Data';
+                    document.getElementById('loadingOverlay').classList.remove('active');
+                }
+            })
+            .catch(err => {
+                alert('Error: ' + err);
+                btn.disabled = false;
+                btn.textContent = 'Refresh Data';
+                document.getElementById('loadingOverlay').classList.remove('active');
+            });
+    }
+
+    function checkStatus() {
+        fetch('/api/inventory/status')
+            .then(r => r.json())
+            .then(data => {
+                if (!data.refreshing) {
+                    clearInterval(pollTimer);
+                    document.getElementById('loadingOverlay').classList.remove('active');
+                    const btn = document.getElementById('refreshBtn');
+                    btn.disabled = false;
+                    btn.textContent = 'Refresh Data';
+                    if (data.error) {
+                        alert('Analysis failed: ' + data.error);
+                    } else if (data.has_data) {
+                        loadDashboard();
+                    }
+                }
+            });
+    }
+
+    function loadDashboard() {
+        fetch('/api/inventory/data')
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) return;
+                renderDashboard(data);
+            });
+    }
+
+    function fmt(n) {
+        if (n === undefined || n === null) return '0';
+        return Number(n).toLocaleString('da-DK', { maximumFractionDigits: 0 });
+    }
+
+    function renderDashboard(data) {
+        const a = data.analysis;
+        const r = data.recommendations;
+        const p = data.projections;
+        const s = a.summary;
+
+        // Clear setup card
+        document.getElementById('dashboardContent').innerHTML =
+            `<p style="color:#888;font-size:13px;">Last refresh: ${data.last_refresh?.substring(0,16) || 'N/A'}</p>`;
+
+        // Health Score
+        const cf = p.cash_flow;
+        document.getElementById('healthSection').innerHTML = `
+            <div class="health-card">
+                <div class="health-score ${cf.color}">${cf.health_score}</div>
+                <div class="health-meta">
+                    <h2>Cash Flow Health: ${cf.rating}</h2>
+                    <div class="metrics">
+                        <div class="metric"><div class="metric-value">${fmt(cf.metrics.inventory_turnover)}x</div><div class="metric-label">Turnover</div></div>
+                        <div class="metric"><div class="metric-value">${fmt(cf.metrics.days_of_inventory)}d</div><div class="metric-label">Days of Stock</div></div>
+                        <div class="metric"><div class="metric-value">${cf.metrics.working_capital_tied_pct}%</div><div class="metric-label">Dead Capital</div></div>
+                        <div class="metric"><div class="metric-value">${fmt(cf.metrics.avg_order_value)}</div><div class="metric-label">Avg Order</div></div>
+                    </div>
+                    ${cf.recommendations.map(r => `<p style="font-size:13px;color:#555;margin:8px 0 0;">&bull; ${r}</p>`).join('')}
+                </div>
+            </div>`;
+
+        // KPIs
+        document.getElementById('kpiSection').innerHTML = `
+            <div class="kpi-grid">
+                <div class="kpi-card"><div class="kpi-value">${fmt(s.total_products)}</div><div class="kpi-label">Products</div><div class="kpi-sub">${fmt(s.active_products)} active, ${fmt(s.zero_sales_products)} never sold</div></div>
+                <div class="kpi-card"><div class="kpi-value">${fmt(s.total_orders)}</div><div class="kpi-label">Orders (12mo)</div></div>
+                <div class="kpi-card success"><div class="kpi-value">${fmt(s.total_revenue)}</div><div class="kpi-label">Revenue (12mo)</div></div>
+                <div class="kpi-card"><div class="kpi-value">${fmt(s.total_inventory_value)}</div><div class="kpi-label">Inventory Value</div></div>
+                <div class="kpi-card ${s.dead_stock_ratio > 0.3 ? 'danger' : s.dead_stock_ratio > 0.15 ? 'warning' : ''}"><div class="kpi-value">${fmt(s.dead_stock_capital)}</div><div class="kpi-label">Dead Stock Capital</div><div class="kpi-sub">${(s.dead_stock_ratio * 100).toFixed(1)}% of inventory</div></div>
+                <div class="kpi-card success"><div class="kpi-value">${fmt(p.revenue.projected_total)}</div><div class="kpi-label">12-Week Forecast</div><div class="kpi-sub">${p.revenue.confidence} confidence</div></div>
+            </div>`;
+
+        // Navigation
+        document.getElementById('navSection').innerHTML = `
+            <div class="inv-nav">
+                <a href="#priorities">This Week</a>
+                <a href="#strategy">Strategy</a>
+                <a href="#products">All Products</a>
+                <a href="#winners">Winners</a>
+                <a href="#deadstock" class="urgent">Dead Stock</a>
+                <a href="#attributes">Colors & Patterns</a>
+                <a href="#discounts">Discount Plan</a>
+                <a href="#buying">Buying Plan</a>
+                <a href="#seasonal">Seasonal</a>
+                <a href="#geography">Geography</a>
+                <a href="#projections">Projections</a>
+            </div>`;
+
+        // Priority List
+        const priorities = r.priorities || [];
+        document.getElementById('prioritySection').innerHTML = `
+            <div class="inv-section" id="priorities">
+                <h2>This Week's Priorities</h2>
+                <ul class="priority-list">
+                    ${priorities.map(p => `
+                        <li class="priority-item">
+                            <span class="priority-badge ${p.urgency}">${p.urgency.replace('_', ' ')}</span>
+                            <div>
+                                <div class="priority-title">${p.title}</div>
+                                <div class="priority-action">${p.action}</div>
+                            </div>
+                        </li>
+                    `).join('')}
+                    ${priorities.length === 0 ? '<li style="color:#888;padding:12px;">No urgent actions right now.</li>' : ''}
+                </ul>
+            </div>`;
+
+        // Strategic Recs
+        const strat = r.strategic || [];
+        document.getElementById('strategicSection').innerHTML = `
+            <div class="inv-section" id="strategy">
+                <h2>Strategic Insights</h2>
+                <div class="strategy-grid">
+                    ${strat.map(s => `
+                        <div class="strategy-card ${s.priority}">
+                            <h4>${s.title}</h4>
+                            <p>${s.detail}</p>
+                            <div class="action-text">${s.action}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>`;
+
+        // Product Action Table
+        const prods = r.product_recommendations || [];
+        document.getElementById('productSection').innerHTML = `
+            <div class="inv-section" id="products">
+                <h2>Product Actions (${prods.length} products)</h2>
+                <div style="overflow-x:auto;">
+                <table class="product-table">
+                    <thead><tr>
+                        <th>Product</th><th>Action</th><th>Price</th><th>Stock</th>
+                        <th>Sold/Week</th><th>Total Sold</th><th>Days Since Sale</th>
+                        <th>Direction</th><th>Reason</th>
+                    </tr></thead>
+                    <tbody>
+                        ${prods.slice(0, 100).map(p => `
+                            <tr>
+                                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;" title="${p.name}">${p.name}</td>
+                                <td><span class="action-badge ${p.action.toLowerCase()}">${p.action.replace(/_/g, ' ')}</span></td>
+                                <td>${fmt(p.price)}</td>
+                                <td>${p.stock_quantity}</td>
+                                <td>${p.qty_per_week.toFixed(1)}</td>
+                                <td>${p.total_sold}</td>
+                                <td>${p.days_since_last_sale}</td>
+                                <td><span class="${p.direction === 'accelerating' ? 'dir-up' : p.direction === 'decelerating' ? 'dir-down' : 'dir-flat'}">${p.direction}</span></td>
+                                <td style="max-width:250px;font-size:12px;color:#666;">${p.reason}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                </div>
+            </div>`;
+
+        // Attribute Performance
+        const attrs = a.attributes || {};
+        const renderBars = (items, label) => {
+            if (!items || items.length === 0) return `<p style="color:#888">No ${label} data</p>`;
+            const max = items[0].total_revenue || 1;
+            return items.slice(0, 10).map(i => `
+                <div class="attr-bar-row">
+                    <div class="attr-name">${i.name}</div>
+                    <div class="attr-bar">
+                        <div class="attr-bar-fill" style="width:${Math.max((i.total_revenue/max)*100, 2)}%"></div>
+                        <div class="attr-bar-label">${fmt(i.total_revenue)} (${i.product_count} products)</div>
+                    </div>
+                    <span class="${i.dominant_direction === 'accelerating' ? 'dir-up' : i.dominant_direction === 'decelerating' ? 'dir-down' : 'dir-flat'}">${i.dominant_direction}</span>
+                </div>
+            `).join('');
+        };
+
+        document.getElementById('attributeSection').innerHTML = `
+            <div class="inv-section" id="attributes">
+                <h2>Color, Pattern & Fabric Performance</h2>
+                <h3>Colors</h3>
+                ${renderBars(attrs.colors, 'color')}
+                <h3 style="margin-top:24px;">Patterns</h3>
+                ${renderBars(attrs.patterns, 'pattern')}
+                <h3 style="margin-top:24px;">Fabric Types</h3>
+                ${renderBars(attrs.fabrics, 'fabric')}
+            </div>`;
+
+        // Discount Plan
+        const dp = r.discount_plan || {};
+        const renderDiscountTier = (items, label, pct) => {
+            if (!items || items.length === 0) return '';
+            return `<div class="discount-tier">
+                <h4>${label} (${items.length} items)</h4>
+                ${items.slice(0, 10).map(i => `
+                    <div class="tier-item">
+                        <span style="flex:1;">${i.name}</span>
+                        <span class="old-price">${fmt(i.current_price)}</span>
+                        <span class="new-price">${fmt(i.suggested_price || i.current_price * (1-pct))}</span>
+                        <span class="capital">${fmt(i.capital_at_stake)} tied up</span>
+                    </div>
+                `).join('')}
+            </div>`;
+        };
+
+        document.getElementById('discountSection').innerHTML = `
+            <div class="inv-section" id="discounts">
+                <h2>Discount Plan</h2>
+                <p style="font-size:14px;color:#555;margin-bottom:16px;">${dp.summary || ''}</p>
+                <div class="kpi-grid" style="margin-bottom:16px;">
+                    <div class="kpi-card danger"><div class="kpi-value">${fmt(dp.total_recoverable_capital)}</div><div class="kpi-label">Total Capital to Recover</div></div>
+                </div>
+                ${renderDiscountTier(dp.deep_discount, 'Deep Discount (50-70% off)', 0.6)}
+                ${renderDiscountTier(dp.medium_discount, 'Medium Discount (25-40% off)', 0.35)}
+                ${renderDiscountTier(dp.light_discount, 'Light Discount (15-25% off)', 0.2)}
+                ${renderDiscountTier(dp.bundle_candidates, 'Bundle Candidates (seasonal)', 0)}
+            </div>`;
+
+        // Buying Plan
+        const bp = r.buying_plan || {};
+        document.getElementById('buyingSection').innerHTML = `
+            <div class="inv-section" id="buying">
+                <h2>Buying Plan</h2>
+                <h3>Reorder NOW</h3>
+                ${(bp.reorder_now || []).length === 0 ? '<p style="color:#888">No urgent reorders needed</p>' :
+                `<table class="product-table"><thead><tr>
+                    <th>Product</th><th>Current Stock</th><th>Weeks Left</th><th>Suggested Order</th><th>Urgency</th>
+                </tr></thead><tbody>
+                ${(bp.reorder_now || []).map(r => `
+                    <tr>
+                        <td>${r.name}</td>
+                        <td>${r.current_stock}</td>
+                        <td style="color:${r.weeks_left < 2 ? '#c62828' : '#e65100'};font-weight:700;">${r.weeks_left.toFixed(1)}</td>
+                        <td style="font-weight:700;">${r.suggested_quantity}</td>
+                        <td><span class="action-badge ${r.urgency === 'critical' ? 'discount_now' : 'reorder_soon'}">${r.urgency}</span></td>
+                    </tr>
+                `).join('')}
+                </tbody></table>`}
+                <h3>Buy More Of</h3>
+                ${(bp.buy_more_of || []).map(b => `
+                    <div style="padding:6px 0;font-size:13px;"><strong>${b.type}:</strong> ${b.name} — ${b.reason}</div>
+                `).join('') || '<p style="color:#888">No strong buy signals</p>'}
+                <h3>Avoid Buying</h3>
+                ${(bp.avoid_buying || []).map(a => `
+                    <div style="padding:6px 0;font-size:13px;color:#c62828;"><strong>${a.type}:</strong> ${a.name} — ${a.reason}</div>
+                `).join('') || '<p style="color:#888">No avoid signals</p>'}
+            </div>`;
+
+        // Seasonal
+        const sea = a.seasonal || {};
+        const currentMonth = new Date().getMonth() + 1;
+        document.getElementById('seasonalSection').innerHTML = `
+            <div class="inv-section" id="seasonal">
+                <h2>Seasonal Patterns</h2>
+                <div class="seasonal-grid">
+                    ${(sea.monthly || []).map(m => `
+                        <div class="month-card ${m.month === currentMonth ? 'current' : ''}">
+                            <div class="month-name">${m.month_name}</div>
+                            <div class="month-rev">${fmt(m.revenue)}</div>
+                            <div style="font-size:11px;color:#888;">${m.orders} orders</div>
+                            <div class="month-tags">
+                                ${m.high_demand_fabrics.slice(0,3).map(f => `<span class="month-tag">${f}</span>`).join('')}
+                                ${m.low_demand_fabrics.slice(0,2).map(f => `<span class="month-tag low">${f}</span>`).join('')}
+                            </div>
+                            ${m.nordic_note ? `<div style="font-size:10px;color:#6a1b9a;margin-top:4px;">${m.nordic_note}</div>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>`;
+
+        // Geography
+        const geo = a.geography || {};
+        document.getElementById('geographySection').innerHTML = `
+            <div class="inv-section" id="geography">
+                <h2>Geography & Channels</h2>
+                <div class="kpi-grid">
+                    <div class="kpi-card"><div class="kpi-value">${fmt(geo.b2b?.revenue)}</div><div class="kpi-label">B2B Revenue</div><div class="kpi-sub">${geo.b2b?.orders || 0} orders, avg ${fmt(geo.b2b?.avg_order_value)}</div></div>
+                    <div class="kpi-card"><div class="kpi-value">${fmt(geo.b2c?.revenue)}</div><div class="kpi-label">B2C Revenue</div><div class="kpi-sub">${geo.b2c?.orders || 0} orders, avg ${fmt(geo.b2c?.avg_order_value)}</div></div>
+                </div>
+                <h3>Revenue by Country</h3>
+                ${(geo.countries || []).slice(0, 10).map(c => {
+                    const max = (geo.countries[0]?.revenue || 1);
+                    return `<div class="attr-bar-row">
+                        <div class="attr-name">${c.country}</div>
+                        <div class="attr-bar">
+                            <div class="attr-bar-fill" style="width:${Math.max((c.revenue/max)*100, 2)}%"></div>
+                            <div class="attr-bar-label">${fmt(c.revenue)} (${c.orders} orders)</div>
+                        </div>
+                    </div>`;
+                }).join('')}
+            </div>`;
+
+        // Projections
+        const proj = p.revenue || {};
+        const weeks = proj.weekly || [];
+        const maxRev = Math.max(...weeks.map(w => w.projected_revenue), 1);
+        document.getElementById('projectionSection').innerHTML = `
+            <div class="inv-section" id="projections">
+                <h2>Revenue Projections (${proj.weeks_ahead || 12} Weeks)</h2>
+                <div class="kpi-grid">
+                    <div class="kpi-card"><div class="kpi-value">${fmt(proj.current_weekly_revenue)}</div><div class="kpi-label">Current Weekly Revenue</div></div>
+                    <div class="kpi-card success"><div class="kpi-value">${fmt(proj.projected_total)}</div><div class="kpi-label">12-Week Projection</div></div>
+                </div>
+                <div class="proj-bars">
+                    ${weeks.map(w => `
+                        <div class="proj-bar" style="height:${Math.max((w.projected_revenue/maxRev)*100, 3)}%;">
+                            <div class="proj-bar-value">${fmt(w.projected_revenue)}</div>
+                            <div class="proj-bar-label">W${w.week}</div>
+                        </div>
+                    `).join('')}
+                </div>
+                <p style="font-size:12px;color:#888;margin-top:24px;">${proj.note || ''}</p>
+            </div>`;
+    }
+
+    // Load existing data on page load if available
+    {% if woo_cache.analysis %}
+    document.addEventListener('DOMContentLoaded', loadDashboard);
+    {% endif %}
+    </script>
+</body>
+</html>

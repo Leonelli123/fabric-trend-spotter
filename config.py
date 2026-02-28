@@ -2,12 +2,31 @@
 
 import os
 
-# Etsy API (fill in when your key is approved)
+# ---------------------------------------------------------------------------
+# API Keys — Recommended free/low-cost stack:
+#   1. Etsy Open API v3   — FREE (10K req/day) → apply at developers.etsy.com
+#   2. Pinterest API v5   — FREE               → apply at developers.pinterest.com
+#   3. Google Trends      — FREE (pytrends + curated fallback, already built-in)
+#   4. eRank              — $10/mo (manual Etsy keyword data)
+#   Optional paid tier:
+#   5. SerpAPI            — $50/mo  (only if you need 5,000+ data points)
+#   6. DataForSEO         — $50 pay-as-you-go (cheaper SerpAPI alternative)
+# ---------------------------------------------------------------------------
+
+# Etsy Open API v3 (apply at developers.etsy.com — free, 10K requests/day)
 ETSY_API_KEY = os.environ.get("ETSY_API_KEY", "")
 
-# SerpAPI (for high-volume Google Trends, Google Shopping, Google Images)
-# Sign up at serpapi.com — $50/mo gets 5000 searches
+# Pinterest API v5 (apply at developers.pinterest.com — free)
+PINTEREST_API_TOKEN = os.environ.get("PINTEREST_API_TOKEN", "")
+
+# SerpAPI — optional paid tier for high-volume data
+# Only needed if free sources aren't enough. $50/mo gets 5000 searches.
 SERPAPI_KEY = os.environ.get("SERPAPI_KEY", "")
+
+# WooCommerce REST API (for Inventory Intelligence tool)
+WOOCOMMERCE_URL = os.environ.get("WOOCOMMERCE_URL", "")  # e.g. https://jydskstoflager.dk
+WOOCOMMERCE_KEY = os.environ.get("WOOCOMMERCE_KEY", "")
+WOOCOMMERCE_SECRET = os.environ.get("WOOCOMMERCE_SECRET", "")
 
 # Scraping settings
 REQUEST_DELAY = 2  # seconds between requests to be polite

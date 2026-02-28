@@ -325,6 +325,168 @@ def api_status():
     return jsonify(scrape_status)
 
 
+# ======================================================================
+# WooCommerce Inventory Intelligence
+# ======================================================================
+
+# Cache for WooCommerce analysis (refreshed on demand)
+woo_cache = {
+    "analysis": None,
+    "recommendations": None,
+    "projections": None,
+    "last_refresh": None,
+    "refreshing": False,
+    "error": None,
+}
+
+
+@app.route("/inventory")
+def inventory_dashboard():
+    """WooCommerce Inventory Intelligence dashboard."""
+    return render_template(
+        "inventory.html",
+        woo_cache=woo_cache,
+        woo_configured=bool(config.WOOCOMMERCE_URL and config.WOOCOMMERCE_KEY),
+    )
+
+
+@app.route("/api/inventory/refresh", methods=["POST"])
+def inventory_refresh():
+    """Trigger a WooCommerce data refresh."""
+    if woo_cache["refreshing"]:
+        return jsonify({"status": "already_running"}), 409
+    if not config.WOOCOMMERCE_URL or not config.WOOCOMMERCE_KEY:
+        return jsonify({
+            "status": "not_configured",
+            "message": (
+                "Set WOOCOMMERCE_URL, WOOCOMMERCE_KEY, and "
+                "WOOCOMMERCE_SECRET environment variables."
+            ),
+        }), 400
+
+    thread = threading.Thread(target=_run_woo_analysis, daemon=True)
+    thread.start()
+    return jsonify({"status": "started"})
+
+
+@app.route("/api/inventory/status")
+def inventory_status():
+    """Check WooCommerce analysis status."""
+    return jsonify({
+        "refreshing": woo_cache["refreshing"],
+        "last_refresh": woo_cache["last_refresh"],
+        "error": woo_cache["error"],
+        "has_data": woo_cache["analysis"] is not None,
+    })
+
+
+@app.route("/api/inventory/data")
+def inventory_data():
+    """Full inventory intelligence data."""
+    if not woo_cache["analysis"]:
+        return jsonify({"error": "No data yet. Click Refresh to analyze."}), 404
+    return jsonify({
+        "analysis": {
+            "summary": woo_cache["analysis"].get("summary", {}),
+            "dead_stock": woo_cache["analysis"].get("dead_stock", [])[:50],
+            "winners": woo_cache["analysis"].get("winners", {}),
+            "attributes": woo_cache["analysis"].get("attributes", {}),
+            "categories": woo_cache["analysis"].get("categories", []),
+            "seasonal": woo_cache["analysis"].get("seasonal", {}),
+            "geography": woo_cache["analysis"].get("geography", {}),
+        },
+        "recommendations": woo_cache["recommendations"],
+        "projections": woo_cache["projections"],
+        "last_refresh": woo_cache["last_refresh"],
+    })
+
+
+@app.route("/api/inventory/velocity")
+def inventory_velocity():
+    """Sales velocity for all products."""
+    if not woo_cache["analysis"]:
+        return jsonify([])
+    velocity = woo_cache["analysis"].get("velocity", [])
+    limit = int(request.args.get("limit", 50))
+    sort = request.args.get("sort", "rev_per_week")
+    direction = request.args.get("dir", "desc")
+
+    if sort in velocity[0] if velocity else False:
+        velocity = sorted(
+            velocity,
+            key=lambda v: v.get(sort, 0),
+            reverse=(direction == "desc"),
+        )
+    return jsonify(velocity[:limit])
+
+
+@app.route("/api/inventory/recommendations")
+def inventory_recommendations():
+    """Action recommendations."""
+    if not woo_cache["recommendations"]:
+        return jsonify({"error": "No data yet."}), 404
+    return jsonify(woo_cache["recommendations"])
+
+
+def _run_woo_analysis():
+    """Background task: connect to WooCommerce, pull data, analyze."""
+    global woo_cache
+    woo_cache["refreshing"] = True
+    woo_cache["error"] = None
+
+    try:
+        from woo_intel.connector import WooConnector
+        from woo_intel.analyzer import InventoryAnalyzer
+        from woo_intel.recommender import ActionRecommender
+        from woo_intel.projections import RevenueProjector
+
+        logger.info("Connecting to WooCommerce at %s...", config.WOOCOMMERCE_URL)
+        woo = WooConnector(
+            url=config.WOOCOMMERCE_URL,
+            key=config.WOOCOMMERCE_KEY,
+            secret=config.WOOCOMMERCE_SECRET,
+        )
+
+        # Pull data
+        products = woo.get_all_products()
+        orders = woo.get_orders(days_back=365)
+        logger.info("WooCommerce: %d products, %d orders", len(products), len(orders))
+
+        # Analyze
+        analyzer = InventoryAnalyzer(products, orders)
+        analysis = analyzer.run_full_analysis()
+
+        # Recommend
+        recommender = ActionRecommender(analysis)
+        recommendations = recommender.generate_all()
+
+        # Project
+        projector = RevenueProjector(analysis, orders)
+        projections = {
+            "revenue": projector.project_revenue(weeks_ahead=12),
+            "cash_flow": projector.get_cash_flow_health(),
+            "category_turnover": projector.get_inventory_turnover_by_category(),
+        }
+
+        woo_cache["analysis"] = analysis
+        woo_cache["recommendations"] = recommendations
+        woo_cache["projections"] = projections
+        woo_cache["last_refresh"] = datetime.now().isoformat()
+
+        logger.info(
+            "WooCommerce analysis complete: %d products, %d orders, "
+            "%d recommendations",
+            len(products), len(orders),
+            len(recommendations.get("product_recommendations", [])),
+        )
+
+    except Exception as e:
+        logger.error("WooCommerce analysis failed: %s", e, exc_info=True)
+        woo_cache["error"] = str(e)
+    finally:
+        woo_cache["refreshing"] = False
+
+
 def _collect_listing_images(listings):
     """Extract images from scraped listings and save to trend_images table.
 
@@ -387,12 +549,20 @@ def _collect_listing_images(listings):
 def _run_scrape():
     """Run all scrapers and analyze the results.
 
-    Strategy:
+    Strategy (free-first approach):
     1. Always load seed data as a baseline (so the dashboard is never empty)
     2. Attempt live scrapers - treat failures gracefully
-    3. Fetch Google Trends with backoff
+       - Free: Etsy (direct + API), Pinterest, Spoonflower, Amazon
+       - Paid (optional): SerpAPI for high-volume data if SERPAPI_KEY is set
+    3. Fetch Google Trends (pytrends free → curated fallback)
     4. Run analysis and forecasting on combined data
     5. Report clearly which sources succeeded/failed
+
+    Recommended free stack covers 80% of insight value:
+    - Google Trends (curated fallback): seasonal patterns, search demand
+    - Etsy Open API v3: direct B2C competitor/market data
+    - Pinterest API v5: visual trend signals, rising aesthetics
+    - Seed data + EU shops: European market coverage
     """
     global scrape_status
     scrape_status["running"] = True
