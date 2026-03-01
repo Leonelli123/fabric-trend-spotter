@@ -339,6 +339,15 @@ woo_cache = {
     "error": None,
 }
 
+# Cache for e-conomic financial analysis (refreshed on demand)
+eco_cache = {
+    "analysis": None,
+    "reconciliation": None,
+    "last_refresh": None,
+    "refreshing": False,
+    "error": None,
+}
+
 
 @app.route("/inventory")
 def inventory_dashboard():
@@ -347,6 +356,8 @@ def inventory_dashboard():
         "inventory.html",
         woo_cache=woo_cache,
         woo_configured=bool(config.WOOCOMMERCE_URL and config.WOOCOMMERCE_KEY),
+        eco_cache=eco_cache,
+        eco_configured=bool(config.ECONOMIC_APP_SECRET and config.ECONOMIC_GRANT_TOKEN),
     )
 
 
@@ -426,6 +437,173 @@ def inventory_recommendations():
     if not woo_cache["recommendations"]:
         return jsonify({"error": "No data yet."}), 404
     return jsonify(woo_cache["recommendations"])
+
+
+# ======================================================================
+# e-conomic Financial Intelligence API
+# ======================================================================
+
+@app.route("/api/economic/refresh", methods=["POST"])
+def economic_refresh():
+    """Trigger an e-conomic data refresh."""
+    if eco_cache["refreshing"]:
+        return jsonify({"status": "already_running"}), 409
+    if not config.ECONOMIC_APP_SECRET or not config.ECONOMIC_GRANT_TOKEN:
+        return jsonify({
+            "status": "not_configured",
+            "message": (
+                "Set ECONOMIC_APP_SECRET and ECONOMIC_GRANT_TOKEN "
+                "environment variables. See config.py for setup instructions."
+            ),
+        }), 400
+
+    thread = threading.Thread(target=_run_eco_analysis, daemon=True)
+    thread.start()
+    return jsonify({"status": "started"})
+
+
+@app.route("/api/economic/status")
+def economic_status():
+    """Check e-conomic analysis status."""
+    return jsonify({
+        "refreshing": eco_cache["refreshing"],
+        "last_refresh": eco_cache["last_refresh"],
+        "error": eco_cache["error"],
+        "has_data": eco_cache["analysis"] is not None,
+        "configured": bool(config.ECONOMIC_APP_SECRET and config.ECONOMIC_GRANT_TOKEN),
+    })
+
+
+@app.route("/api/economic/data")
+def economic_data():
+    """Full e-conomic financial intelligence data."""
+    if not eco_cache["analysis"]:
+        return jsonify({"error": "No data yet. Click Refresh to analyze."}), 404
+    return jsonify({
+        "analysis": eco_cache["analysis"],
+        "reconciliation": eco_cache["reconciliation"],
+        "last_refresh": eco_cache["last_refresh"],
+    })
+
+
+@app.route("/api/economic/receivables")
+def economic_receivables():
+    """Accounts receivable / outstanding invoices."""
+    if not eco_cache["analysis"]:
+        return jsonify({"error": "No data yet."}), 404
+    return jsonify(eco_cache["analysis"].get("accounts_receivable", {}))
+
+
+@app.route("/api/economic/customers")
+def economic_customers():
+    """Customer profitability ranking."""
+    if not eco_cache["analysis"]:
+        return jsonify({"error": "No data yet."}), 404
+    customers = eco_cache["analysis"].get("customer_profitability", [])
+    limit = int(request.args.get("limit", 50))
+    return jsonify(customers[:limit])
+
+
+@app.route("/api/economic/revenue")
+def economic_revenue():
+    """Revenue breakdown (monthly, growth)."""
+    if not eco_cache["analysis"]:
+        return jsonify({"error": "No data yet."}), 404
+    return jsonify(eco_cache["analysis"].get("revenue", {}))
+
+
+@app.route("/api/economic/cash-flow")
+def economic_cash_flow():
+    """Cash flow timing and payment term analysis."""
+    if not eco_cache["analysis"]:
+        return jsonify({"error": "No data yet."}), 404
+    return jsonify(eco_cache["analysis"].get("cash_flow", {}))
+
+
+@app.route("/api/economic/reconciliation")
+def economic_reconciliation():
+    """WooCommerce vs e-conomic revenue reconciliation."""
+    if not eco_cache["reconciliation"]:
+        return jsonify({"error": "No reconciliation data yet."}), 404
+    return jsonify(eco_cache["reconciliation"])
+
+
+def _run_eco_analysis():
+    """Background task: connect to e-conomic, pull data, analyze, reconcile."""
+    global eco_cache
+    eco_cache["refreshing"] = True
+    eco_cache["error"] = None
+
+    try:
+        from economic_intel.connector import EconomicConnector
+        from economic_intel.analyzer import FinancialAnalyzer
+        from economic_intel.reconciler import DataReconciler
+
+        logger.info("Connecting to e-conomic...")
+        eco = EconomicConnector(
+            app_secret=config.ECONOMIC_APP_SECRET,
+            grant_token=config.ECONOMIC_GRANT_TOKEN,
+        )
+
+        # Test connection first
+        conn_test = eco.test_connection()
+        if not conn_test["connected"]:
+            raise ConnectionError(
+                f"e-conomic connection failed: {conn_test.get('error', 'Unknown')}"
+            )
+        logger.info("Connected to e-conomic: %s (agreement %s)",
+                     conn_test["company_name"], conn_test["agreement_number"])
+
+        # Pull data (read-only)
+        invoices = eco.get_booked_invoices(days_back=365)
+        customers = eco.get_customers()
+        products = eco.get_products()
+        drafts = eco.get_draft_invoices()
+        logger.info(
+            "e-conomic: %d booked invoices, %d customers, %d products, %d drafts",
+            len(invoices), len(customers), len(products), len(drafts),
+        )
+
+        # Analyze
+        analyzer = FinancialAnalyzer(invoices, customers, products)
+        analysis = analyzer.run_full_analysis()
+
+        # Add draft invoice info to analysis
+        analysis["draft_invoices"] = {
+            "count": len(drafts),
+            "total_net": round(sum(d.get("net_amount", 0) for d in drafts), 2),
+            "drafts": drafts[:20],
+        }
+
+        # Reconcile with WooCommerce if available
+        reconciliation = None
+        if woo_cache["analysis"]:
+            reconciler = DataReconciler(
+                woo_analysis=woo_cache["analysis"],
+                eco_analysis=analysis,
+            )
+            reconciliation = reconciler.reconcile()
+        else:
+            # Eco-only reconciliation (still useful)
+            reconciler = DataReconciler(eco_analysis=analysis)
+            reconciliation = reconciler.reconcile()
+
+        eco_cache["analysis"] = analysis
+        eco_cache["reconciliation"] = reconciliation
+        eco_cache["last_refresh"] = datetime.now().isoformat()
+
+        logger.info(
+            "e-conomic analysis complete: %d invoices, %d customers, "
+            "revenue: %s",
+            len(invoices), len(customers),
+            analysis.get("summary", {}).get("total_net_revenue", 0),
+        )
+
+    except Exception as e:
+        logger.error("e-conomic analysis failed: %s", e, exc_info=True)
+        eco_cache["error"] = str(e)
+    finally:
+        eco_cache["refreshing"] = False
 
 
 def _run_woo_analysis():

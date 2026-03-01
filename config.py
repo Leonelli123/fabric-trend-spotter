@@ -28,6 +28,15 @@ WOOCOMMERCE_URL = os.environ.get("WOOCOMMERCE_URL", "")  # e.g. https://jydsksto
 WOOCOMMERCE_KEY = os.environ.get("WOOCOMMERCE_KEY", "")
 WOOCOMMERCE_SECRET = os.environ.get("WOOCOMMERCE_SECRET", "")
 
+# e-conomic REST API (Visma e-conomic — invoices, customers, payments)
+# Setup: In e-conomic → Apps → New App → role: Read-only
+#   1. Copy the App Secret Token → set as ECONOMIC_APP_SECRET
+#   2. Open the Installation URL, click "Add app" → copy the Agreement Grant Token
+#   3. Set as ECONOMIC_GRANT_TOKEN
+# Both tokens are long-lived (no expiry, no refresh needed).
+ECONOMIC_APP_SECRET = os.environ.get("ECONOMIC_APP_SECRET", "")
+ECONOMIC_GRANT_TOKEN = os.environ.get("ECONOMIC_GRANT_TOKEN", "")
+
 # Scraping settings
 REQUEST_DELAY = 2  # seconds between requests to be polite
 USER_AGENT = (
