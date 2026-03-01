@@ -1,6 +1,9 @@
 """Configuration for the Fabric Trend Spotter."""
 
 import os
+from dotenv import load_dotenv
+
+load_dotenv()  # reads .env file into os.environ
 
 # ---------------------------------------------------------------------------
 # API Keys — Recommended free/low-cost stack:
