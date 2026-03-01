@@ -2,7 +2,7 @@
 
 import logging
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Flask, render_template, jsonify, request
 from database import (
     init_db, get_latest_trends, get_trend_history, get_recent_listings,
@@ -347,6 +347,41 @@ eco_cache = {
     "refreshing": False,
     "error": None,
 }
+
+
+# ======================================================================
+# Automatic Scheduled Refresh (every 6 hours + on startup)
+# ======================================================================
+
+def _scheduled_refresh():
+    """Auto-refresh both WooCommerce and e-conomic data."""
+    logger.info("Scheduled refresh: starting WooCommerce + e-conomic data pull...")
+    if config.WOOCOMMERCE_URL and config.WOOCOMMERCE_KEY and not woo_cache["refreshing"]:
+        threading.Thread(target=_run_woo_analysis, daemon=True).start()
+    if config.ECONOMIC_APP_SECRET and config.ECONOMIC_GRANT_TOKEN and not eco_cache["refreshing"]:
+        threading.Thread(target=_run_eco_analysis, daemon=True).start()
+
+
+def _start_scheduler():
+    """Start the background scheduler for automatic data refreshes."""
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        scheduler = BackgroundScheduler(daemon=True)
+        # Refresh every 6 hours
+        scheduler.add_job(_scheduled_refresh, "interval", hours=6,
+                          id="data_refresh", replace_existing=True)
+        # Also run once on startup (30 second delay to let the app boot)
+        scheduler.add_job(_scheduled_refresh, "date",
+                          run_date=datetime.now() + timedelta(seconds=30),
+                          id="startup_refresh")
+        scheduler.start()
+        logger.info("Scheduler started: auto-refresh every 6 hours + on startup")
+    except Exception as e:
+        logger.warning("Could not start scheduler: %s (data refresh will be manual only)", e)
+
+
+# Start scheduler (gunicorn preload=True ensures this runs once)
+_start_scheduler()
 
 
 @app.route("/inventory")

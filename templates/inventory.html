@@ -313,6 +313,7 @@ export WOOCOMMERCE_SECRET="cs_your_consumer_secret"</code>
         <div id="healthSection"></div>
         <div id="kpiSection"></div>
         <div id="navSection"></div>
+        <div id="forecastSection"></div>
         <div id="prioritySection"></div>
         <div id="strategicSection"></div>
         <div id="productSection"></div>
@@ -429,6 +430,7 @@ export WOOCOMMERCE_SECRET="cs_your_consumer_secret"</code>
         // Navigation
         document.getElementById('navSection').innerHTML = `
             <div class="inv-nav">
+                <a href="#forecast" class="urgent">Strategic Forecast</a>
                 <a href="#priorities">This Week</a>
                 <a href="#strategy">Strategy</a>
                 <a href="#products">All Products</a>
@@ -661,6 +663,68 @@ export WOOCOMMERCE_SECRET="cs_your_consumer_secret"</code>
                 </div>
                 <p style="font-size:12px;color:#888;margin-top:24px;">${proj.note || ''}</p>
             </div>`;
+
+        // Strategic Forecast (async — loads from /api/forecast)
+        fetch('/api/forecast').then(r => r.json()).then(fc => {
+            const cr = fc.cash_runway || {};
+            const ri = fc.risk_alerts || [];
+            const plan = fc.action_plan_90_day || {};
+            const bs = fc.buying_signals || {};
+            const ma = fc.margin_analysis || {};
+
+            document.getElementById('forecastSection').innerHTML = `
+                <div class="inv-section" id="forecast">
+                    <h2>Strategic Forecast (Combined WooCommerce + e-conomic)</h2>
+                    <p style="font-size:12px;color:#888;margin-bottom:16px;">Auto-refreshes every 6 hours. Last: ${fc.generated_at ? new Date(fc.generated_at).toLocaleString('da-DK') : 'N/A'}</p>
+
+                    <h3>Cash Runway</h3>
+                    <div class="kpi-grid">
+                        <div class="kpi-card success"><div class="kpi-value">${fmt(cr.est_weekly_profit)}</div><div class="kpi-label">Est. Weekly Profit</div></div>
+                        <div class="kpi-card"><div class="kpi-value">${fmt(cr.avg_monthly_revenue)}</div><div class="kpi-label">Avg Monthly Revenue</div></div>
+                        <div class="kpi-card ${cr.overdue_receivables > 200000 ? 'danger' : 'warning'}"><div class="kpi-value">${fmt(cr.overdue_receivables)}</div><div class="kpi-label">Overdue Receivables</div></div>
+                        <div class="kpi-card"><div class="kpi-value">${fmt(cr.expected_inflow_4_weeks)}</div><div class="kpi-label">Expected Inflow 4W</div></div>
+                    </div>
+                    ${(cr.assessment || []).map(a => '<p style="margin:6px 0;font-size:13px;color:#333;">&#x26A0; ' + a + '</p>').join('')}
+
+                    ${ri.length > 0 ? '<h3>Risk Alerts</h3>' + ri.map(a =>
+                        '<div class="strategy-card ' + a.severity + '" style="margin-bottom:10px;">' +
+                        '<h4>[' + a.severity.toUpperCase() + '] ' + a.risk + '</h4>' +
+                        '<p>' + a.detail + '</p>' +
+                        '<div class="action-text">' + a.action + '</div></div>'
+                    ).join('') : ''}
+
+                    <h3>Buying Signals</h3>
+                    <p style="font-size:13px;color:#555;">${bs.summary || ''}</p>
+                    ${(bs.aggressive_buy || []).length > 0 ? '<h4 style="color:#2e7d32;margin-top:12px;">Buy Aggressively</h4><table class="product-table" style="font-size:12px;"><tr><th>Product</th><th>Stock</th><th>Velocity/wk</th><th>Order Qty</th><th>Urgency</th></tr>' + (bs.aggressive_buy || []).slice(0, 10).map(p => '<tr><td>' + p.name.substring(0, 40) + '</td><td>' + p.current_stock + '</td><td>' + p.weekly_velocity + '</td><td><strong>' + p.suggested_order + '</strong></td><td style="color:#c62828;">' + p.urgency + '</td></tr>').join('') + '</table>' : ''}
+
+                    <h3>Margin Erosion</h3>
+                    <p style="font-size:13px;color:#555;">${ma.summary || ''}</p>
+
+                    <h3>90-Day Action Plan</h3>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;">
+                        <div style="background:#fff3f3;border-radius:8px;padding:16px;">
+                            <h4 style="color:#c62828;margin:0 0 8px;">This Week</h4>
+                            <ul style="padding-left:16px;margin:0;">
+                                ${(plan.this_week || []).map(a => '<li style="margin:6px 0;font-size:13px;"><strong>' + a.action + '</strong><br><span style="color:#666;">' + (a.detail || '').substring(0, 100) + '</span></li>').join('')}
+                            </ul>
+                        </div>
+                        <div style="background:#fff8e1;border-radius:8px;padding:16px;">
+                            <h4 style="color:#e65100;margin:0 0 8px;">This Month</h4>
+                            <ul style="padding-left:16px;margin:0;">
+                                ${(plan.this_month || []).map(a => '<li style="margin:6px 0;font-size:13px;"><strong>' + a.action + '</strong><br><span style="color:#666;">' + (a.detail || '').substring(0, 100) + '</span></li>').join('')}
+                            </ul>
+                        </div>
+                        <div style="background:#e8f5e9;border-radius:8px;padding:16px;">
+                            <h4 style="color:#2e7d32;margin:0 0 8px;">This Quarter</h4>
+                            <ul style="padding-left:16px;margin:0;">
+                                ${(plan.this_quarter || []).map(a => '<li style="margin:6px 0;font-size:13px;"><strong>' + a.action + '</strong><br><span style="color:#666;">' + (a.detail || '').substring(0, 100) + '</span></li>').join('')}
+                            </ul>
+                        </div>
+                    </div>
+                </div>`;
+        }).catch(e => {
+            document.getElementById('forecastSection').innerHTML = '<div class="inv-section"><p style="color:#888;">Strategic forecast loading... Refresh both data sources first.</p></div>';
+        });
     }
 
     // Load existing data on page load if available
