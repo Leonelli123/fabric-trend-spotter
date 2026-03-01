@@ -528,6 +528,20 @@ def economic_reconciliation():
     return jsonify(eco_cache["reconciliation"])
 
 
+@app.route("/api/forecast")
+def strategic_forecast():
+    """Strategic forecasting — merges WooCommerce + e-conomic into actionable advice."""
+    from strategic_forecast import StrategicForecaster
+    forecaster = StrategicForecaster(
+        woo_analysis=woo_cache.get("analysis"),
+        woo_recommendations=woo_cache.get("recommendations"),
+        woo_projections=woo_cache.get("projections"),
+        eco_analysis=eco_cache.get("analysis"),
+        eco_reconciliation=eco_cache.get("reconciliation"),
+    )
+    return jsonify(forecaster.generate_full_forecast())
+
+
 def _run_eco_analysis():
     """Background task: connect to e-conomic, pull data, analyze, reconcile."""
     global eco_cache
@@ -623,6 +637,7 @@ def _run_woo_analysis():
             url=config.WOOCOMMERCE_URL,
             key=config.WOOCOMMERCE_KEY,
             secret=config.WOOCOMMERCE_SECRET,
+            timeout=60,
         )
 
         # Pull data

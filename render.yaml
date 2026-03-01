@@ -13,5 +13,15 @@ services:
         generateValue: true
       - key: ETSY_API_KEY
         sync: false
+      - key: ECONOMIC_APP_SECRET
+        sync: false
+      - key: ECONOMIC_GRANT_TOKEN
+        sync: false
+      - key: WOOCOMMERCE_URL
+        sync: false
+      - key: WOOCOMMERCE_KEY
+        sync: false
+      - key: WOOCOMMERCE_SECRET
+        sync: false
       - key: PYTHON_VERSION
         value: "3.11.0"
