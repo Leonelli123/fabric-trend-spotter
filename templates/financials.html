@@ -146,6 +146,20 @@
         .kpi-spark svg { width: 80px; height: 24px; }
         .kpi-spark .spark-line { fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 
+        /* Change Badges */
+        .change-badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-top: 4px; }
+        .change-badge.up { background: rgba(34,197,94,.12); color: var(--green); }
+        .change-badge.down { background: rgba(239,68,68,.12); color: var(--red); }
+        .change-badge.flat { background: rgba(255,255,255,.06); color: var(--muted); }
+
+        /* Copy Button */
+        .copy-btn { background: none; border: 1px solid var(--border); color: var(--muted); padding: 4px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; transition: all .2s; }
+        .copy-btn:hover { border-color: var(--accent); color: var(--text); }
+        .copy-btn.copied { border-color: var(--green); color: var(--green); }
+
+        /* Freshness Warning */
+        .stale-banner { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.25); border-radius: 8px; padding: 10px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--amber); }
+
         .loading-overlay { text-align: center; padding: 80px 20px; }
         .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 16px; }
         @keyframes spin { to { transform: rotate(360deg); } }
@@ -218,6 +232,32 @@
     function healthColor(s) { return s >= 80 ? 'var(--green)' : s >= 60 ? 'var(--amber)' : s >= 40 ? 'var(--amber)' : 'var(--red)'; }
 
     var _ecoData = null, _reconData = null, _forecast = null;
+
+    function changeBadge(pct, label) {
+        if (pct == null || isNaN(pct)) return '';
+        var cls = pct > 0.5 ? 'up' : pct < -0.5 ? 'down' : 'flat';
+        var arrow = pct > 0.5 ? '\u25B2' : pct < -0.5 ? '\u25BC' : '\u2192';
+        var txt = arrow + ' ' + (pct > 0 ? '+' : '') + pct.toFixed(1) + '%';
+        if (label) txt += ' ' + label;
+        return '<div class="change-badge ' + cls + '">' + txt + '</div>';
+    }
+    function copyDigest() {
+        var el = document.getElementById('digestText');
+        if (!el) return;
+        navigator.clipboard.writeText(el.innerText || el.textContent).then(function() {
+            var btn = document.getElementById('copyBtn');
+            btn.textContent = 'Copied!';
+            btn.classList.add('copied');
+            setTimeout(function() { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+        });
+    }
+    function staleBanner(lastRefresh) {
+        if (!lastRefresh) return '<div class="stale-banner"><span>\u26A0</span>No data loaded yet. Click <strong>Refresh Data</strong>.</div>';
+        var hoursAgo = (Date.now() - new Date(lastRefresh).getTime()) / 3600000;
+        if (hoursAgo > 48) return '<div class="stale-banner"><span>\u26A0</span>Data is <strong>' + Math.round(hoursAgo / 24) + ' days old</strong>. Refresh for accurate insights.</div>';
+        if (hoursAgo > 24) return '<div class="stale-banner"><span>\u26A0</span>Data is over 24 hours old. Consider refreshing.</div>';
+        return '';
+    }
 
     function sparklineSVG(values, color) {
         if (!values || values.length < 2) return '';
@@ -310,7 +350,11 @@
             });
 
             aiHTML = '<div class="card ai-card" style="margin-bottom:16px;">' +
-                '<h2><span class="ai-label">AI</span> Economic Context</h2>' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                    '<h2><span class="ai-label">AI</span> Economic Context</h2>' +
+                    '<button id="copyBtn" class="copy-btn" onclick="copyDigest()">Copy</button>' +
+                '</div>' +
+                '<div id="digestText">' +
                 (digest.headline ? '<div class="ai-headline">' + esc(digest.headline) + '</div>' : '') +
                 '<div class="ai-summary">' + esc(econ.summary || digest.summary || mc.ai_narrative || '') + '</div>' +
 
@@ -319,6 +363,7 @@
                         return '<li class="ai-insight"><span class="ai-dot ' + (ins.severity || 'info') + '"></span><span>' + esc(ins.text) + '</span></li>';
                     }).join('') +
                 '</ul>' : '') +
+                '</div>' +
 
                 '<div class="econ-row">' +
                     '<div class="econ-pill"><div class="val" style="color:var(--green);">+' + (econ.gdp_growth || 2.2) + '%</div><div class="lbl">GDP</div></div>' +
@@ -334,7 +379,15 @@
         // Revenue sparkline from monthly data
         var monthlyVals = monthly.map(function(m) { return m.net_amount || 0; });
 
-        document.getElementById('pane-overview').innerHTML = aiHTML +
+        // KPI changes
+        var kc = (_forecast && _forecast.kpi_changes) || {};
+        var revMoM = kc.revenue_mom_pct;
+        var overduePct = kc.overdue_pct_of_outstanding;
+
+        // Data freshness
+        var staleHTML = staleBanner('{{ eco_cache.last_refresh if eco_cache else "" }}');
+
+        document.getElementById('pane-overview').innerHTML = staleHTML + aiHTML +
             (oa.severity === 'critical' ? '<div class="alert-banner critical"><div class="alert-title">' + esc(oa.message) + '</div><div class="alert-detail">Total overdue: ' + fmtK(oa.total_overdue) + ' DKK (' + fmtPct(oa.overdue_pct) + ' of outstanding)</div></div>' : '') +
 
             '<div class="card" style="margin-bottom:16px;"><div class="health-row">' +
@@ -345,9 +398,9 @@
             '</div></div>' +
 
             '<div class="card-grid card-grid-4" style="margin-bottom:16px;">' +
-                '<div class="card kpi"><div class="kpi-val green">' + fmtK(s.total_net_revenue) + '</div><div class="kpi-label">Net Revenue (12mo)</div><div class="kpi-sub">' + fmt(s.total_invoices) + ' invoices</div>' + sparklineSVG(monthlyVals) + '</div>' +
+                '<div class="card kpi"><div class="kpi-val green">' + fmtK(s.total_net_revenue) + '</div><div class="kpi-label">Net Revenue (12mo)</div><div class="kpi-sub">' + fmt(s.total_invoices) + ' invoices</div>' + changeBadge(revMoM, 'MoM') + sparklineSVG(monthlyVals) + '</div>' +
                 '<div class="card kpi"><div class="kpi-val">' + fmtK(s.avg_monthly_revenue) + '</div><div class="kpi-label">Avg Monthly Revenue</div><div class="kpi-sub">' + fmtK(rev.avg_invoice_value) + ' avg invoice</div></div>' +
-                '<div class="card kpi"><div class="kpi-val ' + (s.total_overdue > s.total_outstanding * .3 ? 'red' : 'amber') + '">' + fmtK(s.total_outstanding) + '</div><div class="kpi-label">Outstanding</div><div class="kpi-sub">' + fmtK(s.total_overdue) + ' overdue</div></div>' +
+                '<div class="card kpi"><div class="kpi-val ' + (s.total_overdue > s.total_outstanding * .3 ? 'red' : 'amber') + '">' + fmtK(s.total_outstanding) + '</div><div class="kpi-label">Outstanding</div><div class="kpi-sub">' + fmtK(s.total_overdue) + ' overdue</div>' + (overduePct != null ? '<div class="change-badge ' + (overduePct > 30 ? 'down' : 'up') + '">' + overduePct + '% overdue</div>' : '') + '</div>' +
                 '<div class="card kpi"><div class="kpi-val ' + (lastGrowth.growth_pct > 0 ? 'green' : lastGrowth.growth_pct < 0 ? 'red' : 'blue') + '">' + fmtPct(lastGrowth.growth_pct) + '</div><div class="kpi-label">Latest Growth</div><div class="kpi-sub">' + esc(lastGrowth.month || '') + '</div>' + sparklineSVG(growth.map(function(g) { return g.growth_pct || 0; })) + '</div>' +
             '</div>' +
 

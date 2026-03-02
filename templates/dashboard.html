@@ -56,6 +56,9 @@
     </header>
 
     <main>
+        <!-- Urgent Alerts from Inventory/Financial Intelligence -->
+        <div id="dashboard-alerts" style="max-width:1200px;margin:12px auto 0;padding:0 16px;display:none;"></div>
+
         <!-- Status Banner -->
         <div id="status-banner" class="status-banner hidden">
             <span id="status-text"></span>
@@ -1603,5 +1606,35 @@
     </main>
 
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    <script>
+    // Load urgent alerts from strategic forecast
+    (function() {
+        fetch('/api/forecast').then(function(r) { return r.json(); }).then(function(fc) {
+            var alerts = (fc.risk_alerts || []).filter(function(a) { return a.severity === 'critical'; });
+            var digest = ((fc.market_context || {}).ai_digest || {});
+            var actions = (digest.actions || []).filter(function(a) { return a.priority === 'high'; });
+            if (!alerts.length && !actions.length) return;
+
+            var el = document.getElementById('dashboard-alerts');
+            var html = '<div style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.2);border-radius:10px;padding:14px 18px;">';
+            html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:14px;">&#9888;</span><strong style="font-size:14px;">Attention Needed</strong></div>';
+
+            alerts.slice(0, 2).forEach(function(a) {
+                html += '<div style="font-size:13px;padding:4px 0;color:#e4e6f0;"><span style="color:#ef4444;font-weight:700;">' + a.risk + '</span> &mdash; ' + (a.detail || '').substring(0, 120) + '</div>';
+            });
+            actions.slice(0, 2).forEach(function(a) {
+                html += '<div style="font-size:13px;padding:4px 0;color:#f59e0b;">&rarr; ' + a.action + '</div>';
+            });
+
+            html += '<div style="margin-top:8px;display:flex;gap:8px;">';
+            html += '<a href="/inventory" style="font-size:12px;color:#6c63ff;text-decoration:none;font-weight:600;">View Inventory Intel &rarr;</a>';
+            html += '<a href="/financials" style="font-size:12px;color:#6c63ff;text-decoration:none;font-weight:600;margin-left:12px;">View Financial Intel &rarr;</a>';
+            html += '</div></div>';
+
+            el.innerHTML = html;
+            el.style.display = 'block';
+        }).catch(function() {});
+    })();
+    </script>
 </body>
 </html>

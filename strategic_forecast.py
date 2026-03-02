@@ -140,6 +140,7 @@ class StrategicForecaster:
             "buying_signals": self._buying_signals(),
             "risk_alerts": self._risk_alerts(),
             "action_plan_90_day": self._build_90_day_plan(),
+            "kpi_changes": self._kpi_comparisons(),
         }
 
     # ------------------------------------------------------------------
@@ -1353,3 +1354,63 @@ class StrategicForecaster:
                 f"{len(this_quarter)} this quarter."
             ),
         }
+
+    # ------------------------------------------------------------------
+    # 9. KPI COMPARISONS — Period-over-period change indicators
+    # ------------------------------------------------------------------
+
+    def _kpi_comparisons(self) -> dict:
+        """Compute month-over-month and period comparisons for KPI badges."""
+        eco_revenue = self.eco.get("revenue", {}).get("monthly", [])
+        woo_summary = self.woo.get("summary", {})
+
+        result = {}
+
+        # Revenue MoM from e-conomic monthly data
+        if len(eco_revenue) >= 2:
+            latest = eco_revenue[-1].get("net_amount", 0)
+            prev = eco_revenue[-2].get("net_amount", 0)
+            if prev > 0:
+                result["revenue_mom_pct"] = round((latest - prev) / prev * 100, 1)
+                result["revenue_mom_label"] = eco_revenue[-1].get("month", "")
+            # YoY if we have 13+ months
+            if len(eco_revenue) >= 13:
+                yoy_prev = eco_revenue[-13].get("net_amount", 0)
+                if yoy_prev > 0:
+                    result["revenue_yoy_pct"] = round(
+                        (latest - yoy_prev) / yoy_prev * 100, 1
+                    )
+
+        # Orders trend from WooCommerce velocity data
+        velocity = self.woo.get("velocity", [])
+        if velocity:
+            accel = sum(1 for v in velocity if v.get("direction") == "accelerating")
+            decel = sum(1 for v in velocity if v.get("direction") == "decelerating")
+            total = len(velocity)
+            if total > 0:
+                result["products_accelerating_pct"] = round(accel / total * 100, 0)
+                result["products_decelerating_pct"] = round(decel / total * 100, 0)
+
+        # Dead stock trend (compare to expected seasonal norm)
+        dead_ratio = woo_summary.get("dead_stock_ratio", 0)
+        # In fabric retail, <15% dead stock is healthy
+        result["dead_stock_vs_benchmark"] = round(
+            (dead_ratio - 0.15) * 100, 0
+        ) if dead_ratio > 0 else 0
+
+        # Demand index vs previous month
+        cur_demand = NORDIC_DEMAND_INDEX.get(self._month, 100)
+        prev_month = self._month - 1 if self._month > 1 else 12
+        prev_demand = NORDIC_DEMAND_INDEX.get(prev_month, 100)
+        result["demand_index_change"] = cur_demand - prev_demand
+
+        # Outstanding receivables trend
+        ar = self.eco.get("accounts_receivable", {})
+        overdue = ar.get("total_overdue", 0)
+        total_outstanding = self.eco.get("summary", {}).get("total_outstanding", 0)
+        if total_outstanding > 0:
+            result["overdue_pct_of_outstanding"] = round(
+                overdue / total_outstanding * 100, 0
+            )
+
+        return result

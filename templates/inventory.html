@@ -266,6 +266,21 @@
         .conf-bar-mid { background: var(--accent); }
         .conf-bar-hi { background: rgba(255,255,255,.08); }
 
+        /* ── Change Badges ── */
+        .change-badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-top: 4px; }
+        .change-badge.up { background: rgba(34,197,94,.12); color: var(--green); }
+        .change-badge.down { background: rgba(239,68,68,.12); color: var(--red); }
+        .change-badge.flat { background: rgba(255,255,255,.06); color: var(--muted); }
+
+        /* ── Copy Button ── */
+        .copy-btn { background: none; border: 1px solid var(--border); color: var(--muted); padding: 4px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; transition: all .2s; }
+        .copy-btn:hover { border-color: var(--accent); color: var(--text); }
+        .copy-btn.copied { border-color: var(--green); color: var(--green); }
+
+        /* ── Freshness Warning ── */
+        .stale-banner { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.25); border-radius: 8px; padding: 10px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--amber); }
+        .stale-banner .stale-icon { font-size: 16px; flex-shrink: 0; }
+
         /* ── Loading ── */
         .loading-overlay { text-align: center; padding: 80px 20px; }
         .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 16px; }
@@ -350,6 +365,33 @@
         if (score >= 60) return 'var(--amber)';
         if (score >= 40) return 'var(--amber)';
         return 'var(--red)';
+    }
+    function changeBadge(pct, label) {
+        if (pct == null || isNaN(pct)) return '';
+        var cls = pct > 0.5 ? 'up' : pct < -0.5 ? 'down' : 'flat';
+        var arrow = pct > 0.5 ? '\u25B2' : pct < -0.5 ? '\u25BC' : '\u2192';
+        var txt = arrow + ' ' + (pct > 0 ? '+' : '') + pct.toFixed(1) + '%';
+        if (label) txt += ' ' + label;
+        return '<div class="change-badge ' + cls + '">' + txt + '</div>';
+    }
+    function copyDigest() {
+        var el = document.getElementById('digestText');
+        if (!el) return;
+        var text = el.innerText || el.textContent;
+        navigator.clipboard.writeText(text).then(function() {
+            var btn = document.getElementById('copyBtn');
+            btn.textContent = 'Copied!';
+            btn.classList.add('copied');
+            setTimeout(function() { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+        });
+    }
+    function staleBanner(lastRefresh) {
+        if (!lastRefresh) return '<div class="stale-banner"><span class="stale-icon">\u26A0</span>No data loaded yet. Click <strong>Refresh Data</strong> to get started.</div>';
+        var refreshDate = new Date(lastRefresh);
+        var hoursAgo = (Date.now() - refreshDate.getTime()) / 3600000;
+        if (hoursAgo > 48) return '<div class="stale-banner"><span class="stale-icon">\u26A0</span>Data is <strong>' + Math.round(hoursAgo / 24) + ' days old</strong>. Refresh for accurate insights.</div>';
+        if (hoursAgo > 24) return '<div class="stale-banner"><span class="stale-icon">\u26A0</span>Data is over 24 hours old. Consider refreshing.</div>';
+        return '';
     }
 
     var _allData = null, _forecast = null, _productFilter = 'all', _productSearch = '';
@@ -513,7 +555,11 @@
             var actions = digest.actions || [];
 
             aiHTML = '<div class="card ai-card" style="margin-bottom:16px;">' +
-                '<h2><span class="ai-label">AI</span> Market Intelligence</h2>' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                    '<h2><span class="ai-label">AI</span> Market Intelligence</h2>' +
+                    '<button id="copyBtn" class="copy-btn" onclick="copyDigest()">Copy</button>' +
+                '</div>' +
+                '<div id="digestText">' +
                 '<div class="ai-headline">' + esc(digest.headline || '') + '</div>' +
                 '<div class="ai-summary">' + esc(digest.summary || mc.ai_narrative || '') + '</div>' +
 
@@ -530,6 +576,7 @@
                         return '<span class="ai-action ' + (act.priority || 'low') + '">\u2192 ' + esc(act.action) + '</span>';
                     }).join('') +
                 '</div>' : '') +
+                '</div>' +
 
                 // Economic pills (compact row)
                 '<div class="econ-row" style="margin-top:14px;">' +
@@ -543,6 +590,12 @@
 
         // Revenue sparkline from monthly data
         var monthlyRevenue = (a.seasonal && a.seasonal.monthly || []).map(function(m) { return m.revenue || 0; });
+
+        // KPI change badges from strategic forecast
+        var kc = (fc && fc.kpi_changes) || {};
+        var revMoM = kc.revenue_mom_pct;
+        var deadBench = kc.dead_stock_vs_benchmark;
+        var demandChg = kc.demand_index_change;
 
         // Demand curve
         var demandCurveHTML = '';
@@ -583,7 +636,10 @@
             '</div>';
         }
 
-        document.getElementById('pane-overview').innerHTML = aiHTML +
+        // Data freshness check
+        var staleHTML = staleBanner('{{ woo_cache.last_refresh or "" }}');
+
+        document.getElementById('pane-overview').innerHTML = staleHTML + aiHTML +
 
             '<div class="card" style="margin-bottom:16px;">' +
                 '<div class="health-row">' +
@@ -599,10 +655,10 @@
             '</div>' +
 
             '<div class="card-grid card-grid-4" style="margin-bottom:16px;">' +
-                '<div class="card kpi"><div class="kpi-val green">' + fmtK(s.total_revenue) + '</div><div class="kpi-label">Revenue (12mo)</div><div class="kpi-sub">' + fmt(s.total_orders) + ' orders</div>' + sparklineSVG(monthlyRevenue) + '</div>' +
+                '<div class="card kpi"><div class="kpi-val green">' + fmtK(s.total_revenue) + '</div><div class="kpi-label">Revenue (12mo)</div><div class="kpi-sub">' + fmt(s.total_orders) + ' orders</div>' + changeBadge(revMoM, 'MoM') + sparklineSVG(monthlyRevenue) + '</div>' +
                 '<div class="card kpi"><div class="kpi-val">' + fmtK(s.total_inventory_value) + '</div><div class="kpi-label">Inventory Value</div><div class="kpi-sub">' + fmt(s.total_products) + ' products</div></div>' +
-                '<div class="card kpi"><div class="kpi-val ' + (s.dead_stock_ratio > .25 ? 'red' : s.dead_stock_ratio > .15 ? 'amber' : 'green') + '">' + fmtK(s.dead_stock_capital) + '</div><div class="kpi-label">Dead Stock Capital</div><div class="kpi-sub">' + ((s.dead_stock_ratio || 0) * 100).toFixed(0) + '% of inventory</div></div>' +
-                '<div class="card kpi"><div class="kpi-val blue">' + fmtK(p.revenue && p.revenue.projected_total) + '</div><div class="kpi-label">12-Week Forecast</div><div class="kpi-sub">' + esc(p.revenue && p.revenue.confidence || '') + '</div></div>' +
+                '<div class="card kpi"><div class="kpi-val ' + (s.dead_stock_ratio > .25 ? 'red' : s.dead_stock_ratio > .15 ? 'amber' : 'green') + '">' + fmtK(s.dead_stock_capital) + '</div><div class="kpi-label">Dead Stock Capital</div><div class="kpi-sub">' + ((s.dead_stock_ratio || 0) * 100).toFixed(0) + '% of inventory</div>' + (deadBench != null ? changeBadge(-deadBench, 'vs 15% target') : '') + '</div>' +
+                '<div class="card kpi"><div class="kpi-val blue">' + fmtK(p.revenue && p.revenue.projected_total) + '</div><div class="kpi-label">12-Week Forecast</div><div class="kpi-sub">' + esc(p.revenue && p.revenue.confidence || '') + '</div>' + (demandChg != null ? changeBadge(demandChg, 'vs last month') : '') + '</div>' +
             '</div>' +
 
             confHTML +
