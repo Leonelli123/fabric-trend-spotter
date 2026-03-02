@@ -317,6 +317,68 @@ def _parse_product_elements(html, shop_key, country, currency):
 
 
 # ---------------------------------------------------------------------------
+# Language-specific URL paths (3 per category max → 9 tries vs old 30)
+# ---------------------------------------------------------------------------
+
+_BESTSELLER_PATHS = {
+    "de": ["/bestseller", "/topseller", "/stoffe/bestseller/"],
+    "nl": ["/bestsellers", "/nieuw", "/best-sellers"],
+    "fr": ["/meilleures-ventes", "/best-sellers", "/collections/best-sellers"],
+    "sv": ["/nytt", "/bestseller", "/best-sellers"],
+    "fi": ["/bestseller", "/best-sellers", "/suosituimmat"],
+    "da": ["/bestseller", "/bestsellers", "/best-sellers"],
+    "no": ["/nytt", "/bestseller", "/best-sellers"],
+    "pl": ["/bestseller", "/bestsellers", "/best-sellers"],
+    "en": ["/bestsellers", "/best-sellers", "/collections/best-sellers"],
+}
+
+_NEW_ARRIVALS_PATHS = {
+    "de": ["/neuheiten", "/new", "/stoffe/neuheiten/"],
+    "nl": ["/nieuw", "/new-arrivals", "/new"],
+    "fr": ["/nouveautes", "/nouvelles-arrivees", "/new"],
+    "sv": ["/nyheter", "/new", "/new-arrivals"],
+    "fi": ["/new", "/new-arrivals", "/uutuudet"],
+    "da": ["/nyheder", "/new", "/new-arrivals"],
+    "no": ["/nye-produkter", "/nyheter", "/new"],
+    "pl": ["/new", "/nowosci", "/new-arrivals"],
+    "en": ["/new", "/new-arrivals", "/collections/new"],
+}
+
+_JERSEY_PATHS = {
+    "de": ["/jersey", "/stoffe/jersey/", "/jerseystoffe"],
+    "nl": ["/tricot", "/jersey", "/tricot-stoffen"],
+    "fr": ["/tissus-jersey", "/jersey", "/tricot"],
+    "sv": ["/trikot", "/jersey", "/trikå"],
+    "fi": ["/trikoo", "/jersey", "/trikookangas"],
+    "da": ["/jersey", "/jerseystof", "/tricot"],
+    "no": ["/jersey", "/trikot", "/jerseystoff"],
+    "pl": ["/jersey", "/dzianina", "/tricot"],
+    "en": ["/jersey", "/tricot", "/knit-fabric"],
+}
+
+# Country code → language mapping
+_COUNTRY_LANG = {
+    "DE": "de", "AT": "de", "CH": "de",
+    "NL": "nl", "BE": "nl",
+    "FR": "fr",
+    "SE": "sv",
+    "FI": "fi",
+    "DK": "da",
+    "NO": "no",
+    "PL": "pl",
+    "CZ": "de",  # most Czech fabric shops have German fallback
+}
+
+
+def _detect_shop_language(shop_cfg):
+    """Detect the primary language of a shop from its countries list."""
+    countries = shop_cfg.get("countries", [])
+    if countries:
+        return _COUNTRY_LANG.get(countries[0], "en")
+    return "en"
+
+
+# ---------------------------------------------------------------------------
 # Per-shop scraper logic
 # ---------------------------------------------------------------------------
 
@@ -326,28 +388,27 @@ def _scrape_shop_pages(session, shop_key, shop_cfg):
     base_url = shop_cfg["base_url"]
     countries = shop_cfg["countries"]
 
-    # Common page suffixes to try for bestsellers and new arrivals
-    bestseller_paths = [
-        "/bestseller", "/bestsellers", "/topseller",
-        "/stoffe/bestseller/", "/best-sellers",
-        "/collections/best-sellers",
-        "/meilleures-ventes", "/nieuw", "/nytt",
-    ]
-    new_arrivals_paths = [
-        "/new", "/new-arrivals", "/neuheiten", "/nieuw",
-        "/nouvelles-arrivees", "/nouveautes",
-        "/stoffe/neuheiten/", "/collections/new",
-        "/nyheter", "/nye-produkter",
-    ]
-    jersey_paths = [
-        "/jersey", "/stoffe/jersey/", "/tricot",
-        "/trikot", "/trikoo", "/tissus-jersey",
-        "/jerseystoffe", "/tricot-stoffen",
-    ]
+    # Pick language-appropriate paths based on the shop's base URL / country
+    # instead of trying all 30 paths for every shop.
+    lang = _detect_shop_language(shop_cfg)
+    bestseller_paths = _BESTSELLER_PATHS.get(lang, _BESTSELLER_PATHS["en"])
+    new_arrivals_paths = _NEW_ARRIVALS_PATHS.get(lang, _NEW_ARRIVALS_PATHS["en"])
+    jersey_paths = _JERSEY_PATHS.get(lang, _JERSEY_PATHS["en"])
+
+    consecutive_shop_failures = 0
 
     for country in countries:
+        # Early exit: if first 2 countries returned nothing, shop is blocking us
+        if consecutive_shop_failures >= 2:
+            logger.info(
+                "Skipping remaining countries for %s (blocked after %d failures)",
+                shop_cfg["name"], consecutive_shop_failures,
+            )
+            break
+
         country_cfg = EUROPEAN_COUNTRIES.get(country, {})
         currency = country_cfg.get("currency", "EUR")
+        country_found = 0  # listings found for this country
 
         # Build country-specific base URL
         if "locale_paths" in shop_cfg:
@@ -364,18 +425,18 @@ def _scrape_shop_pages(session, shop_key, shop_cfg):
                 listings = _parse_product_elements(
                     resp.text, shop_key, country, currency,
                 )
-                resp.close()  # free response buffer
-                # Mark all as bestsellers if found on bestseller page
+                resp.close()
                 for l in listings:
                     l["is_bestseller"] = True
                     l["favorites"] = max(l["favorites"], 100)
                 if listings:
                     all_listings.extend(listings)
+                    country_found += len(listings)
                     logger.info(
                         "%s %s bestsellers: %d products",
                         shop_cfg["name"], country, len(listings),
                     )
-                    break  # Found working bestseller page
+                    break
             time.sleep(REQUEST_DELAY)
 
         # Try new arrivals page
@@ -392,6 +453,7 @@ def _scrape_shop_pages(session, shop_key, shop_cfg):
                     l["favorites"] = max(l["favorites"], 50)
                 if listings:
                     all_listings.extend(listings)
+                    country_found += len(listings)
                     logger.info(
                         "%s %s new arrivals: %d products",
                         shop_cfg["name"], country, len(listings),
@@ -409,17 +471,22 @@ def _scrape_shop_pages(session, shop_key, shop_cfg):
                 )
                 resp.close()
                 if listings:
-                    # Ensure jersey tag is present
                     for l in listings:
                         if "jersey" not in l["tags"]:
                             l["tags"].append("jersey")
                     all_listings.extend(listings)
+                    country_found += len(listings)
                     logger.info(
                         "%s %s jersey: %d products",
                         shop_cfg["name"], country, len(listings),
                     )
                     break
             time.sleep(REQUEST_DELAY)
+
+        if country_found == 0:
+            consecutive_shop_failures += 1
+        else:
+            consecutive_shop_failures = 0  # reset on success
 
     return all_listings
 
