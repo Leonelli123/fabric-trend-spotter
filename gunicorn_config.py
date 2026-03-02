@@ -1,26 +1,29 @@
 """Gunicorn configuration for production deployment.
 
-Tuned for Render Free tier (512 MB RAM):
-- 1 worker to avoid duplicating in-memory caches across processes
+Tuned for Render (512 MB RAM):
+- 1 worker to keep all in-memory caches in a single process
 - 2 threads for concurrent request handling within the single worker
-- preload_app shares code pages and runs init_db / scheduler once
+- preload_app DISABLED so the scheduler starts inside the worker
+  (with preload=True the scheduler runs in the master process, but
+  data written there is invisible to the forked worker — a silent bug)
 """
 
-import multiprocessing
 import os
 
 bind = "0.0.0.0:10000"
 
-# On Render Free (512 MB), 1 worker keeps memory under control.
-# Each worker duplicates the full in-memory caches (woo_cache, eco_cache,
-# scrape_status), so fewer workers = proportionally less RAM.
+# 1 worker = one process handles everything (scheduler + HTTP).
+# The gunicorn master arbiter is lightweight (~15 MB overhead).
 workers = int(os.environ.get("WEB_CONCURRENCY", 1))
 threads = 2
 timeout = 120
 
-# Share application code across workers (saves ~30-50 MB per extra worker)
-preload_app = True
+# Do NOT preload: we need the scheduler to start inside the worker
+# process so that scheduled refresh data (woo_cache, eco_cache) is
+# visible to request handlers.  With preload=True, _start_scheduler()
+# ran in the master process, and its writes were trapped there.
+preload_app = False
 
-# Cap worker memory: restart if a worker exceeds 450 MB (leaves headroom)
-max_requests = 1000          # recycle workers every 1000 requests
-max_requests_jitter = 50     # stagger restarts
+# Recycle the worker periodically to reclaim fragmented memory
+max_requests = 1000
+max_requests_jitter = 50

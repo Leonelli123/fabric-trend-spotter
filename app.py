@@ -386,7 +386,7 @@ def _start_scheduler():
         logger.warning("Could not start scheduler: %s (data refresh will be manual only)", e)
 
 
-# Start scheduler (gunicorn preload=True ensures this runs once)
+# Start scheduler (runs inside the worker process with preload_app=False)
 _start_scheduler()
 
 
