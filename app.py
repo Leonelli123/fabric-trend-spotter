@@ -27,6 +27,8 @@ from analysis import analyze_trends, analyze_european_trends, run_forecasts
 from database import save_listings
 from config import SEGMENTS, EUROPEAN_COUNTRIES, EUROPEAN_REGIONS
 import config
+import json as _json
+from flask.json.provider import DefaultJSONProvider
 
 logging.basicConfig(
     level=logging.INFO,
@@ -34,7 +36,29 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+def _safe_default(o):
+    """Convert numpy/pandas scalar types to native Python for JSON."""
+    if hasattr(o, "item"):          # numpy.bool_, numpy.float64, numpy.int64, etc.
+        return o.item()
+    if hasattr(o, "isoformat"):     # datetime/date
+        return o.isoformat()
+    raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
+
+
+class _SafeJSONProvider(DefaultJSONProvider):
+    """JSON provider that handles numpy types from pytrends/pandas."""
+
+    def dumps(self, obj, **kwargs):
+        kwargs.setdefault("default", _safe_default)
+        kwargs.setdefault("ensure_ascii", self.ensure_ascii)
+        kwargs.setdefault("sort_keys", self.sort_keys)
+        return _json.dumps(obj, **kwargs)
+
+
 app = Flask(__name__)
+app.json_provider_class = _SafeJSONProvider
+app.json = _SafeJSONProvider(app)
 app.secret_key = config.SECRET_KEY
 
 # Initialize database on import (needed for gunicorn)

@@ -204,7 +204,7 @@ def _try_pytrends():
                         results[kw] = {
                             "avg_interest": round(avg_interest, 1),
                             "recent_interest": round(recent_interest, 1),
-                            "trending_up": recent_interest > avg_interest * 1.1,
+                            "trending_up": bool(recent_interest > avg_interest * 1.1),
                             "history": [
                                 {"date": str(d.date()), "value": int(v)}
                                 for d, v in interest[kw].items()
@@ -350,7 +350,7 @@ def fetch_european_trends(countries=None):
                             country_results[kw] = {
                                 "avg_interest": round(avg_interest, 1),
                                 "recent_interest": round(recent_interest, 1),
-                                "trending_up": recent_interest > avg_interest * 1.1,
+                                "trending_up": bool(recent_interest > avg_interest * 1.1),
                                 "country": country_code,
                             }
                     consecutive_failures = 0
