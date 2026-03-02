@@ -355,12 +355,17 @@ eco_cache = {
 # ======================================================================
 
 def _scheduled_refresh():
-    """Auto-refresh both WooCommerce and e-conomic data."""
-    logger.info("Scheduled refresh: starting WooCommerce + e-conomic data pull...")
+    """Auto-refresh WooCommerce then e-conomic data sequentially.
+
+    Running these in ONE thread (not two) keeps peak memory in check on
+    the 512 MB Render plan — each refresh can use ~100-200 MB during data
+    pull, and running them concurrently would double the peak.
+    """
+    logger.info("Scheduled refresh: starting sequential data pull...")
     if config.WOOCOMMERCE_URL and config.WOOCOMMERCE_KEY and not woo_cache["refreshing"]:
-        threading.Thread(target=_run_woo_analysis, daemon=True).start()
+        _run_woo_analysis()  # blocks until done, then frees memory
     if config.ECONOMIC_APP_SECRET and config.ECONOMIC_GRANT_TOKEN and not eco_cache["refreshing"]:
-        threading.Thread(target=_run_eco_analysis, daemon=True).start()
+        _run_eco_analysis()  # runs after woo is fully cleaned up
 
 
 def _start_scheduler():
@@ -857,6 +862,7 @@ def _run_scrape():
                         "count": len(listings),
                     }
                     logger.info("Got %d listings from %s", len(listings), name)
+                    del listings
                 else:
                     source_status[name] = {
                         "status": "empty",
@@ -871,6 +877,7 @@ def _run_scrape():
                     "note": str(e)[:100],
                 }
                 logger.warning("%s failed: %s", name, e)
+            gc.collect()  # free scraper's BS4 trees and HTTP responses
 
         # Step 2b: SerpAPI high-volume data (if configured)
         serpapi_summary = get_serpapi_summary()
@@ -1014,9 +1021,11 @@ def _run_scrape():
         if all_listings:
             save_listings(all_listings)
 
+        seed_count = len(seed_listings)
+        total_count = len(all_listings)
         logger.info(
             "Analyzing %d listings (%d seed + %d live)...",
-            len(all_listings), len(seed_listings), live_count,
+            total_count, seed_count, live_count,
         )
         result = analyze_trends(all_listings, google_data)
 
@@ -1030,51 +1039,57 @@ def _run_scrape():
         emerging = [f for f in forecasts if f["lifecycle"] == "emerging"]
         rising = [f for f in forecasts if f["lifecycle"] == "rising"]
 
-        # Action board is built after EU data is available (below)
-
         # Step 6: Pinterest Social/Visual Trends
-        pinterest_result = {}
+        pinterest_pins = 0
         try:
-            # Get Pinterest listings from the scraper step above
             pinterest_listings = [l for l in all_listings if l.get("source") == "pinterest"]
             if pinterest_listings:
                 logger.info("Analyzing %d Pinterest pins...", len(pinterest_listings))
                 pinterest_result = analyze_pinterest_data(pinterest_listings)
                 scrape_status["pinterest_result"] = pinterest_result
+                pinterest_pins = pinterest_result.get("total_pins_analyzed", 0)
                 logger.info(
                     "Pinterest analysis: %d pins, %d fabric signals, %d pattern signals",
-                    pinterest_result.get("total_pins_analyzed", 0),
+                    pinterest_pins,
                     len(pinterest_result.get("fabric_signals", [])),
                     len(pinterest_result.get("pattern_signals", [])),
                 )
+                del pinterest_result, pinterest_listings
             else:
                 logger.info("No Pinterest data to analyze (scraper may have been blocked)")
         except Exception as e:
             logger.warning("Pinterest analysis failed: %s", e)
 
+        # --- Free all_listings now (saved to DB, analyzed, Pinterest done) ---
+        del all_listings, seed_listings
+        gc.collect()
+        logger.info("Memory: freed raw listing data after analysis")
+
         # Step 7: European Markets (seed data + live shop scraping)
         logger.info("Loading European market data...")
         eu_listings = get_european_seed_listings()
+        eu_seed_count = len(eu_listings)
         source_status["EU Seed Data"] = {
             "status": "ok",
-            "count": len(eu_listings),
+            "count": eu_seed_count,
             "note": f"{len(EUROPEAN_COUNTRIES)} countries baseline",
         }
 
         # Step 7b: Scrape real EU shops (Phase 1 = highest impact)
-        eu_shop_listings = []
+        eu_shop_count = 0
         try:
             logger.info("Scraping EU shops (Phase 1)...")
             eu_shop_result = scrape_eu_shops(priority=1)
             eu_shop_listings = eu_shop_result.get("listings", [])
+            eu_shop_count = len(eu_shop_listings)
             eu_listings.extend(eu_shop_listings)
             source_status["EU Shops"] = {
                 "status": "ok" if eu_shop_listings else "empty",
-                "count": len(eu_shop_listings),
+                "count": eu_shop_count,
                 "note": f"{eu_shop_result.get('shop_count', 0)} shops scraped",
             }
-            # Store shop stats for dashboard
             scrape_status["eu_shop_stats"] = eu_shop_result.get("stats", {})
+            del eu_shop_listings, eu_shop_result
         except Exception as e:
             source_status["EU Shops"] = {
                 "status": "error",
@@ -1083,19 +1098,23 @@ def _run_scrape():
             }
             logger.warning("EU shop scraping failed: %s", e)
 
+        gc.collect()  # free BS4 trees from EU shop scraping
+
         # Step 7c: Scrape competitor brands
-        competitor_listings = []
+        competitor_count = 0
         try:
             logger.info("Scraping competitor brands...")
             comp_result = scrape_competitors()
             competitor_listings = comp_result.get("listings", [])
+            competitor_count = len(competitor_listings)
             eu_listings.extend(competitor_listings)
             source_status["Competitors"] = {
                 "status": "ok" if competitor_listings else "empty",
-                "count": len(competitor_listings),
+                "count": competitor_count,
                 "note": f"{comp_result.get('brand_count', 0)} brands",
             }
             scrape_status["competitor_stats"] = comp_result.get("stats", {})
+            del competitor_listings, comp_result
         except Exception as e:
             source_status["Competitors"] = {
                 "status": "error",
@@ -1125,6 +1144,11 @@ def _run_scrape():
         eu_result = analyze_european_trends(eu_listings, eu_google)
         scrape_status["eu_result"] = eu_result
 
+        # Free eu_listings — analysis is done, results stored in eu_result
+        eu_listing_count = len(eu_listings)
+        del eu_listings, eu_google
+        gc.collect()
+
         # Generate action board (after EU data so weekly tasks can cite markets)
         scrape_status["action_board"] = _build_action_board(
             result, forecasts, google_data, eu_result
@@ -1141,10 +1165,10 @@ def _run_scrape():
             "total_listings": result["total_listings_analyzed"],
             "sources": result["sources"],
             "live_listings": live_count,
-            "seed_listings": len(seed_listings),
-            "eu_listings": len(eu_listings),
-            "eu_shop_listings": len(eu_shop_listings),
-            "competitor_listings": len(competitor_listings),
+            "seed_listings": seed_count,
+            "eu_listings": eu_listing_count,
+            "eu_shop_listings": eu_shop_count,
+            "competitor_listings": competitor_count,
             "eu_countries": eu_result.get("total_countries", 0),
             "google_keywords": len(google_data),
             "top_fabric": (
@@ -1160,7 +1184,7 @@ def _run_scrape():
             "emerging_count": len(emerging),
             "rising_count": len(rising),
             "segments_analyzed": len(result.get("segment_trends", {})),
-            "pinterest_pins": pinterest_result.get("total_pins_analyzed", 0),
+            "pinterest_pins": pinterest_pins,
             "serpapi_configured": serpapi_summary.get("configured", False),
             "source_status": source_status,
             "ok_sources": ok_sources,
@@ -1170,18 +1194,14 @@ def _run_scrape():
             "Collection complete! %d US listings (%d live), %d EU listings "
             "(%d seed + %d shops + %d competitors, %d countries), "
             "%d forecasts. Sources OK: %s. Failed: %s",
-            len(all_listings), live_count, len(eu_listings),
-            len(eu_listings) - len(eu_shop_listings) - len(competitor_listings),
-            len(eu_shop_listings), len(competitor_listings),
+            total_count, live_count, eu_listing_count,
+            eu_seed_count, eu_shop_count, competitor_count,
             eu_result.get("total_countries", 0), len(forecasts),
             ok_sources, failed_sources,
         )
 
-        # --- Memory cleanup: free large temp lists after analysis ---
-        del all_listings, eu_listings, seed_listings
-        del eu_shop_listings, competitor_listings
-        del forecasts, google_data, result, eu_result
-        del pinterest_result, trend_report
+        # --- Final memory cleanup ---
+        del forecasts, google_data, result, eu_result, trend_report
         gc.collect()
         logger.info("Memory cleanup: freed temporary scrape data")
 
@@ -1280,10 +1300,10 @@ def _build_action_board(result, forecasts, google_data, eu_data=None):
         "opportunity_gaps": opportunity_gaps,
         "seasonal_calendar": seasonal_calendar,
         "buckets": {
-            "design_now": design_now,
-            "watch": watch,
-            "phase_out": phase_out,
-            "evergreen": evergreen,
+            "design_now": design_now[:25],
+            "watch": watch[:25],
+            "phase_out": phase_out[:25],
+            "evergreen": evergreen[:25],
         },
     }
 

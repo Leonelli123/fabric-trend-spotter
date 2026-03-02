@@ -199,6 +199,7 @@ def _scrape_via_internal_api():
             # Strategy C: Parse HTML with BeautifulSoup
             soup = BeautifulSoup(html, "html.parser")
             html_listings = _parse_html_listings(soup)
+            soup.decompose()  # free BS4 tree immediately
             if html_listings:
                 listings.extend(html_listings)
                 consecutive_failures = 0
@@ -325,7 +326,7 @@ def _extract_json_ld(html):
     listings = []
     soup = BeautifulSoup(html, "html.parser")
 
-    for script in soup.select('script[type="application/ld+json"]'):
+    for script in soup.find_all('script', type='application/ld+json'):
         try:
             data = json.loads(script.string)
             if isinstance(data, dict) and data.get("@type") == "ItemList":
@@ -372,6 +373,7 @@ def _extract_json_ld(html):
         except (json.JSONDecodeError, AttributeError):
             pass
 
+    soup.decompose()
     return listings
 
 
@@ -462,6 +464,8 @@ def _scrape_via_web():
                             })
             except (json.JSONDecodeError, AttributeError):
                 pass
+
+        soup.decompose()  # free BS4 tree immediately
 
     logger.info("Scraped %d Etsy listings via web", len(listings))
     return listings

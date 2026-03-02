@@ -294,6 +294,7 @@ def _extract_trend_signals(html, source_name, authority_score, source_type):
                         "strength": strength,
                     })
 
+    soup.decompose()  # free BS4 tree
     return signals, articles
 
 

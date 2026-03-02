@@ -172,7 +172,11 @@ def _parse_product_elements(html, shop_key, country, currency):
     Tries multiple common e-commerce element patterns to find product cards.
     Returns a list of standardised listing dicts.
     """
-    soup = BeautifulSoup(html, "html.parser")
+    # Use lxml if available (2-3x faster, less memory than html.parser)
+    try:
+        soup = BeautifulSoup(html, "lxml")
+    except Exception:
+        soup = BeautifulSoup(html, "html.parser")
     listings = []
 
     # Common product card selectors across Shopware, WooCommerce, Magento, etc.
@@ -307,6 +311,8 @@ def _parse_product_elements(html, shop_key, country, currency):
             logger.debug("Failed to parse product element: %s", e)
             continue
 
+    # Free the BS4 tree immediately — each parsed page can hold 5-10 MB
+    soup.decompose()
     return listings
 
 
@@ -358,6 +364,7 @@ def _scrape_shop_pages(session, shop_key, shop_cfg):
                 listings = _parse_product_elements(
                     resp.text, shop_key, country, currency,
                 )
+                resp.close()  # free response buffer
                 # Mark all as bestsellers if found on bestseller page
                 for l in listings:
                     l["is_bestseller"] = True
@@ -379,6 +386,7 @@ def _scrape_shop_pages(session, shop_key, shop_cfg):
                 listings = _parse_product_elements(
                     resp.text, shop_key, country, currency,
                 )
+                resp.close()
                 for l in listings:
                     l["is_new"] = True
                     l["favorites"] = max(l["favorites"], 50)
@@ -399,6 +407,7 @@ def _scrape_shop_pages(session, shop_key, shop_cfg):
                 listings = _parse_product_elements(
                     resp.text, shop_key, country, currency,
                 )
+                resp.close()
                 if listings:
                     # Ensure jersey tag is present
                     for l in listings:

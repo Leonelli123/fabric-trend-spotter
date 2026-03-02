@@ -47,6 +47,8 @@ def scrape_amazon():
             except Exception as e:
                 logger.debug("Error parsing Amazon card: %s", e)
 
+        soup.decompose()  # free BS4 tree immediately
+
     logger.info("Scraped %d Amazon listings", len(listings))
     return listings
 
