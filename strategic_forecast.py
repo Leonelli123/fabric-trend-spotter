@@ -166,7 +166,8 @@ class StrategicForecaster:
         current_season = season_map.get(self._month, "unknown")
 
         return {
-            "ai_narrative": narrative,
+            "ai_narrative": narrative.get("text", "") if isinstance(narrative, dict) else narrative,
+            "ai_digest": narrative if isinstance(narrative, dict) else {"headline": "", "summary": str(narrative), "insights": [], "actions": []},
             "danish_economy": {
                 "gdp_growth": economy["gdp_growth_2026"],
                 "inflation": economy["inflation_2026"],
@@ -287,7 +288,11 @@ class StrategicForecaster:
         }
 
     def _build_ai_narrative(self, economy, trends, alignment, demand_idx):
-        """Generate a natural-language AI analysis paragraph."""
+        """Generate a structured AI digest with headline, insights, and actions.
+
+        Inspired by ThoughtSpot's morning digest and Fathom's structured insights.
+        Returns a dict with: headline, summary, insights (categorized), actions.
+        """
         woo_summary = self.woo.get("summary", {})
         eco_summary = self.eco.get("summary", {})
 
@@ -295,85 +300,137 @@ class StrategicForecaster:
                        5: "May", 6: "June", 7: "July", 8: "August",
                        9: "September", 10: "October", 11: "November", 12: "December"}
         quarter = (self._month - 1) // 3 + 1
+        month_name = month_names[self._month]
 
-        parts = []
-
-        # Market conditions
-        if demand_idx >= 115:
-            parts.append(
-                f"{month_names[self._month]} is a high-demand period for Danish fabric retail "
-                f"(demand index: {demand_idx}/100). Maximize sales and marketing spend now."
-            )
-        elif demand_idx <= 80:
-            parts.append(
-                f"{month_names[self._month]} is a slow period for fabric retail "
-                f"(demand index: {demand_idx}/100). Focus on planning and reducing costs, "
-                f"not on heavy inventory purchases."
-            )
-        else:
-            parts.append(
-                f"{month_names[self._month]} shows average demand for fabric retail "
-                f"(index: {demand_idx}/100)."
-            )
-
-        # Economic context
-        conf = economy["consumer_confidence_index"]
-        retail = economy["retail_sales_yoy"]
-        parts.append(
-            f"The Danish economy is in cautious recovery: consumer confidence "
-            f"is negative ({conf}) but retail sales are growing +{retail}%. "
-            f"Danes are spending despite low confidence — a bullish signal for Q{quarter}."
-        )
-
-        # Dead stock context
+        # --- Headline ---
         dead_ratio = woo_summary.get("dead_stock_ratio", 0)
-        dead_cap = woo_summary.get("dead_stock_capital", 0)
-        if dead_ratio > 0.25:
-            parts.append(
-                f"CRITICAL: {dead_ratio:.0%} of your inventory value ({dead_cap:,.0f} DKK) "
-                f"is dead stock. In a market where fabric trends are shifting toward "
-                f"texture and sustainability, holding stale inventory is costly. "
-                f"Every month of delay loses ~3% of that capital."
-            )
-        elif dead_ratio > 0.15:
-            parts.append(
-                f"Your dead stock ratio ({dead_ratio:.0%}) needs attention. "
-                f"Fabric trends are moving fast — clear underperformers to free capital "
-                f"for trending fabrics like bouclé and linen."
-            )
-
-        # Trend alignment
         score = alignment.get("score", 0)
         opps = alignment.get("opportunities", [])
-        if score >= 60:
-            parts.append(
-                f"Your inventory aligns well with 2026 trends (score: {score}/100). "
-                f"Focus on promoting your trending stock more aggressively."
-            )
-        elif score >= 30:
-            parts.append(
-                f"Your inventory has moderate alignment with 2026 trends ({score}/100). "
-                + (f"Consider adding {', '.join(o['fabric'] for o in opps[:2])} to strengthen your position."
-                   if opps else "Review your assortment against market trends.")
-            )
+
+        if demand_idx >= 115:
+            headline = f"{month_name}: High-demand period — push marketing and stock best-sellers"
+        elif demand_idx <= 80:
+            headline = f"{month_name}: Low season — focus on clearance and planning ahead"
+        elif dead_ratio > 0.25:
+            headline = f"{month_name}: Clear dead stock urgently — {dead_ratio:.0%} of capital is stuck"
+        elif score < 30:
+            headline = f"{month_name}: Trend gap detected — inventory misaligned with 2026 trends"
         else:
-            parts.append(
-                f"Low trend alignment ({score}/100) — your inventory may miss "
-                f"the 2026 shift toward textured, sustainable fabrics. "
-                + (f"Key gaps: {', '.join(o['fabric'] for o in opps[:3])}."
-                   if opps else "Review trending fabrics and adjust purchasing.")
-            )
+            headline = f"{month_name}: Steady quarter — optimize margins and prepare for next season"
 
-        # Revenue context
+        # --- Summary (1-2 sentences) ---
+        conf = economy["consumer_confidence_index"]
+        retail = economy["retail_sales_yoy"]
+        summary = (
+            f"Danish retail is growing +{retail}% despite negative confidence ({conf}). "
+            f"Demand index for {month_name} is {demand_idx}/100. "
+            f"Trend alignment: {score}%."
+        )
+
+        # --- Categorized Insights ---
+        insights = []
+
+        # Market insight
+        if demand_idx >= 115:
+            insights.append({
+                "category": "market", "severity": "opportunity",
+                "text": f"Peak demand period (index {demand_idx}). Increase ad spend and email campaigns on best-sellers.",
+            })
+        elif demand_idx >= 95:
+            insights.append({
+                "category": "market", "severity": "info",
+                "text": f"Average demand period (index {demand_idx}). Maintain steady operations.",
+            })
+        elif demand_idx <= 80:
+            insights.append({
+                "category": "market", "severity": "warning",
+                "text": f"Low season (index {demand_idx}). Reduce purchasing, focus on clearance and next-season prep.",
+            })
+
+        # Economy insight
+        insights.append({
+            "category": "economy", "severity": "info",
+            "text": (
+                f"Danes spending despite low confidence ({conf}). "
+                f"Real wages +{economy['real_wage_growth_2026']}%, tax cuts effective 2026. "
+                f"Bullish for Q{quarter}."
+            ),
+        })
+
+        # Dead stock insight
+        dead_cap = woo_summary.get("dead_stock_capital", 0)
+        if dead_ratio > 0.25:
+            insights.append({
+                "category": "inventory", "severity": "critical",
+                "text": f"{dead_ratio:.0%} of inventory ({dead_cap:,.0f} DKK) is dead stock. Every month loses ~3% of that value.",
+            })
+        elif dead_ratio > 0.15:
+            insights.append({
+                "category": "inventory", "severity": "warning",
+                "text": f"Dead stock at {dead_ratio:.0%} — clear underperformers to free capital for trending fabrics.",
+            })
+        elif dead_ratio > 0:
+            insights.append({
+                "category": "inventory", "severity": "good",
+                "text": f"Dead stock ratio at {dead_ratio:.0%} — healthy level. Keep monitoring.",
+            })
+
+        # Trend alignment insight
+        if score >= 60:
+            insights.append({
+                "category": "trends", "severity": "good",
+                "text": f"Strong trend alignment ({score}%). Your inventory matches 2026 fabric trends well. Push marketing on trending items.",
+            })
+        elif score >= 30:
+            gap_text = f" Consider adding {', '.join(o['fabric'] for o in opps[:2])}." if opps else ""
+            insights.append({
+                "category": "trends", "severity": "warning",
+                "text": f"Moderate trend alignment ({score}%).{gap_text}",
+            })
+        else:
+            gap_text = f" Missing: {', '.join(o['fabric'] for o in opps[:3])}." if opps else ""
+            insights.append({
+                "category": "trends", "severity": "critical",
+                "text": f"Low trend alignment ({score}%) — risk of missing 2026 shift to textured, sustainable fabrics.{gap_text}",
+            })
+
+        # Revenue insight
         monthly_rev = eco_summary.get("avg_monthly_revenue", 0)
+        total_rev = woo_summary.get("total_revenue", 0)
         if monthly_rev:
-            parts.append(
-                f"At your current revenue rate ({monthly_rev:,.0f}/month), "
-                f"the upcoming tax cuts and +2.4% real wage growth in Denmark "
-                f"should support gradual demand improvement through 2026."
-            )
+            insights.append({
+                "category": "revenue", "severity": "info",
+                "text": f"Current run rate: {monthly_rev:,.0f} DKK/month. Tax cuts + wage growth support improvement through 2026.",
+            })
 
-        return " ".join(parts)
+        # --- Clear Actions ---
+        actions = []
+        if demand_idx >= 115:
+            actions.append({"priority": "high", "action": "Increase marketing spend on best-sellers this month"})
+        if dead_ratio > 0.15:
+            recovery = dead_cap * 0.4
+            actions.append({"priority": "high", "action": f"Run clearance on dead stock to recover ~{recovery:,.0f} DKK"})
+        if score < 50 and opps:
+            actions.append({"priority": "medium", "action": f"Source trending fabrics: {', '.join(o['fabric'] for o in opps[:2])}"})
+        if demand_idx <= 80:
+            actions.append({"priority": "medium", "action": "Reduce new inventory orders — save budget for next high-demand period"})
+
+        next_month = (self._month % 12) + 1
+        next_demand = NORDIC_DEMAND_INDEX.get(next_month, 100)
+        if next_demand >= 115 and demand_idx < 115:
+            actions.append({"priority": "medium", "action": f"Prepare for {month_names[next_month]} peak (demand index: {next_demand})"})
+
+        # Always add a planning action
+        if not actions:
+            actions.append({"priority": "low", "action": "Review inventory ROI and phase out lowest-performing SKUs"})
+
+        return {
+            "headline": headline,
+            "summary": summary,
+            "insights": insights,
+            "actions": actions,
+            "text": summary,  # backward-compatible flat text
+        }
 
     # ------------------------------------------------------------------
     # 1. CASH RUNWAY — How many weeks can you operate?
@@ -647,8 +704,28 @@ class StrategicForecaster:
         # Nordic demand index for this month
         demand_idx = NORDIC_DEMAND_INDEX.get(next_month, 100)
 
+        # Confidence band: wider when less historical data or more volatile
+        data_months = len(revenue_by_month)
+        if data_months >= 9:
+            confidence = "high"
+            band_pct = 0.12  # +/- 12%
+        elif data_months >= 5:
+            confidence = "medium"
+            band_pct = 0.22  # +/- 22%
+        else:
+            confidence = "low"
+            band_pct = 0.35  # +/- 35%
+
         return {
             "next_month_projected_revenue": round(next_month_total, 0),
+            "confidence_band": {
+                "level": confidence,
+                "low": round(next_month_total * (1 - band_pct), 0),
+                "mid": round(next_month_total, 0),
+                "high": round(next_month_total * (1 + band_pct), 0),
+                "band_pct": band_pct,
+                "data_months": data_months,
+            },
             "seasonal_factor": round(next_factor, 2),
             "economic_modifier": round(econ_modifier, 3),
             "demand_index": demand_idx,

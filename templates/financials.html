@@ -117,15 +117,34 @@
         .alert-title { font-weight: 700; font-size: 14px; }
         .alert-detail { font-size: 13px; color: var(--muted); margin-top: 4px; }
 
-        /* AI narrative */
+        /* AI Digest (structured) */
         .ai-card { border-left: 3px solid var(--accent); background: linear-gradient(135deg, var(--bg-card), rgba(108,99,255,.05)); }
         .ai-card h2 { display: flex; align-items: center; gap: 8px; }
         .ai-label { font-size: 9px; padding: 2px 6px; border-radius: 3px; background: var(--accent); color: #fff; font-weight: 700; letter-spacing: .05em; }
-        .ai-text { font-size: 13px; line-height: 1.7; color: var(--text); }
+        .ai-headline { font-size: 16px; font-weight: 700; color: var(--text); margin: 8px 0 4px; line-height: 1.4; }
+        .ai-summary { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+        .ai-insights { list-style: none; margin: 0 0 12px; }
+        .ai-insight { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; font-size: 13px; line-height: 1.5; }
+        .ai-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+        .ai-dot.critical { background: var(--red); }
+        .ai-dot.warning { background: var(--amber); }
+        .ai-dot.opportunity { background: var(--teal); }
+        .ai-dot.good { background: var(--green); }
+        .ai-dot.info { background: var(--blue); }
+        .ai-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+        .ai-action { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; }
+        .ai-action.high { background: rgba(239,68,68,.1); color: var(--red); border: 1px solid rgba(239,68,68,.2); }
+        .ai-action.medium { background: rgba(245,158,11,.1); color: var(--amber); border: 1px solid rgba(245,158,11,.2); }
+        .ai-action.low { background: rgba(59,130,246,.1); color: var(--blue); border: 1px solid rgba(59,130,246,.2); }
         .econ-row { display: flex; gap: 12px; flex-wrap: wrap; margin: 12px 0; }
         .econ-pill { display: flex; flex-direction: column; align-items: center; padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px; min-width: 90px; }
         .econ-pill .val { font-size: 16px; font-weight: 800; }
         .econ-pill .lbl { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-top: 2px; }
+
+        /* KPI Sparkline */
+        .kpi-spark { margin-top: 6px; }
+        .kpi-spark svg { width: 80px; height: 24px; }
+        .kpi-spark .spark-line { fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 
         .loading-overlay { text-align: center; padding: 80px 20px; }
         .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 16px; }
@@ -200,6 +219,22 @@
 
     var _ecoData = null, _reconData = null, _forecast = null;
 
+    function sparklineSVG(values, color) {
+        if (!values || values.length < 2) return '';
+        var max = Math.max.apply(null, values);
+        var min = Math.min.apply(null, values);
+        var range = max - min || 1;
+        var w = 80, h = 24, pad = 2;
+        var pts = values.map(function(v, i) {
+            return ((i / (values.length - 1)) * (w - pad*2) + pad) + ',' + (h - pad - ((v - min) / range) * (h - pad*2));
+        });
+        var endColor = values[values.length-1] >= values[0] ? 'var(--green)' : 'var(--red)';
+        return '<div class="kpi-spark"><svg viewBox="0 0 ' + w + ' ' + h + '" xmlns="http://www.w3.org/2000/svg">' +
+            '<polyline points="' + pts.join(' ') + '" class="spark-line" style="stroke:' + (color || endColor) + '"/>' +
+            '<circle cx="' + pts[pts.length-1].split(',')[0] + '" cy="' + pts[pts.length-1].split(',')[1] + '" r="2" fill="' + (color || endColor) + '"/>' +
+            '</svg></div>';
+    }
+
     function switchTab(id) {
         document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.tab === id); });
         document.querySelectorAll('.pane').forEach(function(p) { p.classList.toggle('active', p.id === 'pane-' + id); });
@@ -231,7 +266,7 @@
             // Also load strategic forecast for market context
             fetch('/api/forecast').then(function(r) { return r.json(); }).then(function(fc) {
                 _forecast = fc;
-                renderOverview(); // Re-render with AI narrative
+                renderOverview(); // Re-render with AI digest
             }).catch(function() {});
         });
     }
@@ -259,27 +294,45 @@
         var rev = _ecoData.revenue || {};
         var growth = rev.growth || [];
         var lastGrowth = growth.length ? growth[growth.length - 1] : {};
+        var monthly = rev.monthly || [];
 
-        // AI narrative from strategic forecast
+        // AI digest from strategic forecast
         var mc = (_forecast && _forecast.market_context) || {};
+        var digest = mc.ai_digest || {};
         var econ = mc.danish_economy || {};
         var aiHTML = '';
-        if (mc.ai_narrative || econ.summary) {
-            var conf = econ.consumer_confidence || -17.3;
-            aiHTML =
-                '<div class="card ai-card" style="margin-bottom:16px;">' +
-                    '<h2><span class="ai-label">AI</span> Economic Context</h2>' +
-                    '<p class="ai-text">' + esc(econ.summary || mc.ai_narrative || '') + '</p>' +
-                    '<div class="econ-row">' +
-                        '<div class="econ-pill"><div class="val" style="color:var(--green);">+' + (econ.gdp_growth || 2.2) + '%</div><div class="lbl">GDP 2026</div></div>' +
-                        '<div class="econ-pill"><div class="val" style="color:' + (conf < -10 ? 'var(--red)' : 'var(--amber)') + ';">' + conf + '</div><div class="lbl">Confidence</div></div>' +
-                        '<div class="econ-pill"><div class="val" style="color:var(--green);">+' + (econ.retail_sales_growth || 4.7) + '%</div><div class="lbl">Retail YoY</div></div>' +
-                        '<div class="econ-pill"><div class="val">' + (econ.inflation || 1.1) + '%</div><div class="lbl">Inflation</div></div>' +
-                        '<div class="econ-pill"><div class="val" style="color:var(--green);">+' + (econ.real_wage_growth || 2.4) + '%</div><div class="lbl">Real Wages</div></div>' +
-                        '<div class="econ-pill"><div class="val">' + (econ.unemployment || 2.9) + '%</div><div class="lbl">Unemployment</div></div>' +
-                    '</div>' +
-                '</div>';
+        if (digest.headline || mc.ai_narrative || econ.summary) {
+            var insights = digest.insights || [];
+            var actions = digest.actions || [];
+            // Filter to economy/revenue relevant insights for financial page
+            var finInsights = insights.filter(function(i) {
+                return i.category === 'economy' || i.category === 'revenue' || i.category === 'market';
+            });
+
+            aiHTML = '<div class="card ai-card" style="margin-bottom:16px;">' +
+                '<h2><span class="ai-label">AI</span> Economic Context</h2>' +
+                (digest.headline ? '<div class="ai-headline">' + esc(digest.headline) + '</div>' : '') +
+                '<div class="ai-summary">' + esc(econ.summary || digest.summary || mc.ai_narrative || '') + '</div>' +
+
+                (finInsights.length ? '<ul class="ai-insights">' +
+                    finInsights.map(function(ins) {
+                        return '<li class="ai-insight"><span class="ai-dot ' + (ins.severity || 'info') + '"></span><span>' + esc(ins.text) + '</span></li>';
+                    }).join('') +
+                '</ul>' : '') +
+
+                '<div class="econ-row">' +
+                    '<div class="econ-pill"><div class="val" style="color:var(--green);">+' + (econ.gdp_growth || 2.2) + '%</div><div class="lbl">GDP</div></div>' +
+                    '<div class="econ-pill"><div class="val" style="color:' + ((econ.consumer_confidence || -17.3) < -10 ? 'var(--red)' : 'var(--amber)') + ';">' + (econ.consumer_confidence || -17.3) + '</div><div class="lbl">Confidence</div></div>' +
+                    '<div class="econ-pill"><div class="val" style="color:var(--green);">+' + (econ.retail_sales_growth || 4.7) + '%</div><div class="lbl">Retail</div></div>' +
+                    '<div class="econ-pill"><div class="val">' + (econ.inflation || 1.1) + '%</div><div class="lbl">Inflation</div></div>' +
+                    '<div class="econ-pill"><div class="val" style="color:var(--green);">+' + (econ.real_wage_growth || 2.4) + '%</div><div class="lbl">Wages</div></div>' +
+                    '<div class="econ-pill"><div class="val">' + (econ.unemployment || 2.9) + '%</div><div class="lbl">Unemp.</div></div>' +
+                '</div>' +
+            '</div>';
         }
+
+        // Revenue sparkline from monthly data
+        var monthlyVals = monthly.map(function(m) { return m.net_amount || 0; });
 
         document.getElementById('pane-overview').innerHTML = aiHTML +
             (oa.severity === 'critical' ? '<div class="alert-banner critical"><div class="alert-title">' + esc(oa.message) + '</div><div class="alert-detail">Total overdue: ' + fmtK(oa.total_overdue) + ' DKK (' + fmtPct(oa.overdue_pct) + ' of outstanding)</div></div>' : '') +
@@ -292,10 +345,10 @@
             '</div></div>' +
 
             '<div class="card-grid card-grid-4" style="margin-bottom:16px;">' +
-                '<div class="card kpi"><div class="kpi-val green">' + fmtK(s.total_net_revenue) + '</div><div class="kpi-label">Net Revenue (12mo)</div><div class="kpi-sub">' + fmt(s.total_invoices) + ' invoices</div></div>' +
+                '<div class="card kpi"><div class="kpi-val green">' + fmtK(s.total_net_revenue) + '</div><div class="kpi-label">Net Revenue (12mo)</div><div class="kpi-sub">' + fmt(s.total_invoices) + ' invoices</div>' + sparklineSVG(monthlyVals) + '</div>' +
                 '<div class="card kpi"><div class="kpi-val">' + fmtK(s.avg_monthly_revenue) + '</div><div class="kpi-label">Avg Monthly Revenue</div><div class="kpi-sub">' + fmtK(rev.avg_invoice_value) + ' avg invoice</div></div>' +
                 '<div class="card kpi"><div class="kpi-val ' + (s.total_overdue > s.total_outstanding * .3 ? 'red' : 'amber') + '">' + fmtK(s.total_outstanding) + '</div><div class="kpi-label">Outstanding</div><div class="kpi-sub">' + fmtK(s.total_overdue) + ' overdue</div></div>' +
-                '<div class="card kpi"><div class="kpi-val ' + (lastGrowth.growth_pct > 0 ? 'green' : lastGrowth.growth_pct < 0 ? 'red' : 'blue') + '">' + fmtPct(lastGrowth.growth_pct) + '</div><div class="kpi-label">Latest Growth</div><div class="kpi-sub">' + esc(lastGrowth.month || '') + '</div></div>' +
+                '<div class="card kpi"><div class="kpi-val ' + (lastGrowth.growth_pct > 0 ? 'green' : lastGrowth.growth_pct < 0 ? 'red' : 'blue') + '">' + fmtPct(lastGrowth.growth_pct) + '</div><div class="kpi-label">Latest Growth</div><div class="kpi-sub">' + esc(lastGrowth.month || '') + '</div>' + sparklineSVG(growth.map(function(g) { return g.growth_pct || 0; })) + '</div>' +
             '</div>' +
 
             '<div class="card-grid card-grid-2">' +

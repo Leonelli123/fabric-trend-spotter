@@ -193,11 +193,25 @@
         .plan-item:last-child { border-bottom: none; }
         .plan-item strong { display: block; font-size: 13px; margin-bottom: 2px; color: var(--text); }
 
-        /* ── AI narrative ── */
+        /* ── AI Digest (structured) ── */
         .ai-card { border-left: 3px solid var(--accent); background: linear-gradient(135deg, var(--bg-card), rgba(108,99,255,.05)); }
         .ai-card h2 { display: flex; align-items: center; gap: 8px; }
         .ai-label { font-size: 9px; padding: 2px 6px; border-radius: 3px; background: var(--accent); color: #fff; font-weight: 700; letter-spacing: .05em; }
-        .ai-text { font-size: 13px; line-height: 1.7; color: var(--text); }
+        .ai-headline { font-size: 16px; font-weight: 700; color: var(--text); margin: 8px 0 4px; line-height: 1.4; }
+        .ai-summary { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+        .ai-insights { list-style: none; margin: 0 0 12px; }
+        .ai-insight { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; font-size: 13px; line-height: 1.5; }
+        .ai-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+        .ai-dot.critical { background: var(--red); }
+        .ai-dot.warning { background: var(--amber); }
+        .ai-dot.opportunity { background: var(--teal); }
+        .ai-dot.good { background: var(--green); }
+        .ai-dot.info { background: var(--blue); }
+        .ai-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+        .ai-action { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; }
+        .ai-action.high { background: rgba(239,68,68,.1); color: var(--red); border: 1px solid rgba(239,68,68,.2); }
+        .ai-action.medium { background: rgba(245,158,11,.1); color: var(--amber); border: 1px solid rgba(245,158,11,.2); }
+        .ai-action.low { background: rgba(59,130,246,.1); color: var(--blue); border: 1px solid rgba(59,130,246,.2); }
 
         /* ── Market context ── */
         .econ-row { display: flex; gap: 12px; flex-wrap: wrap; margin: 12px 0; }
@@ -209,10 +223,48 @@
         .trend-chip.strong { background: rgba(34,197,94,.12); color: var(--green); }
         .trend-chip.rising { background: rgba(20,184,166,.12); color: var(--teal); }
         .trend-chip.stable { background: rgba(59,130,246,.12); color: var(--blue); }
-        .demand-gauge { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
-        .demand-track { flex: 1; max-width: 200px; height: 8px; background: rgba(255,255,255,.06); border-radius: 4px; overflow: hidden; }
-        .demand-fill { height: 100%; border-radius: 4px; transition: width .5s ease; }
         .pantone-swatch { display: inline-block; width: 16px; height: 16px; border-radius: 3px; vertical-align: middle; margin-right: 6px; border: 1px solid rgba(255,255,255,.15); }
+
+        /* ── Demand Curve (12-month sparkline) ── */
+        .demand-curve { margin: 16px 0; }
+        .demand-curve h3 { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
+        .demand-curve svg { width: 100%; height: 80px; }
+        .demand-curve .curve-line { fill: none; stroke: var(--accent); stroke-width: 2; }
+        .demand-curve .curve-area { fill: url(#demandGrad); opacity: .3; }
+        .demand-curve .curve-dot { fill: var(--accent); }
+        .demand-curve .curve-dot.current { fill: var(--green); stroke: var(--green); stroke-width: 2; r: 5; }
+        .demand-curve .curve-label { font-size: 8px; fill: var(--muted); text-anchor: middle; }
+        .demand-curve .curve-val { font-size: 9px; fill: var(--text); text-anchor: middle; font-weight: 600; }
+
+        /* ── Trend Alignment Gauge ── */
+        .trend-gauge { margin: 12px 0; }
+        .trend-gauge-bar { height: 10px; background: rgba(255,255,255,.06); border-radius: 5px; overflow: hidden; position: relative; }
+        .trend-gauge-fill { height: 100%; border-radius: 5px; transition: width .8s ease; }
+        .trend-gauge-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin-top: 4px; }
+        .trend-breakdown { display: flex; gap: 16px; margin-top: 10px; flex-wrap: wrap; }
+        .trend-breakdown-item { font-size: 12px; display: flex; align-items: center; gap: 6px; }
+        .trend-breakdown-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+        /* ── KPI Sparkline ── */
+        .kpi-spark { margin-top: 6px; }
+        .kpi-spark svg { width: 80px; height: 24px; }
+        .kpi-spark .spark-line { fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+        /* ── Confidence Band ── */
+        .conf-band { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border: 1px solid var(--border); border-radius: 8px; margin: 12px 0; }
+        .conf-badge { padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+        .conf-badge.high { background: rgba(34,197,94,.15); color: var(--green); }
+        .conf-badge.medium { background: rgba(245,158,11,.15); color: var(--amber); }
+        .conf-badge.low { background: rgba(239,68,68,.15); color: var(--red); }
+        .conf-range { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+        .conf-range .low-val { color: var(--muted); }
+        .conf-range .mid-val { font-weight: 700; color: var(--text); font-size: 14px; }
+        .conf-range .high-val { color: var(--muted); }
+        .conf-bar { width: 120px; height: 6px; background: rgba(255,255,255,.06); border-radius: 3px; overflow: hidden; position: relative; }
+        .conf-bar-inner { position: absolute; height: 100%; border-radius: 3px; }
+        .conf-bar-lo { background: rgba(255,255,255,.08); }
+        .conf-bar-mid { background: var(--accent); }
+        .conf-bar-hi { background: rgba(255,255,255,.08); }
 
         /* ── Loading ── */
         .loading-overlay { text-align: center; padding: 80px 20px; }
@@ -351,6 +403,87 @@
     }
 
     /* ══════════════════════════════════════════════════════
+       SVG HELPERS
+       ══════════════════════════════════════════════════════ */
+    function sparklineSVG(values, color) {
+        if (!values || values.length < 2) return '';
+        var max = Math.max.apply(null, values);
+        var min = Math.min.apply(null, values);
+        var range = max - min || 1;
+        var w = 80, h = 24, pad = 2;
+        var pts = values.map(function(v, i) {
+            return ((i / (values.length - 1)) * (w - pad*2) + pad) + ',' + (h - pad - ((v - min) / range) * (h - pad*2));
+        });
+        var endColor = values[values.length-1] >= values[0] ? 'var(--green)' : 'var(--red)';
+        return '<div class="kpi-spark"><svg viewBox="0 0 ' + w + ' ' + h + '" xmlns="http://www.w3.org/2000/svg">' +
+            '<polyline points="' + pts.join(' ') + '" class="spark-line" style="stroke:' + (color || endColor) + '"/>' +
+            '<circle cx="' + pts[pts.length-1].split(',')[0] + '" cy="' + pts[pts.length-1].split(',')[1] + '" r="2" fill="' + (color || endColor) + '"/>' +
+            '</svg></div>';
+    }
+
+    function demandCurveSVG(monthlyIndex, currentMonth) {
+        var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        var vals = [];
+        for (var i = 1; i <= 12; i++) vals.push(monthlyIndex[i] || 100);
+        var max = Math.max.apply(null, vals);
+        var min = Math.min.apply(null, vals);
+        var range = max - min || 1;
+        var w = 100, h = 60, padX = 4, padY = 12;
+        var pts = vals.map(function(v, i) {
+            return ((i / 11) * (w - padX*2) + padX) + ',' + (h - padY - ((v - min) / range) * (h - padY*2));
+        });
+        var areapts = padX + ',' + (h - padY) + ' ' + pts.join(' ') + ' ' + (w - padX) + ',' + (h - padY);
+        var labels = months.map(function(m, i) {
+            var x = (i / 11) * (w - padX*2) + padX;
+            return '<text x="' + x + '" y="' + (h - 1) + '" class="curve-label">' + m + '</text>';
+        }).join('');
+        var dots = vals.map(function(v, i) {
+            var x = (i / 11) * (w - padX*2) + padX;
+            var y = h - padY - ((v - min) / range) * (h - padY*2);
+            var cls = (i + 1) === currentMonth ? 'curve-dot current' : 'curve-dot';
+            var r = (i + 1) === currentMonth ? 3 : 1.5;
+            return '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" class="' + cls + '"/>';
+        }).join('');
+        var valLabels = vals.map(function(v, i) {
+            if ((i + 1) === currentMonth || i === 0 || i === 11 || v === max || v === min) {
+                var x = (i / 11) * (w - padX*2) + padX;
+                var y = h - padY - ((v - min) / range) * (h - padY*2) - 4;
+                return '<text x="' + x + '" y="' + y + '" class="curve-val">' + v + '</text>';
+            }
+            return '';
+        }).join('');
+        return '<div class="demand-curve"><h3>Seasonal Demand Curve</h3>' +
+            '<svg viewBox="0 0 ' + w + ' ' + h + '" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">' +
+            '<defs><linearGradient id="demandGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--accent)" stop-opacity=".3"/><stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>' +
+            '<polygon points="' + areapts + '" class="curve-area"/>' +
+            '<polyline points="' + pts.join(' ') + '" class="curve-line"/>' +
+            dots + labels + valLabels +
+            '</svg></div>';
+    }
+
+    function trendGaugeHTML(ta) {
+        var score = ta.score || 0;
+        var clr = score >= 60 ? 'var(--green)' : score >= 30 ? 'var(--amber)' : 'var(--red)';
+        var aligned = ta.aligned_count || 0;
+        var total = ta.total_products || 0;
+        var misCount = (ta.misaligned || []).length;
+        var oppCount = (ta.opportunities || []).length;
+        return '<div class="trend-gauge">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
+                '<span style="font-size:12px;font-weight:700;">Trend Alignment</span>' +
+                '<span style="font-size:14px;font-weight:800;color:' + clr + ';">' + score + '%</span>' +
+            '</div>' +
+            '<div class="trend-gauge-bar"><div class="trend-gauge-fill" style="width:' + Math.min(score, 100) + '%;background:' + clr + ';"></div></div>' +
+            '<div class="trend-gauge-labels"><span>Misaligned</span><span>Aligned</span></div>' +
+            '<div class="trend-breakdown">' +
+                '<div class="trend-breakdown-item"><span class="trend-breakdown-dot" style="background:var(--green);"></span>' + aligned + ' aligned products</div>' +
+                (misCount > 0 ? '<div class="trend-breakdown-item"><span class="trend-breakdown-dot" style="background:var(--red);"></span>' + misCount + ' misaligned</div>' : '') +
+                (oppCount > 0 ? '<div class="trend-breakdown-item"><span class="trend-breakdown-dot" style="background:var(--teal);"></span>' + oppCount + ' opportunities</div>' : '') +
+            '</div>' +
+            '</div>';
+    }
+
+    /* ══════════════════════════════════════════════════════
        OVERVIEW TAB
        ══════════════════════════════════════════════════════ */
     function renderOverview(a, r, p, fc) {
@@ -364,47 +497,94 @@
         var priorities = (r.priorities || []).slice(0, 6);
         var recs = (cf.recommendations || []).slice(0, 3);
 
-        // AI narrative from strategic forecast
+        // AI digest from strategic forecast
         var mc = (fc && fc.market_context) || {};
-        var narrative = mc.ai_narrative || '';
+        var digest = mc.ai_digest || {};
         var econ = mc.danish_economy || {};
         var ft = mc.fabric_trends || {};
         var di = mc.demand_index || {};
         var ta = mc.trend_alignment || {};
+        var trendFabrics = (ft.trending_fabrics || []);
 
-        // Build AI + market context section
+        // Build structured AI digest
         var aiHTML = '';
-        if (narrative) {
-            var demandIdx = di.current_month || 100;
-            var demandClr = demandIdx >= 115 ? 'var(--green)' : demandIdx >= 95 ? 'var(--blue)' : demandIdx >= 80 ? 'var(--amber)' : 'var(--red)';
-            var taScore = ta.score || 0;
-            var taClr = taScore >= 60 ? 'var(--green)' : taScore >= 30 ? 'var(--amber)' : 'var(--red)';
-            var trendFabrics = (ft.trending_fabrics || []);
+        if (digest.headline || mc.ai_narrative) {
+            var insights = digest.insights || [];
+            var actions = digest.actions || [];
 
-            aiHTML =
-                '<div class="card ai-card" style="margin-bottom:16px;">' +
-                    '<h2><span class="ai-label">AI</span> Market Intelligence</h2>' +
-                    '<p class="ai-text">' + esc(narrative) + '</p>' +
-                    '<div class="econ-row">' +
-                        '<div class="econ-pill"><div class="val" style="color:var(--green);">+' + (econ.gdp_growth || 2.2) + '%</div><div class="lbl">DK GDP 2026</div></div>' +
-                        '<div class="econ-pill"><div class="val" style="color:' + (econ.consumer_confidence < -10 ? 'var(--red)' : 'var(--amber)') + ';">' + (econ.consumer_confidence || '\u2014') + '</div><div class="lbl">Confidence</div></div>' +
-                        '<div class="econ-pill"><div class="val" style="color:var(--green);">+' + (econ.retail_sales_growth || 4.7) + '%</div><div class="lbl">Retail Sales</div></div>' +
-                        '<div class="econ-pill"><div class="val">' + (econ.inflation || 1.1) + '%</div><div class="lbl">Inflation</div></div>' +
-                        '<div class="econ-pill"><div class="val" style="color:' + demandClr + ';">' + demandIdx + '</div><div class="lbl">Demand Index</div></div>' +
-                        '<div class="econ-pill"><div class="val" style="color:' + taClr + ';">' + taScore + '%</div><div class="lbl">Trend Align</div></div>' +
-                    '</div>' +
-                    '<div style="margin-top:8px;">' +
-                        '<span style="font-size:11px;color:var(--muted);margin-right:8px;">2026 Trending:</span>' +
-                        trendFabrics.slice(0, 6).map(function(t) {
-                            var cls = t.strength === 'very_high' ? 'hot' : t.strength === 'high' ? 'strong' : t.strength === 'rising' ? 'rising' : 'stable';
-                            return '<span class="trend-chip ' + cls + '" title="' + esc(t.note) + '">' + esc(t.name) + '</span>';
-                        }).join('') +
-                    '</div>' +
-                    (ft.pantone_2026 ? '<p style="font-size:11px;color:var(--muted);margin-top:6px;"><span class="pantone-swatch" style="background:' + (ft.pantone_2026.hex || '#F0EDE5') + ';"></span>Pantone 2026: <strong>' + esc(ft.pantone_2026.name) + '</strong> \u2014 ' + esc(ft.pantone_2026.note || '') + '</p>' : '') +
-                '</div>';
+            aiHTML = '<div class="card ai-card" style="margin-bottom:16px;">' +
+                '<h2><span class="ai-label">AI</span> Market Intelligence</h2>' +
+                '<div class="ai-headline">' + esc(digest.headline || '') + '</div>' +
+                '<div class="ai-summary">' + esc(digest.summary || mc.ai_narrative || '') + '</div>' +
+
+                // Categorized insights with colored dots
+                (insights.length ? '<ul class="ai-insights">' +
+                    insights.map(function(ins) {
+                        return '<li class="ai-insight"><span class="ai-dot ' + (ins.severity || 'info') + '"></span><span>' + esc(ins.text) + '</span></li>';
+                    }).join('') +
+                '</ul>' : '') +
+
+                // Action chips
+                (actions.length ? '<div class="ai-actions">' +
+                    actions.map(function(act) {
+                        return '<span class="ai-action ' + (act.priority || 'low') + '">\u2192 ' + esc(act.action) + '</span>';
+                    }).join('') +
+                '</div>' : '') +
+
+                // Economic pills (compact row)
+                '<div class="econ-row" style="margin-top:14px;">' +
+                    '<div class="econ-pill"><div class="val" style="color:var(--green);">+' + (econ.gdp_growth || 2.2) + '%</div><div class="lbl">GDP</div></div>' +
+                    '<div class="econ-pill"><div class="val" style="color:' + (econ.consumer_confidence < -10 ? 'var(--red)' : 'var(--amber)') + ';">' + (econ.consumer_confidence || '\u2014') + '</div><div class="lbl">Confidence</div></div>' +
+                    '<div class="econ-pill"><div class="val" style="color:var(--green);">+' + (econ.retail_sales_growth || 4.7) + '%</div><div class="lbl">Retail</div></div>' +
+                    '<div class="econ-pill"><div class="val">' + (econ.inflation || 1.1) + '%</div><div class="lbl">Inflation</div></div>' +
+                '</div>' +
+            '</div>';
+        }
+
+        // Revenue sparkline from monthly data
+        var monthlyRevenue = (a.seasonal && a.seasonal.monthly || []).map(function(m) { return m.revenue || 0; });
+
+        // Demand curve
+        var demandCurveHTML = '';
+        if (di.monthly_indexes) {
+            var curMonth = new Date().getMonth() + 1;
+            demandCurveHTML = demandCurveSVG(di.monthly_indexes, curMonth);
+        }
+
+        // Trend gauge
+        var trendGauge = ta.score != null ? trendGaugeHTML(ta) : '';
+
+        // Trending fabrics + Pantone
+        var trendingHTML = '';
+        if (trendFabrics.length) {
+            trendingHTML = '<div style="margin-top:12px;">' +
+                '<span style="font-size:11px;color:var(--muted);margin-right:8px;">2026 Trending:</span>' +
+                trendFabrics.slice(0, 6).map(function(t) {
+                    var cls = t.strength === 'very_high' ? 'hot' : t.strength === 'high' ? 'strong' : t.strength === 'rising' ? 'rising' : 'stable';
+                    return '<span class="trend-chip ' + cls + '" title="' + esc(t.note) + '">' + esc(t.name) + '</span>';
+                }).join('') +
+                (ft.pantone_2026 ? '<p style="font-size:11px;color:var(--muted);margin-top:6px;"><span class="pantone-swatch" style="background:' + (ft.pantone_2026.hex || '#F0EDE5') + ';"></span>Pantone 2026: <strong>' + esc(ft.pantone_2026.name) + '</strong></p>' : '') +
+            '</div>';
+        }
+
+        // Confidence band from demand forecast
+        var confHTML = '';
+        var df = (fc && fc.demand_forecast) || {};
+        var confBand = df.confidence_band || {};
+        if (confBand.level) {
+            confHTML = '<div class="conf-band">' +
+                '<span class="conf-badge ' + confBand.level + '">' + confBand.level + ' confidence</span>' +
+                '<div class="conf-range">' +
+                    '<span class="low-val">' + fmtK(confBand.low) + '</span>' +
+                    '<span class="mid-val">' + fmtK(confBand.mid) + '</span>' +
+                    '<span class="high-val">' + fmtK(confBand.high) + '</span>' +
+                '</div>' +
+                '<span style="font-size:11px;color:var(--muted);">Next month forecast range</span>' +
+            '</div>';
         }
 
         document.getElementById('pane-overview').innerHTML = aiHTML +
+
             '<div class="card" style="margin-bottom:16px;">' +
                 '<div class="health-row">' +
                     '<div class="health-ring" style="background:conic-gradient(' + clr + ' ' + pct + 'deg, rgba(255,255,255,.06) 0);">' +
@@ -419,30 +599,34 @@
             '</div>' +
 
             '<div class="card-grid card-grid-4" style="margin-bottom:16px;">' +
-                '<div class="card kpi"><div class="kpi-val green">' + fmtK(s.total_revenue) + '</div><div class="kpi-label">Revenue (12mo)</div><div class="kpi-sub">' + fmt(s.total_orders) + ' orders</div></div>' +
+                '<div class="card kpi"><div class="kpi-val green">' + fmtK(s.total_revenue) + '</div><div class="kpi-label">Revenue (12mo)</div><div class="kpi-sub">' + fmt(s.total_orders) + ' orders</div>' + sparklineSVG(monthlyRevenue) + '</div>' +
                 '<div class="card kpi"><div class="kpi-val">' + fmtK(s.total_inventory_value) + '</div><div class="kpi-label">Inventory Value</div><div class="kpi-sub">' + fmt(s.total_products) + ' products</div></div>' +
                 '<div class="card kpi"><div class="kpi-val ' + (s.dead_stock_ratio > .25 ? 'red' : s.dead_stock_ratio > .15 ? 'amber' : 'green') + '">' + fmtK(s.dead_stock_capital) + '</div><div class="kpi-label">Dead Stock Capital</div><div class="kpi-sub">' + ((s.dead_stock_ratio || 0) * 100).toFixed(0) + '% of inventory</div></div>' +
-                '<div class="card kpi"><div class="kpi-val blue">' + fmtK(p.revenue && p.revenue.projected_total) + '</div><div class="kpi-label">12-Week Forecast</div><div class="kpi-sub">' + esc(p.revenue && p.revenue.confidence || '') + ' confidence</div></div>' +
+                '<div class="card kpi"><div class="kpi-val blue">' + fmtK(p.revenue && p.revenue.projected_total) + '</div><div class="kpi-label">12-Week Forecast</div><div class="kpi-sub">' + esc(p.revenue && p.revenue.confidence || '') + '</div></div>' +
             '</div>' +
 
-            '<div class="card-grid card-grid-2">' +
+            confHTML +
+
+            '<div class="card-grid card-grid-2" style="margin-bottom:16px;">' +
+                '<div class="card">' + demandCurveHTML + trendGauge + trendingHTML + '</div>' +
                 '<div class="card"><h2>This Week\'s Priorities</h2><ul class="priority-list">' +
                     (priorities.length ? priorities.map(function(p) {
                         return '<li class="priority-item"><span class="urgency ' + p.urgency + '">' + esc(p.urgency).replace('_', ' ') + '</span><div class="priority-text"><div class="title">' + esc(p.title) + '</div><div class="action">' + esc(p.action) + '</div></div></li>';
                     }).join('') : '<li style="color:var(--muted);padding:12px;">No urgent actions right now.</li>') +
                 '</ul></div>' +
-                '<div>' +
-                    '<div class="card" style="margin-bottom:16px;"><h2 style="color:var(--green);">Top Winners</h2><ul class="mini-list">' +
-                        (winners.slice(0, 5).map(function(w) {
-                            return '<li class="mini-item"><span class="mini-name">' + esc(w.name) + '</span><span class="mini-stat">' + dirIcon(w.direction) + ' ' + (w.qty_per_week != null ? w.qty_per_week.toFixed(1) : '0') + '/wk</span><span class="mini-stat" style="width:70px;text-align:right;">' + fmtK(w.total_revenue) + '</span></li>';
-                        }).join('') || '<li class="mini-item" style="color:var(--muted);">No sales data yet</li>') +
-                    '</ul></div>' +
-                    '<div class="card"><h2 style="color:var(--red);">Needs Attention</h2><ul class="mini-list">' +
-                        (deadstock.map(function(d) {
-                            return '<li class="mini-item"><span class="mini-name">' + esc(d.name) + '</span><span class="abadge ' + d.severity + '">' + d.severity + '</span><span class="mini-stat" style="width:70px;text-align:right;">' + fmtK(d.capital_tied) + '</span></li>';
-                        }).join('') || '<li class="mini-item" style="color:var(--muted);">No dead stock detected</li>') +
-                    '</ul></div>' +
-                '</div>' +
+            '</div>' +
+
+            '<div class="card-grid card-grid-2">' +
+                '<div class="card"><h2 style="color:var(--green);">Top Winners</h2><ul class="mini-list">' +
+                    (winners.slice(0, 5).map(function(w) {
+                        return '<li class="mini-item"><span class="mini-name">' + esc(w.name) + '</span><span class="mini-stat">' + dirIcon(w.direction) + ' ' + (w.qty_per_week != null ? w.qty_per_week.toFixed(1) : '0') + '/wk</span><span class="mini-stat" style="width:70px;text-align:right;">' + fmtK(w.total_revenue) + '</span></li>';
+                    }).join('') || '<li class="mini-item" style="color:var(--muted);">No sales data yet</li>') +
+                '</ul></div>' +
+                '<div class="card"><h2 style="color:var(--red);">Needs Attention</h2><ul class="mini-list">' +
+                    (deadstock.map(function(d) {
+                        return '<li class="mini-item"><span class="mini-name">' + esc(d.name) + '</span><span class="abadge ' + d.severity + '">' + d.severity + '</span><span class="mini-stat" style="width:70px;text-align:right;">' + fmtK(d.capital_tied) + '</span></li>';
+                    }).join('') || '<li class="mini-item" style="color:var(--muted);">No dead stock detected</li>') +
+                '</ul></div>' +
             '</div>';
     }
 
@@ -658,22 +842,38 @@
                 '</div>';
         }
 
+        // Confidence band info for forecast chart
+        var fcDemand = (fc && fc.demand_forecast) || {};
+        var fcConf = fcDemand.confidence_band || {};
+        var confLevel = fcConf.level || '';
+        var bandPct = fcConf.band_pct || 0;
+
         var revChartHTML = '';
         if (weeks.length) {
             revChartHTML = '<div class="card" style="margin-bottom:16px;">' +
                 '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-bottom:16px;">' +
                     '<h2>12-Week Revenue Projection</h2>' +
-                    '<div style="display:flex;gap:20px;">' +
+                    '<div style="display:flex;gap:20px;align-items:center;">' +
+                        (confLevel ? '<span class="conf-badge ' + confLevel + '" style="align-self:center;">' + confLevel + '</span>' : '') +
                         '<div class="kpi" style="padding:0;text-align:right;"><div class="kpi-val" style="font-size:18px;">' + fmtK(proj.current_weekly_revenue) + '</div><div class="kpi-label">Current Weekly</div></div>' +
                         '<div class="kpi" style="padding:0;text-align:right;"><div class="kpi-val blue" style="font-size:18px;">' + fmtK(proj.projected_total) + '</div><div class="kpi-label">12-Week Total</div></div>' +
                     '</div>' +
                 '</div>' +
                 '<div class="rev-chart">' +
                     weeks.map(function(w) {
-                        return '<div class="rev-bar-wrap"><div class="rev-bar-val">' + fmtK(w.projected_revenue) + '</div><div class="rev-bar" style="height:' + Math.max((w.projected_revenue/maxRev)*100, 3) + '%;"></div><div class="rev-bar-label">W' + w.week + '</div></div>';
+                        var barH = Math.max((w.projected_revenue/maxRev)*100, 3);
+                        // Show confidence band as a lighter overlay area behind bar
+                        var loH = bandPct > 0 ? Math.max(barH * (1 - bandPct), 2) : 0;
+                        var hiH = bandPct > 0 ? Math.min(barH * (1 + bandPct), 100) : 0;
+                        return '<div class="rev-bar-wrap">' +
+                            '<div class="rev-bar-val">' + fmtK(w.projected_revenue) + '</div>' +
+                            (bandPct > 0 ? '<div style="width:100%;height:' + hiH + '%;position:relative;"><div style="position:absolute;bottom:0;width:100%;height:100%;background:rgba(108,99,255,.08);border-radius:4px 4px 0 0;"></div><div class="rev-bar" style="position:absolute;bottom:0;width:100%;height:' + Math.max((barH/hiH)*100, 10) + '%;"></div></div>' :
+                            '<div class="rev-bar" style="height:' + barH + '%;"></div>') +
+                            '<div class="rev-bar-label">W' + w.week + '</div></div>';
                     }).join('') +
                 '</div>' +
-                (proj.note ? '<p style="font-size:12px;color:var(--muted);margin-top:12px;">' + esc(proj.note) + '</p>' : '') +
+                (bandPct > 0 ? '<p style="font-size:11px;color:var(--muted);margin-top:8px;">Shaded area shows \u00B1' + Math.round(bandPct * 100) + '% confidence range (' + confLevel + '). Based on ' + (fcConf.data_months || 0) + ' months of data.</p>' : '') +
+                (proj.note ? '<p style="font-size:12px;color:var(--muted);margin-top:8px;">' + esc(proj.note) + '</p>' : '') +
             '</div>';
         }
 
