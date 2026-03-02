@@ -183,8 +183,12 @@ def fetch_trend_reports():
     all_signals = []
     all_articles = []
 
-    # Phase 1: Scrape authoritative trend sources
+    # Phase 1: Scrape authoritative trend sources (circuit breaker at 3 failures)
+    consecutive_failures = 0
     for source in TREND_SOURCES:
+        if consecutive_failures >= 3:
+            logger.info("Stopping trend sources after %d consecutive failures", consecutive_failures)
+            break
         try:
             logger.info("Fetching trend source: %s", source["name"])
             resp = fetch_page(session, source["url"])
@@ -195,22 +199,33 @@ def fetch_trend_reports():
                 )
                 all_signals.extend(signals)
                 all_articles.extend(articles)
+                consecutive_failures = 0
                 logger.info(
                     "%s: extracted %d signals from %d articles",
                     source["name"], len(signals), len(articles),
                 )
-            time.sleep(2)
+            else:
+                consecutive_failures += 1
         except Exception as e:
+            consecutive_failures += 1
             logger.warning("Failed to fetch %s: %s", source["name"], e)
 
     # Phase 2: Google News search for recent trend articles
-    for query in TREND_SEARCH_QUERIES[:5]:  # Limit to avoid rate limiting
+    consecutive_failures = 0
+    for query in TREND_SEARCH_QUERIES[:5]:
+        if consecutive_failures >= 2:
+            logger.info("Stopping Google News after %d failures", consecutive_failures)
+            break
         try:
             logger.info("Searching Google News for: %s", query)
             news_signals = _search_google_news(session, query)
-            all_signals.extend(news_signals)
-            time.sleep(2)
+            if news_signals:
+                all_signals.extend(news_signals)
+                consecutive_failures = 0
+            else:
+                consecutive_failures += 1
         except Exception as e:
+            consecutive_failures += 1
             logger.warning("Google News search failed for '%s': %s", query, e)
 
     # Aggregate and deduplicate signals
