@@ -163,18 +163,19 @@ def _try_pytrends():
     # Process in batches of 5 (Google Trends API limit)
     groups = [all_keywords[i:i + 5] for i in range(0, len(all_keywords), 5)]
     consecutive_failures = 0
-    base_delay = 3
 
     for batch_idx, group in enumerate(groups):
-        if consecutive_failures >= 3:
+        if consecutive_failures >= 2:
             logger.warning(
                 "Stopping Google Trends after %d consecutive failures. "
                 "Got data for %d keywords.", consecutive_failures, len(results)
             )
             break
 
-        delay = base_delay * (2 ** consecutive_failures)
-        time.sleep(min(delay, 30))
+        # Only sleep between batches (not before first), backoff on failure
+        if batch_idx > 0:
+            delay = 2 * (2 ** consecutive_failures)
+            time.sleep(min(delay, 15))
 
         try:
             # Enhanced anti-detection: custom headers to look more like a browser
@@ -298,10 +299,9 @@ def fetch_european_trends(countries=None):
 
     eu_results = {}
     consecutive_failures = 0
-    base_delay = 3
 
     for country_code in countries:
-        if consecutive_failures >= 3:
+        if consecutive_failures >= 2:
             logger.warning(
                 "Stopping European trends after %d consecutive failures "
                 "at country %s", consecutive_failures, country_code,
@@ -319,11 +319,11 @@ def fetch_european_trends(countries=None):
         groups = [all_kw[i:i + 5] for i in range(0, len(all_kw), 5)]
 
         for batch_idx, group in enumerate(groups):
-            if consecutive_failures >= 3:
+            if consecutive_failures >= 2:
                 break
 
-            delay = base_delay * (2 ** consecutive_failures)
-            time.sleep(min(delay, 30))
+            delay = 2 * (2 ** consecutive_failures)
+            time.sleep(min(delay, 10))
 
             try:
                 pytrends = TrendReq(

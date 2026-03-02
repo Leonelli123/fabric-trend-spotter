@@ -604,7 +604,20 @@ def scrape_eu_shops(priority=1):
         len(target_shops), priority,
     )
 
+    consecutive_empty = 0
     for shop_key, shop_cfg in target_shops.items():
+        # Circuit breaker: if 3 consecutive shops return nothing, stop
+        if consecutive_empty >= 3:
+            logger.info(
+                "Stopping EU shop scraping after %d consecutive empty shops "
+                "(likely all blocked from this IP)", consecutive_empty,
+            )
+            stats[shop_key] = {
+                "name": shop_cfg["name"],
+                "status": "skipped",
+                "count": 0,
+            }
+            continue
         try:
             logger.info("Scraping %s (%s)...", shop_cfg["name"], shop_key)
             listings = _scrape_shop_pages(session, shop_key, shop_cfg)
@@ -621,9 +634,12 @@ def scrape_eu_shops(priority=1):
                     shop_cfg["name"], len(listings),
                     ", ".join(shop_cfg["countries"]),
                 )
+                consecutive_empty = 0
             else:
+                consecutive_empty += 1
                 logger.warning("%s: no products found", shop_cfg["name"])
         except Exception as e:
+            consecutive_empty += 1
             stats[shop_key] = {
                 "name": shop_cfg["name"],
                 "status": "error",
@@ -668,7 +684,11 @@ def scrape_competitors():
 
     logger.info("Scraping %d competitor brands...", len(targets))
 
+    consecutive_empty = 0
     for brand_key, brand_cfg in targets.items():
+        if consecutive_empty >= 2:
+            logger.info("Stopping competitor scraping (blocked from this IP)")
+            break
         try:
             logger.info("Scraping competitor: %s", brand_cfg["name"])
             listings = _scrape_competitor_brand(session, brand_key, brand_cfg)
@@ -679,7 +699,12 @@ def scrape_competitors():
                 "count": len(listings),
                 "country": brand_cfg["country"],
             }
+            if listings:
+                consecutive_empty = 0
+            else:
+                consecutive_empty += 1
         except Exception as e:
+            consecutive_empty += 1
             stats[brand_key] = {
                 "name": brand_cfg["name"],
                 "status": "error",

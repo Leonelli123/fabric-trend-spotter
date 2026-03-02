@@ -844,13 +844,25 @@ def _run_scrape():
         logger.info("Loaded %d seed listings as baseline", len(seed_listings))
 
         # Step 2: Attempt live scrapers (failures are expected from cloud IPs)
+        # Circuit breaker: if first 2 scrapers both fail, we're on a blocked
+        # IP — skip the rest instead of wasting 10+ minutes on timeouts.
         live_count = 0
-        for name, scraper in [
+        scraper_failures = 0
+        scrapers = [
             ("Etsy", scrape_etsy),
             ("Amazon", scrape_amazon),
             ("Spoonflower", scrape_spoonflower),
             ("Pinterest", scrape_pinterest),
-        ]:
+        ]
+        for name, scraper in scrapers:
+            if scraper_failures >= 2:
+                source_status[name] = {
+                    "status": "skipped",
+                    "count": 0,
+                    "note": "Skipped (cloud IP blocked by earlier scrapers)",
+                }
+                logger.info("Skipping %s (circuit breaker: %d failures)", name, scraper_failures)
+                continue
             try:
                 logger.info("Attempting %s...", name)
                 listings = scraper()
@@ -862,6 +874,7 @@ def _run_scrape():
                         "count": len(listings),
                     }
                     logger.info("Got %d listings from %s", len(listings), name)
+                    scraper_failures = 0  # reset on success
                     del listings
                 else:
                     source_status[name] = {
@@ -869,6 +882,7 @@ def _run_scrape():
                         "count": 0,
                         "note": "No listings returned (likely blocked)",
                     }
+                    scraper_failures += 1
                     logger.warning("%s returned no listings", name)
             except Exception as e:
                 source_status[name] = {
@@ -876,8 +890,9 @@ def _run_scrape():
                     "count": 0,
                     "note": str(e)[:100],
                 }
+                scraper_failures += 1
                 logger.warning("%s failed: %s", name, e)
-            gc.collect()  # free scraper's BS4 trees and HTTP responses
+            gc.collect()
 
         # Step 2b: SerpAPI high-volume data (if configured)
         serpapi_summary = get_serpapi_summary()
@@ -1075,53 +1090,68 @@ def _run_scrape():
             "note": f"{len(EUROPEAN_COUNTRIES)} countries baseline",
         }
 
-        # Step 7b: Scrape real EU shops (Phase 1 = highest impact)
+        # Step 7b: Scrape real EU shops + competitors
+        # Skip live scraping entirely if US scrapers all failed — if Etsy/Amazon
+        # are blocked from this cloud IP, small EU shops will be too.
         eu_shop_count = 0
-        try:
-            logger.info("Scraping EU shops (Phase 1)...")
-            eu_shop_result = scrape_eu_shops(priority=1)
-            eu_shop_listings = eu_shop_result.get("listings", [])
-            eu_shop_count = len(eu_shop_listings)
-            eu_listings.extend(eu_shop_listings)
-            source_status["EU Shops"] = {
-                "status": "ok" if eu_shop_listings else "empty",
-                "count": eu_shop_count,
-                "note": f"{eu_shop_result.get('shop_count', 0)} shops scraped",
-            }
-            scrape_status["eu_shop_stats"] = eu_shop_result.get("stats", {})
-            del eu_shop_listings, eu_shop_result
-        except Exception as e:
-            source_status["EU Shops"] = {
-                "status": "error",
-                "count": 0,
-                "note": str(e)[:100],
-            }
-            logger.warning("EU shop scraping failed: %s", e)
-
-        gc.collect()  # free BS4 trees from EU shop scraping
-
-        # Step 7c: Scrape competitor brands
         competitor_count = 0
-        try:
-            logger.info("Scraping competitor brands...")
-            comp_result = scrape_competitors()
-            competitor_listings = comp_result.get("listings", [])
-            competitor_count = len(competitor_listings)
-            eu_listings.extend(competitor_listings)
-            source_status["Competitors"] = {
-                "status": "ok" if competitor_listings else "empty",
-                "count": competitor_count,
-                "note": f"{comp_result.get('brand_count', 0)} brands",
+        skip_live_eu = (scraper_failures >= 2 and live_count == 0)
+
+        if skip_live_eu:
+            logger.info(
+                "Skipping EU live scraping (US scrapers blocked → EU shops "
+                "will be too). Using seed data only."
+            )
+            source_status["EU Shops"] = {
+                "status": "skipped", "count": 0,
+                "note": "Skipped (cloud IP blocked)",
             }
-            scrape_status["competitor_stats"] = comp_result.get("stats", {})
-            del competitor_listings, comp_result
-        except Exception as e:
             source_status["Competitors"] = {
-                "status": "error",
-                "count": 0,
-                "note": str(e)[:100],
+                "status": "skipped", "count": 0,
+                "note": "Skipped (cloud IP blocked)",
             }
-            logger.warning("Competitor scraping failed: %s", e)
+        else:
+            try:
+                logger.info("Scraping EU shops (Phase 1)...")
+                eu_shop_result = scrape_eu_shops(priority=1)
+                eu_shop_listings = eu_shop_result.get("listings", [])
+                eu_shop_count = len(eu_shop_listings)
+                eu_listings.extend(eu_shop_listings)
+                source_status["EU Shops"] = {
+                    "status": "ok" if eu_shop_listings else "empty",
+                    "count": eu_shop_count,
+                    "note": f"{eu_shop_result.get('shop_count', 0)} shops scraped",
+                }
+                scrape_status["eu_shop_stats"] = eu_shop_result.get("stats", {})
+                del eu_shop_listings, eu_shop_result
+            except Exception as e:
+                source_status["EU Shops"] = {
+                    "status": "error", "count": 0,
+                    "note": str(e)[:100],
+                }
+                logger.warning("EU shop scraping failed: %s", e)
+
+            gc.collect()
+
+            try:
+                logger.info("Scraping competitor brands...")
+                comp_result = scrape_competitors()
+                competitor_listings = comp_result.get("listings", [])
+                competitor_count = len(competitor_listings)
+                eu_listings.extend(competitor_listings)
+                source_status["Competitors"] = {
+                    "status": "ok" if competitor_listings else "empty",
+                    "count": competitor_count,
+                    "note": f"{comp_result.get('brand_count', 0)} brands",
+                }
+                scrape_status["competitor_stats"] = comp_result.get("stats", {})
+                del competitor_listings, comp_result
+            except Exception as e:
+                source_status["Competitors"] = {
+                    "status": "error", "count": 0,
+                    "note": str(e)[:100],
+                }
+                logger.warning("Competitor scraping failed: %s", e)
 
         if eu_listings:
             save_listings(eu_listings)

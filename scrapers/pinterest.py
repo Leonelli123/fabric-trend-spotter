@@ -76,7 +76,7 @@ def _create_pinterest_session():
 
     # Visit homepage to get cookies
     try:
-        resp = session.get("https://www.pinterest.com/", timeout=15)
+        resp = session.get("https://www.pinterest.com/", timeout=5)
         resp.raise_for_status()
     except requests.RequestException as e:
         logger.warning("Failed to initialize Pinterest session: %s", e)
@@ -122,7 +122,7 @@ def _search_pinterest(session, query):
     }
 
     try:
-        resp = session.get(PINTEREST_SEARCH_API, params=params, timeout=15)
+        resp = session.get(PINTEREST_SEARCH_API, params=params, timeout=5)
         resp.raise_for_status()
         data = resp.json()
     except (requests.RequestException, json.JSONDecodeError) as e:

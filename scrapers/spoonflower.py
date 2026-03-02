@@ -93,7 +93,7 @@ def scrape_spoonflower():
 def _fetch_designs(session, params):
     """Fetch designs from the Pythias API."""
     try:
-        resp = session.get(PYTHIAS_URL, params=params, timeout=15)
+        resp = session.get(PYTHIAS_URL, params=params, timeout=5)
         if resp.status_code != 200:
             logger.warning("Spoonflower API returned %d", resp.status_code)
             return None

@@ -89,7 +89,7 @@ def _scrape_via_api():
                     "limit": 25,
                     "includes": "Images",
                 },
-                timeout=15,
+                timeout=5,
             )
             resp.raise_for_status()
             data = resp.json()
@@ -137,12 +137,12 @@ def _scrape_via_internal_api():
 
     # First, establish a session by visiting the homepage
     try:
-        session.get("https://www.etsy.com/", timeout=10)
+        session.get("https://www.etsy.com/", timeout=5)
         time.sleep(1)
     except requests.RequestException:
         pass  # Continue anyway
 
-    queries = SEARCH_QUERIES[:5] + NICHE_QUERIES[:3]
+    queries = SEARCH_QUERIES[:3] + NICHE_QUERIES[:2]  # 5 queries max (was 8)
     for query in queries:
         if consecutive_failures >= 3:
             logger.warning(
@@ -159,7 +159,7 @@ def _scrape_via_internal_api():
                     "ref": "search_bar",
                     "order": "most_relevant",
                 },
-                timeout=15,
+                timeout=5,
                 allow_redirects=True,
             )
 
@@ -414,8 +414,12 @@ def _scrape_via_web():
     """Legacy web scraping fallback."""
     session = get_session()
     listings = []
+    consecutive_failures = 0
 
-    for query in SEARCH_QUERIES:
+    for query in SEARCH_QUERIES[:4]:  # max 4 queries (was 8)
+        if consecutive_failures >= 2:
+            logger.info("Stopping Etsy web scraping after %d failures", consecutive_failures)
+            break
         logger.info("Scraping Etsy web for: %s", query)
         resp = fetch_page(session, ETSY_SEARCH_URL, params={
             "q": query,
@@ -423,6 +427,7 @@ def _scrape_via_web():
             "order": "most_relevant",
         })
         if not resp:
+            consecutive_failures += 1
             continue
 
         soup = BeautifulSoup(resp.text, "html.parser")

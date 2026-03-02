@@ -41,12 +41,12 @@ ECONOMIC_APP_SECRET = os.environ.get("ECONOMIC_APP_SECRET", "")
 ECONOMIC_GRANT_TOKEN = os.environ.get("ECONOMIC_GRANT_TOKEN", "")
 
 # Scraping settings
-REQUEST_DELAY = 2  # seconds between requests to be polite
+REQUEST_DELAY = 1  # seconds between requests (was 2, reduced for speed)
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 )
-REQUEST_TIMEOUT = 15
+REQUEST_TIMEOUT = 5  # seconds (was 15 — if a site doesn't respond in 5s from cloud, it's blocking us)
 
 # Data refresh interval (hours)
 REFRESH_INTERVAL_HOURS = 6
