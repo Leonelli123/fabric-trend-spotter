@@ -117,6 +117,16 @@
         .alert-title { font-weight: 700; font-size: 14px; }
         .alert-detail { font-size: 13px; color: var(--muted); margin-top: 4px; }
 
+        /* AI narrative */
+        .ai-card { border-left: 3px solid var(--accent); background: linear-gradient(135deg, var(--bg-card), rgba(108,99,255,.05)); }
+        .ai-card h2 { display: flex; align-items: center; gap: 8px; }
+        .ai-label { font-size: 9px; padding: 2px 6px; border-radius: 3px; background: var(--accent); color: #fff; font-weight: 700; letter-spacing: .05em; }
+        .ai-text { font-size: 13px; line-height: 1.7; color: var(--text); }
+        .econ-row { display: flex; gap: 12px; flex-wrap: wrap; margin: 12px 0; }
+        .econ-pill { display: flex; flex-direction: column; align-items: center; padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px; min-width: 90px; }
+        .econ-pill .val { font-size: 16px; font-weight: 800; }
+        .econ-pill .lbl { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-top: 2px; }
+
         .loading-overlay { text-align: center; padding: 80px 20px; }
         .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 16px; }
         @keyframes spin { to { transform: rotate(360deg); } }
@@ -188,7 +198,7 @@
     function esc(s) { var d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
     function healthColor(s) { return s >= 80 ? 'var(--green)' : s >= 60 ? 'var(--amber)' : s >= 40 ? 'var(--amber)' : 'var(--red)'; }
 
-    var _ecoData = null, _reconData = null;
+    var _ecoData = null, _reconData = null, _forecast = null;
 
     function switchTab(id) {
         document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.tab === id); });
@@ -218,6 +228,11 @@
             _ecoData = data.analysis || {};
             _reconData = data.reconciliation || {};
             renderAll();
+            // Also load strategic forecast for market context
+            fetch('/api/forecast').then(function(r) { return r.json(); }).then(function(fc) {
+                _forecast = fc;
+                renderOverview(); // Re-render with AI narrative
+            }).catch(function() {});
         });
     }
 
@@ -245,7 +260,28 @@
         var growth = rev.growth || [];
         var lastGrowth = growth.length ? growth[growth.length - 1] : {};
 
-        document.getElementById('pane-overview').innerHTML =
+        // AI narrative from strategic forecast
+        var mc = (_forecast && _forecast.market_context) || {};
+        var econ = mc.danish_economy || {};
+        var aiHTML = '';
+        if (mc.ai_narrative || econ.summary) {
+            var conf = econ.consumer_confidence || -17.3;
+            aiHTML =
+                '<div class="card ai-card" style="margin-bottom:16px;">' +
+                    '<h2><span class="ai-label">AI</span> Economic Context</h2>' +
+                    '<p class="ai-text">' + esc(econ.summary || mc.ai_narrative || '') + '</p>' +
+                    '<div class="econ-row">' +
+                        '<div class="econ-pill"><div class="val" style="color:var(--green);">+' + (econ.gdp_growth || 2.2) + '%</div><div class="lbl">GDP 2026</div></div>' +
+                        '<div class="econ-pill"><div class="val" style="color:' + (conf < -10 ? 'var(--red)' : 'var(--amber)') + ';">' + conf + '</div><div class="lbl">Confidence</div></div>' +
+                        '<div class="econ-pill"><div class="val" style="color:var(--green);">+' + (econ.retail_sales_growth || 4.7) + '%</div><div class="lbl">Retail YoY</div></div>' +
+                        '<div class="econ-pill"><div class="val">' + (econ.inflation || 1.1) + '%</div><div class="lbl">Inflation</div></div>' +
+                        '<div class="econ-pill"><div class="val" style="color:var(--green);">+' + (econ.real_wage_growth || 2.4) + '%</div><div class="lbl">Real Wages</div></div>' +
+                        '<div class="econ-pill"><div class="val">' + (econ.unemployment || 2.9) + '%</div><div class="lbl">Unemployment</div></div>' +
+                    '</div>' +
+                '</div>';
+        }
+
+        document.getElementById('pane-overview').innerHTML = aiHTML +
             (oa.severity === 'critical' ? '<div class="alert-banner critical"><div class="alert-title">' + esc(oa.message) + '</div><div class="alert-detail">Total overdue: ' + fmtK(oa.total_overdue) + ' DKK (' + fmtPct(oa.overdue_pct) + ' of outstanding)</div></div>' : '') +
 
             '<div class="card" style="margin-bottom:16px;"><div class="health-row">' +

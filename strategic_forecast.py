@@ -1,16 +1,17 @@
 """Strategic Forecasting Engine.
 
-Combines WooCommerce inventory data + e-conomic financial data to produce
-actionable forecasts that a business owner can't easily calculate themselves:
+Combines WooCommerce inventory data + e-conomic financial data + external
+market intelligence to produce actionable forecasts:
 
-  1. CASH RUNWAY        — "How many weeks can you operate?"
-  2. INVENTORY ROI      — "Which SKUs earn their shelf space?"
-  3. DEMAND FORECAST    — "What will sell next month/quarter?"
-  4. MARGIN EROSION     — "Where are you losing money without realizing?"
-  5. CUSTOMER LIFECYCLE — "Who's about to churn? Who should you invest in?"
-  6. BUYING SIGNALS     — "What should you buy aggressively vs. let die?"
-  7. RISK ALERTS        — "What could hurt you in the next 90 days?"
-  8. 90-DAY ACTION PLAN — "Exactly what to do, in what order, this week/month/quarter"
+  1. MARKET CONTEXT     — Danish economy, fabric trends, AI narrative
+  2. CASH RUNWAY        — "How many weeks can you operate?"
+  3. INVENTORY ROI      — "Which SKUs earn their shelf space?"
+  4. DEMAND FORECAST    — "What will sell next month/quarter?"
+  5. MARGIN EROSION     — "Where are you losing money without realizing?"
+  6. CUSTOMER LIFECYCLE — "Who's about to churn? Who should you invest in?"
+  7. BUYING SIGNALS     — "What should you buy aggressively vs. let die?"
+  8. RISK ALERTS        — "What could hurt you in the next 90 days?"
+  9. 90-DAY ACTION PLAN — "Exactly what to do, in what order, this week/month/quarter"
 """
 
 import logging
@@ -18,6 +19,98 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
+
+# ======================================================================
+# External Market Intelligence (updated periodically)
+# ======================================================================
+
+# Source: OECD, Nordea, European Commission, Danmarks Statistik, Trading Economics
+DANISH_ECONOMY = {
+    "gdp_growth_2025": 2.9,
+    "gdp_growth_2026": 2.2,
+    "inflation_2025": 1.9,
+    "inflation_2026": 1.1,
+    "core_inflation_2026": 1.7,
+    "real_wage_growth_2026": 2.4,
+    "unemployment_pct": 2.9,
+    "interest_rate_dk": 1.6,
+    "consumer_confidence_index": -17.3,  # Dec 2025 (long-term avg +1.31)
+    "retail_sales_yoy": 4.7,  # Nov 2025
+    "clothing_retail_yoy": 4.4,  # Nov 2025
+    "household_savings_rate": 15.0,
+    "ecommerce_growth_rate": 6.3,
+    "b2b_ecommerce_cagr": 21.2,
+    "tax_cuts_2026": True,
+    "summary": (
+        "Danish GDP grew 2.9% in 2025, moderating to 2.2% in 2026. Consumer "
+        "confidence is negative (-17.3) but improving, while retail sales "
+        "are actually growing +4.7% YoY. Clothing retail up +4.4%. "
+        "Real wages growing +2.4% (3.5% nominal minus 1.1% inflation). "
+        "Tax cuts in 2026 boost disposable income. Record employment at 2.9% "
+        "unemployment. Danish households saving 15% — pent-up spending potential."
+    ),
+    "risk_factors": [
+        "Consumer confidence deeply negative (-17.3) despite strong fundamentals",
+        "Food price inflation (+6.5%) squeezing household budgets",
+        "Temu becoming 3rd largest Danish webshop — aggressive price competition",
+        "Global trade uncertainty and potential tariff impacts",
+    ],
+    "positive_factors": [
+        "Retail sales growing +4.7% despite low confidence (consumers spending anyway)",
+        "Tax cuts effective 2026 lift disposable income",
+        "Record-low unemployment at 2.9%, wages growing +3.5%",
+        "High savings rate (15%) = pent-up demand if confidence returns",
+        "Lowest interest rates since Nov 2022 (1.6%) reduce business costs",
+    ],
+}
+
+# Monthly demand index for Danish fabric retail (100 = average month)
+# Source: seasonal analysis + Nordic market patterns
+NORDIC_DEMAND_INDEX = {
+    1: 120,   # Jan: New Year projects, dark winter = indoor crafting peak
+    2: 125,   # Feb: Valentine's, peak search for quilting/fabric
+    3: 130,   # Mar: National Quilting Month, spring fabric launches
+    4: 110,   # Apr: Easter sewing, spring collections
+    5: 105,   # May: Wedding season, spring apparel
+    6: 80,    # Jun: Summer begins, outdoor focus, demand drops
+    7: 70,    # Jul: Peak summer / vacation trough
+    8: 85,    # Aug: Back-to-school prep begins
+    9: 100,   # Sep: Fall crafting starts, autumn fabrics arrive
+    10: 115,  # Oct: Halloween, fall shop hops, holiday prep begins
+    11: 125,  # Nov: Pre-Christmas peak, Black Friday, gift sewing
+    12: 115,  # Dec: Holiday finishing, drops late month
+}
+
+# Source: Première Vision, Fiberseal, Pantone, AllAboutFabrics, WGSN, Accio
+FABRIC_TRENDS_2026 = {
+    "trending_fabrics": [
+        {"name": "bouclé", "strength": "very_high", "note": "Top trend from 2025 into 2026, expanding to home décor"},
+        {"name": "linen", "strength": "very_high", "note": "No longer seasonal — year-round sustainability darling"},
+        {"name": "organic cotton", "strength": "high", "note": "Top for quilting, apparel, home. Water-washed poplin trending"},
+        {"name": "velvet", "strength": "high", "note": "Deeper colors, matte finishes, improved durability"},
+        {"name": "canvas", "strength": "high", "note": "Moving from utility to fashion — softer, lighter, unexpected colors"},
+        {"name": "jacquard", "strength": "high", "note": "Oversized florals, geometric repeats, metallic threads"},
+        {"name": "textured knits", "strength": "high", "note": "Slub, nubby textures — 'plain jersey won't cut it' in 2026"},
+        {"name": "recycled fabrics", "strength": "rising", "note": "Sustainable fabrics market growing 12% CAGR"},
+        {"name": "hemp", "strength": "rising", "note": "Durable, breathable, sustainable — bags to casual wear"},
+    ],
+    "pantone_2025": {"name": "Mocha Mousse", "hex": "#A47764", "note": "Warm earth tones, chocolate/cocoa hues"},
+    "pantone_2026": {"name": "Cloud Dancer", "hex": "#F0EDE5", "note": "Clean whites, natural tones, quiet luxury"},
+    "trending_themes": [
+        "Sustainability: natural, recycled, organic, bio-based (12% CAGR market growth)",
+        "Texture over print: bouclé, velvet, jacquard — touch is the new luxury",
+        "Bold prints & maximalism: moving away from all-neutral spaces",
+        "DIY & Gen Z sewing: 71% of new sewers learned via YouTube/Instagram",
+        "Anti-fast-fashion: upcycling, thrift, handmade — sewing as mindfulness",
+    ],
+    "color_directions": {
+        "spring_summer": "Cloud Dancer white, warm pastels, sage green, sky blue, ecru",
+        "fall_winter": "Deep jewel tones (emerald, burgundy, sapphire), warm earth tones",
+        "year_round": "Quiet luxury neutrals, terracotta, olive, cream, Mocha Mousse brown",
+    },
+    "sustainable_market_cagr": 12.0,
+    "eu_sewing_machine_cagr": 5.67,
+}
 
 
 class StrategicForecaster:
@@ -38,6 +131,7 @@ class StrategicForecaster:
         """Run all forecasting modules and return combined strategic output."""
         return {
             "generated_at": self._now.isoformat(),
+            "market_context": self._market_context(),
             "cash_runway": self._cash_runway(),
             "inventory_roi": self._inventory_roi_ranking(),
             "demand_forecast": self._demand_forecast(),
@@ -47,6 +141,239 @@ class StrategicForecaster:
             "risk_alerts": self._risk_alerts(),
             "action_plan_90_day": self._build_90_day_plan(),
         }
+
+    # ------------------------------------------------------------------
+    # 0. MARKET CONTEXT — Economy, trends, AI narrative
+    # ------------------------------------------------------------------
+
+    def _market_context(self) -> dict:
+        """Generate market intelligence combining Danish economy + fabric trends
+        + actual business data into a natural language AI narrative."""
+        economy = DANISH_ECONOMY
+        trends = FABRIC_TRENDS_2026
+        demand_idx = NORDIC_DEMAND_INDEX.get(self._month, 100)
+
+        # Trend alignment: check our inventory against trending fabrics
+        alignment = self._trend_alignment()
+
+        # Build AI narrative
+        narrative = self._build_ai_narrative(economy, trends, alignment, demand_idx)
+
+        # Current season
+        season_map = {1: "winter", 2: "winter", 3: "spring", 4: "spring",
+                      5: "spring", 6: "summer", 7: "summer", 8: "summer",
+                      9: "fall", 10: "fall", 11: "fall", 12: "winter"}
+        current_season = season_map.get(self._month, "unknown")
+
+        return {
+            "ai_narrative": narrative,
+            "danish_economy": {
+                "gdp_growth": economy["gdp_growth_2026"],
+                "inflation": economy["inflation_2026"],
+                "consumer_confidence": economy["consumer_confidence_index"],
+                "retail_sales_growth": economy["retail_sales_yoy"],
+                "clothing_retail_growth": economy["clothing_retail_yoy"],
+                "unemployment": economy["unemployment_pct"],
+                "real_wage_growth": economy["real_wage_growth_2026"],
+                "outlook": "cautious_recovery",
+                "summary": economy["summary"],
+                "risk_factors": economy["risk_factors"],
+                "positive_factors": economy["positive_factors"],
+            },
+            "fabric_trends": {
+                "trending_fabrics": trends["trending_fabrics"],
+                "pantone_2026": trends["pantone_2026"],
+                "trending_themes": trends["trending_themes"],
+                "color_direction": trends["color_directions"].get(
+                    "spring_summer" if self._month in (3, 4, 5, 6, 7, 8)
+                    else "fall_winter", trends["color_directions"]["year_round"]
+                ),
+                "sustainable_market_growth": f"{trends['sustainable_market_cagr']}% CAGR",
+            },
+            "demand_index": {
+                "current_month": demand_idx,
+                "current_season": current_season,
+                "interpretation": (
+                    "High demand period" if demand_idx >= 115
+                    else "Above average" if demand_idx >= 105
+                    else "Average" if demand_idx >= 95
+                    else "Below average — reduce orders" if demand_idx >= 80
+                    else "Low season — minimize inventory spend"
+                ),
+                "monthly_indexes": NORDIC_DEMAND_INDEX,
+            },
+            "trend_alignment": alignment,
+        }
+
+    def _trend_alignment(self) -> dict:
+        """Check how well current inventory aligns with 2026 fabric trends."""
+        velocity = self.woo.get("velocity", [])
+        attributes = self.woo.get("attributes", {})
+        fabrics = attributes.get("fabrics", [])
+        colors = attributes.get("colors", [])
+
+        trending_names = {t["name"].lower() for t in FABRIC_TRENDS_2026["trending_fabrics"]}
+
+        # Check fabric inventory against trends
+        aligned = []
+        misaligned = []
+        opportunities = []
+
+        for f in fabrics:
+            fname = f.get("name", "").lower()
+            rev = f.get("total_revenue", 0)
+            count = f.get("product_count", 0)
+
+            # Check if any trending fabric name appears in this fabric name
+            is_trending = any(t in fname for t in trending_names)
+
+            if is_trending and rev > 0:
+                aligned.append({
+                    "fabric": f["name"], "revenue": rev,
+                    "products": count, "status": "aligned",
+                })
+            elif is_trending and rev == 0:
+                misaligned.append({
+                    "fabric": f["name"], "products": count,
+                    "issue": "Trending fabric but no sales — check pricing/visibility",
+                })
+            elif not is_trending and rev == 0 and count >= 2:
+                misaligned.append({
+                    "fabric": f["name"], "products": count,
+                    "issue": "Not trending and no sales — consider clearing",
+                })
+
+        # Check for missing trending fabrics we don't stock
+        stocked_fabric_names = {f.get("name", "").lower() for f in fabrics}
+        for trend in FABRIC_TRENDS_2026["trending_fabrics"]:
+            tname = trend["name"].lower()
+            if not any(tname in sf for sf in stocked_fabric_names):
+                if trend["strength"] in ("very_high", "high"):
+                    opportunities.append({
+                        "fabric": trend["name"],
+                        "strength": trend["strength"],
+                        "note": trend["note"],
+                        "action": f"Consider adding {trend['name']} to your collection",
+                    })
+
+        # Color trend alignment
+        pantone_2026 = FABRIC_TRENDS_2026["pantone_2026"]["name"].lower()
+        color_insights = []
+        white_natural = [c for c in colors if any(
+            w in c.get("name", "").lower()
+            for w in ["white", "hvid", "cream", "ecru", "natural", "natur"]
+        )]
+        if white_natural:
+            rev = sum(c.get("total_revenue", 0) for c in white_natural)
+            color_insights.append(
+                f"Pantone 2026 is Cloud Dancer (white). "
+                f"Your white/natural fabrics generated {rev:,.0f} — "
+                f"{'promote these heavily' if rev > 0 else 'stock and promote these'}"
+            )
+
+        total_fabric_products = sum(f.get("product_count", 0) for f in fabrics)
+        aligned_products = sum(a.get("products", 0) for a in aligned)
+        score = round((aligned_products / total_fabric_products * 100)
+                       if total_fabric_products > 0 else 0)
+
+        return {
+            "score": min(score, 100),
+            "aligned": aligned[:10],
+            "misaligned": misaligned[:10],
+            "opportunities": opportunities[:5],
+            "color_insights": color_insights,
+            "total_products": total_fabric_products,
+            "aligned_count": aligned_products,
+        }
+
+    def _build_ai_narrative(self, economy, trends, alignment, demand_idx):
+        """Generate a natural-language AI analysis paragraph."""
+        woo_summary = self.woo.get("summary", {})
+        eco_summary = self.eco.get("summary", {})
+
+        month_names = {1: "January", 2: "February", 3: "March", 4: "April",
+                       5: "May", 6: "June", 7: "July", 8: "August",
+                       9: "September", 10: "October", 11: "November", 12: "December"}
+        quarter = (self._month - 1) // 3 + 1
+
+        parts = []
+
+        # Market conditions
+        if demand_idx >= 115:
+            parts.append(
+                f"{month_names[self._month]} is a high-demand period for Danish fabric retail "
+                f"(demand index: {demand_idx}/100). Maximize sales and marketing spend now."
+            )
+        elif demand_idx <= 80:
+            parts.append(
+                f"{month_names[self._month]} is a slow period for fabric retail "
+                f"(demand index: {demand_idx}/100). Focus on planning and reducing costs, "
+                f"not on heavy inventory purchases."
+            )
+        else:
+            parts.append(
+                f"{month_names[self._month]} shows average demand for fabric retail "
+                f"(index: {demand_idx}/100)."
+            )
+
+        # Economic context
+        conf = economy["consumer_confidence_index"]
+        retail = economy["retail_sales_yoy"]
+        parts.append(
+            f"The Danish economy is in cautious recovery: consumer confidence "
+            f"is negative ({conf}) but retail sales are growing +{retail}%. "
+            f"Danes are spending despite low confidence — a bullish signal for Q{quarter}."
+        )
+
+        # Dead stock context
+        dead_ratio = woo_summary.get("dead_stock_ratio", 0)
+        dead_cap = woo_summary.get("dead_stock_capital", 0)
+        if dead_ratio > 0.25:
+            parts.append(
+                f"CRITICAL: {dead_ratio:.0%} of your inventory value ({dead_cap:,.0f} DKK) "
+                f"is dead stock. In a market where fabric trends are shifting toward "
+                f"texture and sustainability, holding stale inventory is costly. "
+                f"Every month of delay loses ~3% of that capital."
+            )
+        elif dead_ratio > 0.15:
+            parts.append(
+                f"Your dead stock ratio ({dead_ratio:.0%}) needs attention. "
+                f"Fabric trends are moving fast — clear underperformers to free capital "
+                f"for trending fabrics like bouclé and linen."
+            )
+
+        # Trend alignment
+        score = alignment.get("score", 0)
+        opps = alignment.get("opportunities", [])
+        if score >= 60:
+            parts.append(
+                f"Your inventory aligns well with 2026 trends (score: {score}/100). "
+                f"Focus on promoting your trending stock more aggressively."
+            )
+        elif score >= 30:
+            parts.append(
+                f"Your inventory has moderate alignment with 2026 trends ({score}/100). "
+                + (f"Consider adding {', '.join(o['fabric'] for o in opps[:2])} to strengthen your position."
+                   if opps else "Review your assortment against market trends.")
+            )
+        else:
+            parts.append(
+                f"Low trend alignment ({score}/100) — your inventory may miss "
+                f"the 2026 shift toward textured, sustainable fabrics. "
+                + (f"Key gaps: {', '.join(o['fabric'] for o in opps[:3])}."
+                   if opps else "Review trending fabrics and adjust purchasing.")
+            )
+
+        # Revenue context
+        monthly_rev = eco_summary.get("avg_monthly_revenue", 0)
+        if monthly_rev:
+            parts.append(
+                f"At your current revenue rate ({monthly_rev:,.0f}/month), "
+                f"the upcoming tax cuts and +2.4% real wage growth in Denmark "
+                f"should support gradual demand improvement through 2026."
+            )
+
+        return " ".join(parts)
 
     # ------------------------------------------------------------------
     # 1. CASH RUNWAY — How many weeks can you operate?
@@ -306,15 +633,25 @@ class StrategicForecaster:
         pattern_forecast = self._forecast_attributes(attributes.get("patterns", []))
         fabric_forecast = self._forecast_attributes(attributes.get("fabrics", []))
 
-        # Next month's expected total
+        # Next month's expected total with Nordic demand index adjustment
         next_month = ((self._month - 1 + 1) % 12) + 1
         next_factor = seasonal_factors.get(next_month, 1.0)
         current_weekly = sum(v["rev_per_week"] for v in velocity if v["rev_per_week"] > 0)
         next_month_total = current_weekly * 4.33 * next_factor
 
+        # Apply economic confidence adjustment
+        # Retail is growing +4.7% despite negative confidence — slight positive
+        econ_modifier = 1.0 + (DANISH_ECONOMY.get("retail_sales_yoy", 0) / 100 * 0.3)
+        next_month_total *= econ_modifier
+
+        # Nordic demand index for this month
+        demand_idx = NORDIC_DEMAND_INDEX.get(next_month, 100)
+
         return {
             "next_month_projected_revenue": round(next_month_total, 0),
             "seasonal_factor": round(next_factor, 2),
+            "economic_modifier": round(econ_modifier, 3),
+            "demand_index": demand_idx,
             "category_forecasts": cat_forecasts,
             "trending_up": {
                 "colors": [c for c in color_forecast if c["signal"] == "BUY MORE"],
@@ -743,7 +1080,53 @@ class StrategicForecaster:
                 "action": "Launch 'warehouse sale' this week. Target 50% recovery on dead stock.",
             })
 
-        alerts.sort(key=lambda a: {"critical": 0, "warning": 1, "info": 2}[a["severity"]])
+        # Risk: economic headwinds
+        conf = DANISH_ECONOMY.get("consumer_confidence_index", 0)
+        if conf < -15:
+            alerts.append({
+                "risk": "LOW CONSUMER CONFIDENCE",
+                "severity": "info",
+                "timeframe": "ongoing",
+                "impact": f"Danish consumer confidence at {conf} (long-term avg: +1.3)",
+                "detail": (
+                    "Consumer confidence is deeply negative, though retail sales "
+                    "are still growing +4.7%. Danes are spending but cautious. "
+                    "Focus on value propositions and avoid aggressive price increases."
+                ),
+                "action": (
+                    "Emphasize quality and sustainability in marketing. "
+                    "Consider bundle deals to increase perceived value."
+                ),
+            })
+
+        # Risk: trend misalignment
+        velocity = self.woo.get("velocity", [])
+        fabrics = self.woo.get("attributes", {}).get("fabrics", [])
+        if fabrics:
+            trending_names = {t["name"].lower() for t in FABRIC_TRENDS_2026["trending_fabrics"]}
+            total_rev = sum(f.get("total_revenue", 0) for f in fabrics)
+            trending_rev = sum(
+                f.get("total_revenue", 0) for f in fabrics
+                if any(t in f.get("name", "").lower() for t in trending_names)
+            )
+            if total_rev > 0 and trending_rev / total_rev < 0.3:
+                alerts.append({
+                    "risk": "TREND MISALIGNMENT",
+                    "severity": "warning",
+                    "timeframe": "next 3-6 months",
+                    "impact": f"Only {trending_rev/total_rev:.0%} of revenue from trending fabrics",
+                    "detail": (
+                        "2026 fabric trends emphasize texture (bouclé, velvet, jacquard), "
+                        "sustainability (linen, organic cotton, hemp), and bold prints. "
+                        "Your inventory may be falling behind market direction."
+                    ),
+                    "action": (
+                        "Shift purchasing toward trending fabrics. "
+                        "Consider adding bouclé and textured knits to your collection."
+                    ),
+                })
+
+        alerts.sort(key=lambda a: {"critical": 0, "warning": 1, "info": 2}.get(a.get("severity"), 2))
         return alerts
 
     # ------------------------------------------------------------------

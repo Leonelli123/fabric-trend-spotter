@@ -193,6 +193,27 @@
         .plan-item:last-child { border-bottom: none; }
         .plan-item strong { display: block; font-size: 13px; margin-bottom: 2px; color: var(--text); }
 
+        /* ── AI narrative ── */
+        .ai-card { border-left: 3px solid var(--accent); background: linear-gradient(135deg, var(--bg-card), rgba(108,99,255,.05)); }
+        .ai-card h2 { display: flex; align-items: center; gap: 8px; }
+        .ai-label { font-size: 9px; padding: 2px 6px; border-radius: 3px; background: var(--accent); color: #fff; font-weight: 700; letter-spacing: .05em; }
+        .ai-text { font-size: 13px; line-height: 1.7; color: var(--text); }
+
+        /* ── Market context ── */
+        .econ-row { display: flex; gap: 12px; flex-wrap: wrap; margin: 12px 0; }
+        .econ-pill { display: flex; flex-direction: column; align-items: center; padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px; min-width: 90px; }
+        .econ-pill .val { font-size: 16px; font-weight: 800; }
+        .econ-pill .lbl { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-top: 2px; }
+        .trend-chip { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; margin: 3px 2px; }
+        .trend-chip.hot { background: rgba(239,68,68,.12); color: var(--red); }
+        .trend-chip.strong { background: rgba(34,197,94,.12); color: var(--green); }
+        .trend-chip.rising { background: rgba(20,184,166,.12); color: var(--teal); }
+        .trend-chip.stable { background: rgba(59,130,246,.12); color: var(--blue); }
+        .demand-gauge { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+        .demand-track { flex: 1; max-width: 200px; height: 8px; background: rgba(255,255,255,.06); border-radius: 4px; overflow: hidden; }
+        .demand-fill { height: 100%; border-radius: 4px; transition: width .5s ease; }
+        .pantone-swatch { display: inline-block; width: 16px; height: 16px; border-radius: 3px; vertical-align: middle; margin-right: 6px; border: 1px solid rgba(255,255,255,.15); }
+
         /* ── Loading ── */
         .loading-overlay { text-align: center; padding: 80px 20px; }
         .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 16px; }
@@ -312,6 +333,9 @@
             renderAll(data);
             fetch('/api/forecast').then(function(r) { return r.json(); }).then(function(fc) {
                 _forecast = fc;
+                // Re-render overview with market context from forecast
+                var a = data.analysis || {}, r = data.recommendations || {}, p = data.projections || {};
+                renderOverview(a, r, p, fc);
                 renderForecastPane(data, fc);
             }).catch(function() {});
         });
@@ -319,7 +343,7 @@
 
     function renderAll(data) {
         var a = data.analysis || {}, r = data.recommendations || {}, p = data.projections || {};
-        renderOverview(a, r, p);
+        renderOverview(a, r, p, _forecast);
         renderProducts(r);
         renderPerformance(a);
         renderBuying(a, r);
@@ -329,7 +353,7 @@
     /* ══════════════════════════════════════════════════════
        OVERVIEW TAB
        ══════════════════════════════════════════════════════ */
-    function renderOverview(a, r, p) {
+    function renderOverview(a, r, p, fc) {
         var s = a.summary || {};
         var cf = p.cash_flow || {};
         var score = cf.health_score || 0;
@@ -340,7 +364,47 @@
         var priorities = (r.priorities || []).slice(0, 6);
         var recs = (cf.recommendations || []).slice(0, 3);
 
-        document.getElementById('pane-overview').innerHTML =
+        // AI narrative from strategic forecast
+        var mc = (fc && fc.market_context) || {};
+        var narrative = mc.ai_narrative || '';
+        var econ = mc.danish_economy || {};
+        var ft = mc.fabric_trends || {};
+        var di = mc.demand_index || {};
+        var ta = mc.trend_alignment || {};
+
+        // Build AI + market context section
+        var aiHTML = '';
+        if (narrative) {
+            var demandIdx = di.current_month || 100;
+            var demandClr = demandIdx >= 115 ? 'var(--green)' : demandIdx >= 95 ? 'var(--blue)' : demandIdx >= 80 ? 'var(--amber)' : 'var(--red)';
+            var taScore = ta.score || 0;
+            var taClr = taScore >= 60 ? 'var(--green)' : taScore >= 30 ? 'var(--amber)' : 'var(--red)';
+            var trendFabrics = (ft.trending_fabrics || []);
+
+            aiHTML =
+                '<div class="card ai-card" style="margin-bottom:16px;">' +
+                    '<h2><span class="ai-label">AI</span> Market Intelligence</h2>' +
+                    '<p class="ai-text">' + esc(narrative) + '</p>' +
+                    '<div class="econ-row">' +
+                        '<div class="econ-pill"><div class="val" style="color:var(--green);">+' + (econ.gdp_growth || 2.2) + '%</div><div class="lbl">DK GDP 2026</div></div>' +
+                        '<div class="econ-pill"><div class="val" style="color:' + (econ.consumer_confidence < -10 ? 'var(--red)' : 'var(--amber)') + ';">' + (econ.consumer_confidence || '\u2014') + '</div><div class="lbl">Confidence</div></div>' +
+                        '<div class="econ-pill"><div class="val" style="color:var(--green);">+' + (econ.retail_sales_growth || 4.7) + '%</div><div class="lbl">Retail Sales</div></div>' +
+                        '<div class="econ-pill"><div class="val">' + (econ.inflation || 1.1) + '%</div><div class="lbl">Inflation</div></div>' +
+                        '<div class="econ-pill"><div class="val" style="color:' + demandClr + ';">' + demandIdx + '</div><div class="lbl">Demand Index</div></div>' +
+                        '<div class="econ-pill"><div class="val" style="color:' + taClr + ';">' + taScore + '%</div><div class="lbl">Trend Align</div></div>' +
+                    '</div>' +
+                    '<div style="margin-top:8px;">' +
+                        '<span style="font-size:11px;color:var(--muted);margin-right:8px;">2026 Trending:</span>' +
+                        trendFabrics.slice(0, 6).map(function(t) {
+                            var cls = t.strength === 'very_high' ? 'hot' : t.strength === 'high' ? 'strong' : t.strength === 'rising' ? 'rising' : 'stable';
+                            return '<span class="trend-chip ' + cls + '" title="' + esc(t.note) + '">' + esc(t.name) + '</span>';
+                        }).join('') +
+                    '</div>' +
+                    (ft.pantone_2026 ? '<p style="font-size:11px;color:var(--muted);margin-top:6px;"><span class="pantone-swatch" style="background:' + (ft.pantone_2026.hex || '#F0EDE5') + ';"></span>Pantone 2026: <strong>' + esc(ft.pantone_2026.name) + '</strong> \u2014 ' + esc(ft.pantone_2026.note || '') + '</p>' : '') +
+                '</div>';
+        }
+
+        document.getElementById('pane-overview').innerHTML = aiHTML +
             '<div class="card" style="margin-bottom:16px;">' +
                 '<div class="health-row">' +
                     '<div class="health-ring" style="background:conic-gradient(' + clr + ' ' + pct + 'deg, rgba(255,255,255,.06) 0);">' +
