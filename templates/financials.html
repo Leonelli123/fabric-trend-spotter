@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial Intelligence — Fabric Trend Spotter</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        :root {
+            --bg: #0f1117; --bg-card: #1a1d27; --bg-hover: #22263a;
+            --border: #2a2e3f; --text: #e4e6f0; --muted: #8b8fa3;
+            --green: #22c55e; --red: #ef4444; --amber: #f59e0b;
+            --blue: #3b82f6; --purple: #a855f7; --teal: #14b8a6;
+            --accent: #6c63ff;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+
+        .page-header { padding: 20px 24px 0; max-width: 1400px; margin: 0 auto; }
+        .header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+        .header-row h1 { font-size: 22px; font-weight: 700; }
+        .back { color: var(--muted); text-decoration: none; font-size: 13px; }
+        .back:hover { color: var(--text); }
+        .meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
+        .btn { padding: 8px 18px; border-radius: 8px; border: none; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .2s; }
+        .btn-primary { background: var(--accent); color: #fff; }
+        .btn-primary:hover { filter: brightness(1.15); }
+        .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+        .btn-outline { background: var(--bg-card); color: var(--text); border: 1px solid var(--border); }
+        .btn-outline:hover { border-color: var(--accent); }
+
+        .tab-bar { display: flex; gap: 2px; max-width: 1400px; margin: 16px auto 0; padding: 0 24px; border-bottom: 1px solid var(--border); overflow-x: auto; }
+        .tab-btn { padding: 10px 20px; font-size: 13px; font-weight: 600; color: var(--muted); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; transition: all .2s; }
+        .tab-btn:hover { color: var(--text); }
+        .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+        .content { max-width: 1400px; margin: 0 auto; padding: 24px; }
+        .pane { display: none; }
+        .pane.active { display: block; }
+
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+        .card-grid { display: grid; gap: 16px; }
+        .card-grid-2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+        .card-grid-3 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+        .card-grid-4 { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+        .card h2 { font-size: 16px; font-weight: 700; margin-bottom: 12px; }
+        .card h3 { font-size: 14px; font-weight: 600; margin: 16px 0 8px; }
+
+        /* Health ring */
+        .health-row { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
+        .health-ring { width: 130px; height: 130px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .health-inner { width: 100px; height: 100px; border-radius: 50%; background: var(--bg-card); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .health-inner .score { font-size: 36px; font-weight: 800; }
+        .health-inner .label { font-size: 11px; color: var(--muted); text-transform: uppercase; }
+        .health-text h2 { font-size: 18px; margin-bottom: 4px; }
+        .health-text p { color: var(--muted); font-size: 13px; max-width: 500px; }
+        .health-factors { margin-top: 10px; list-style: none; }
+        .health-factors li { font-size: 12px; color: var(--muted); padding: 2px 0; }
+        .health-factors li::before { content: "\2192  "; color: var(--accent); }
+
+        .kpi { text-align: center; padding: 16px; }
+        .kpi-val { font-size: 26px; font-weight: 800; }
+        .kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-top: 2px; }
+        .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+        .kpi-val.green { color: var(--green); }
+        .kpi-val.red { color: var(--red); }
+        .kpi-val.amber { color: var(--amber); }
+        .kpi-val.blue { color: var(--blue); }
+
+        /* Revenue chart */
+        .rev-chart { display: flex; align-items: flex-end; gap: 4px; height: 180px; padding: 0 2px; }
+        .rev-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
+        .rev-bar { width: 100%; border-radius: 4px 4px 0 0; min-height: 3px; transition: height .6s ease; }
+        .rev-bar.positive { background: linear-gradient(180deg, var(--green), rgba(34,197,94,.3)); }
+        .rev-bar.negative { background: linear-gradient(180deg, var(--red), rgba(239,68,68,.3)); }
+        .rev-bar.neutral { background: linear-gradient(180deg, var(--accent), rgba(108,99,255,.3)); }
+        .rev-bar-label { font-size: 8px; color: var(--muted); margin-top: 4px; text-align: center; white-space: nowrap; }
+        .rev-bar-val { font-size: 9px; color: var(--text); margin-bottom: 3px; font-weight: 600; }
+
+        /* Aging chart */
+        .aging-row { display: flex; gap: 8px; align-items: flex-end; height: 120px; margin: 16px 0; }
+        .aging-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+        .aging-bar { width: 80%; border-radius: 4px 4px 0 0; min-height: 3px; transition: height .5s ease; }
+        .aging-val { font-size: 11px; font-weight: 700; margin-bottom: 4px; }
+        .aging-label { font-size: 10px; color: var(--muted); margin-top: 6px; text-align: center; }
+
+        /* Cash flow chart */
+        .cf-chart { display: flex; align-items: flex-end; gap: 4px; height: 140px; }
+        .cf-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
+        .cf-bar { width: 100%; border-radius: 4px 4px 0 0; background: linear-gradient(180deg, var(--teal), rgba(20,184,166,.3)); min-height: 3px; transition: height .5s ease; }
+        .cf-bar-val { font-size: 9px; color: var(--text); margin-bottom: 3px; font-weight: 600; }
+        .cf-bar-label { font-size: 8px; color: var(--muted); margin-top: 4px; }
+
+        /* Customer table */
+        .ctable { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .ctable th { text-align: left; padding: 8px; font-size: 10px; text-transform: uppercase; color: var(--muted); letter-spacing: .05em; border-bottom: 1px solid var(--border); }
+        .ctable td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,.03); }
+        .ctable tr:hover td { background: var(--bg-hover); }
+        .reliability-bar { width: 50px; height: 6px; background: rgba(255,255,255,.06); border-radius: 3px; display: inline-block; overflow: hidden; vertical-align: middle; margin-right: 6px; }
+        .reliability-fill { height: 100%; border-radius: 3px; }
+
+        /* Reconciliation */
+        .recon-row { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+        .recon-row:last-child { border-bottom: none; }
+        .recon-label { width: 160px; font-size: 13px; color: var(--muted); flex-shrink: 0; }
+        .recon-val { font-size: 16px; font-weight: 700; }
+        .match-badge { padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; }
+        .match-badge.good { background: rgba(34,197,94,.15); color: var(--green); }
+        .match-badge.warning { background: rgba(245,158,11,.15); color: var(--amber); }
+        .match-badge.bad { background: rgba(239,68,68,.15); color: var(--red); }
+
+        /* Overdue alert */
+        .alert-banner { padding: 16px; border-radius: 10px; border-left: 4px solid; margin-bottom: 16px; }
+        .alert-banner.critical { border-color: var(--red); background: rgba(239,68,68,.06); }
+        .alert-banner.warning { border-color: var(--amber); background: rgba(245,158,11,.06); }
+        .alert-banner.info { border-color: var(--blue); background: rgba(59,130,246,.06); }
+        .alert-title { font-weight: 700; font-size: 14px; }
+        .alert-detail { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+        .loading-overlay { text-align: center; padding: 80px 20px; }
+        .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 16px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+        .empty-state h2 { color: var(--text); margin-bottom: 8px; }
+
+        @media (max-width: 768px) {
+            .health-row { flex-direction: column; }
+            .card-grid-4 { grid-template-columns: 1fr 1fr; }
+            .card-grid-3 { grid-template-columns: 1fr; }
+            .tab-btn { padding: 8px 14px; font-size: 12px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="page-header">
+        <div class="header-row">
+            <div>
+                <a href="/" class="back">&larr; Back to Dashboard</a>
+                <h1>Financial Intelligence</h1>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;">
+                <a href="/inventory" class="btn btn-outline">&larr; Inventory Intel</a>
+                <button id="refreshBtn" class="btn btn-primary" onclick="refreshData()">Refresh Data</button>
+            </div>
+        </div>
+        <p class="meta" id="lastRefresh">
+            {% if eco_cache.last_refresh %}Last updated: {{ eco_cache.last_refresh[:16] }}{% else %}No data yet &mdash; click Refresh{% endif %}
+        </p>
+    </div>
+
+    {% if not eco_configured %}
+    <div class="content">
+        <div class="card empty-state">
+            <h2>e-conomic Not Configured</h2>
+            <p>Set <code>ECONOMIC_APP_SECRET</code> and <code>ECONOMIC_GRANT_TOKEN</code> in your environment variables.</p>
+            <p style="margin-top:12px;font-size:13px;">In e-conomic: Settings &rarr; Extensions &rarr; Apps &rarr; New App (Read-only). Copy the App Secret and Grant Token.</p>
+        </div>
+    </div>
+    {% else %}
+
+    <div class="tab-bar">
+        <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">Overview</button>
+        <button class="tab-btn" data-tab="revenue" onclick="switchTab('revenue')">Revenue</button>
+        <button class="tab-btn" data-tab="cashflow" onclick="switchTab('cashflow')">Cash Flow</button>
+        <button class="tab-btn" data-tab="customers" onclick="switchTab('customers')">Customers</button>
+        <button class="tab-btn" data-tab="receivables" onclick="switchTab('receivables')">Receivables</button>
+        <button class="tab-btn" data-tab="reconciliation" onclick="switchTab('reconciliation')">Reconciliation</button>
+    </div>
+
+    <div class="content">
+        <div id="pane-overview" class="pane active"></div>
+        <div id="pane-revenue" class="pane"></div>
+        <div id="pane-cashflow" class="pane"></div>
+        <div id="pane-customers" class="pane"></div>
+        <div id="pane-receivables" class="pane"></div>
+        <div id="pane-reconciliation" class="pane"></div>
+
+        <div id="loadingState" class="loading-overlay" style="display:none;">
+            <div class="spinner"></div>
+            <p>Connecting to e-conomic...</p>
+        </div>
+    </div>
+
+    <script>
+    function fmt(n) { return (n == null || isNaN(n)) ? '\u2014' : Math.round(n).toLocaleString('da-DK'); }
+    function fmtK(n) { if (n == null || isNaN(n)) return '\u2014'; return n >= 1000000 ? (n/1000000).toFixed(1).replace('.', ',') + 'M' : n >= 1000 ? (n/1000).toFixed(1).replace('.', ',') + 'k' : Math.round(n).toString(); }
+    function fmtPct(n) { return (n == null || isNaN(n)) ? '\u2014' : n.toFixed(1) + '%'; }
+    function esc(s) { var d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+    function healthColor(s) { return s >= 80 ? 'var(--green)' : s >= 60 ? 'var(--amber)' : s >= 40 ? 'var(--amber)' : 'var(--red)'; }
+
+    var _ecoData = null, _reconData = null;
+
+    function switchTab(id) {
+        document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.tab === id); });
+        document.querySelectorAll('.pane').forEach(function(p) { p.classList.toggle('active', p.id === 'pane-' + id); });
+    }
+
+    function refreshData() {
+        var btn = document.getElementById('refreshBtn');
+        btn.disabled = true; btn.textContent = 'Refreshing...';
+        document.getElementById('loadingState').style.display = 'block';
+        fetch('/api/economic/refresh', {method: 'POST'}).then(function(r) { return r.json(); }).then(function() { pollStatus(); }).catch(function() { btn.disabled = false; btn.textContent = 'Refresh Data'; });
+    }
+
+    function pollStatus() {
+        fetch('/api/economic/status').then(function(r) { return r.json(); }).then(function(s) {
+            if (s.refreshing) { setTimeout(pollStatus, 2000); return; }
+            if (s.error) alert('Error: ' + s.error);
+            document.getElementById('refreshBtn').disabled = false;
+            document.getElementById('refreshBtn').textContent = 'Refresh Data';
+            document.getElementById('loadingState').style.display = 'none';
+            if (s.has_data) loadData();
+        });
+    }
+
+    function loadData() {
+        fetch('/api/economic/data').then(function(r) { return r.json(); }).then(function(data) {
+            _ecoData = data.analysis || {};
+            _reconData = data.reconciliation || {};
+            renderAll();
+        });
+    }
+
+    function renderAll() {
+        renderOverview();
+        renderRevenue();
+        renderCashFlow();
+        renderCustomers();
+        renderReceivables();
+        renderReconciliation();
+    }
+
+    /* ══════════════════════════════════════════════════════
+       OVERVIEW
+       ══════════════════════════════════════════════════════ */
+    function renderOverview() {
+        var s = _ecoData.summary || {};
+        var ch = (_reconData && _reconData.combined_health) || {};
+        var score = ch.score || 0;
+        var clr = healthColor(score);
+        var pct = Math.min(score, 100) * 3.6;
+        var factors = ch.factors || [];
+        var oa = (_reconData && _reconData.overdue_alert) || {};
+        var rev = _ecoData.revenue || {};
+        var growth = rev.growth || [];
+        var lastGrowth = growth.length ? growth[growth.length - 1] : {};
+
+        document.getElementById('pane-overview').innerHTML =
+            (oa.severity === 'critical' ? '<div class="alert-banner critical"><div class="alert-title">' + esc(oa.message) + '</div><div class="alert-detail">Total overdue: ' + fmtK(oa.total_overdue) + ' DKK (' + fmtPct(oa.overdue_pct) + ' of outstanding)</div></div>' : '') +
+
+            '<div class="card" style="margin-bottom:16px;"><div class="health-row">' +
+                '<div class="health-ring" style="background:conic-gradient(' + clr + ' ' + pct + 'deg, rgba(255,255,255,.06) 0);"><div class="health-inner"><div class="score" style="color:' + clr + '">' + score + '</div><div class="label">/ 100</div></div></div>' +
+                '<div class="health-text"><h2>Financial Health: ' + esc(ch.rating || 'Unknown') + '</h2><p>Based on revenue trends, receivables, payment reliability, and WooCommerce reconciliation.</p>' +
+                    '<ul class="health-factors">' + factors.map(function(f) { return '<li>' + esc(f) + '</li>'; }).join('') + '</ul>' +
+                '</div>' +
+            '</div></div>' +
+
+            '<div class="card-grid card-grid-4" style="margin-bottom:16px;">' +
+                '<div class="card kpi"><div class="kpi-val green">' + fmtK(s.total_net_revenue) + '</div><div class="kpi-label">Net Revenue (12mo)</div><div class="kpi-sub">' + fmt(s.total_invoices) + ' invoices</div></div>' +
+                '<div class="card kpi"><div class="kpi-val">' + fmtK(s.avg_monthly_revenue) + '</div><div class="kpi-label">Avg Monthly Revenue</div><div class="kpi-sub">' + fmtK(rev.avg_invoice_value) + ' avg invoice</div></div>' +
+                '<div class="card kpi"><div class="kpi-val ' + (s.total_overdue > s.total_outstanding * .3 ? 'red' : 'amber') + '">' + fmtK(s.total_outstanding) + '</div><div class="kpi-label">Outstanding</div><div class="kpi-sub">' + fmtK(s.total_overdue) + ' overdue</div></div>' +
+                '<div class="card kpi"><div class="kpi-val ' + (lastGrowth.growth_pct > 0 ? 'green' : lastGrowth.growth_pct < 0 ? 'red' : 'blue') + '">' + fmtPct(lastGrowth.growth_pct) + '</div><div class="kpi-label">Latest Growth</div><div class="kpi-sub">' + esc(lastGrowth.month || '') + '</div></div>' +
+            '</div>' +
+
+            '<div class="card-grid card-grid-2">' +
+                '<div class="card"><h2>Customer Overview</h2>' +
+                    '<div style="display:flex;gap:24px;flex-wrap:wrap;">' +
+                        '<div><div style="font-size:28px;font-weight:800;">' + fmt(s.total_customers) + '</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Total Customers</div></div>' +
+                        '<div><div style="font-size:28px;font-weight:800;color:var(--green);">' + fmt(s.active_customers) + '</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Active (12mo)</div></div>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="card"><h2>Collection Health</h2>' +
+                    (function() {
+                        var cc = (_reconData && _reconData.cash_collection) || {};
+                        return '<div style="display:flex;gap:24px;flex-wrap:wrap;">' +
+                            '<div><div style="font-size:28px;font-weight:800;color:' + (cc.collection_rate_pct > 90 ? 'var(--green)' : cc.collection_rate_pct > 75 ? 'var(--amber)' : 'var(--red)') + ';">' + fmtPct(cc.collection_rate_pct) + '</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Collection Rate</div></div>' +
+                            '<div><div style="font-size:28px;font-weight:800;color:var(--blue);">' + fmtK(cc.expected_next_12_weeks) + '</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Expected 12-wk</div></div>' +
+                        '</div>';
+                    })() +
+                '</div>' +
+            '</div>';
+    }
+
+    /* ══════════════════════════════════════════════════════
+       REVENUE
+       ══════════════════════════════════════════════════════ */
+    function renderRevenue() {
+        var rev = _ecoData.revenue || {};
+        var monthly = rev.monthly || [];
+        var growth = rev.growth || [];
+        var maxRev = Math.max.apply(null, monthly.map(function(m) { return m.net_amount || 0; }).concat([1]));
+
+        document.getElementById('pane-revenue').innerHTML =
+            '<div class="card" style="margin-bottom:16px;"><h2>Monthly Revenue</h2>' +
+                '<div class="rev-chart">' +
+                    monthly.map(function(m) {
+                        var g = growth.find(function(g) { return g.month === m.month; });
+                        var gPct = g ? g.growth_pct : 0;
+                        var barClass = gPct > 0 ? 'positive' : gPct < 0 ? 'negative' : 'neutral';
+                        return '<div class="rev-bar-wrap"><div class="rev-bar-val">' + fmtK(m.net_amount) + '</div><div class="rev-bar ' + barClass + '" style="height:' + Math.max((m.net_amount/maxRev)*100, 3) + '%;"></div><div class="rev-bar-label">' + esc(m.month).slice(5) + '</div></div>';
+                    }).join('') +
+                '</div>' +
+                '<p style="font-size:11px;color:var(--muted);margin-top:8px;">Bar color: <span style="color:var(--green);">green</span> = growth, <span style="color:var(--red);">red</span> = decline</p>' +
+            '</div>' +
+
+            '<div class="card-grid card-grid-3">' +
+                '<div class="card kpi"><div class="kpi-val green">' + fmtK(rev.total_net_revenue) + '</div><div class="kpi-label">Total Net Revenue</div></div>' +
+                '<div class="card kpi"><div class="kpi-val">' + fmtK(rev.total_gross_revenue) + '</div><div class="kpi-label">Total Gross</div></div>' +
+                '<div class="card kpi"><div class="kpi-val blue">' + fmtK(rev.avg_invoice_value) + '</div><div class="kpi-label">Avg Invoice Value</div></div>' +
+            '</div>' +
+
+            (growth.length ? '<div class="card" style="margin-top:16px;"><h2>Month-over-Month Growth</h2>' +
+                '<table class="ctable"><thead><tr><th>Month</th><th style="text-align:right">Growth</th><th style="text-align:right">Change</th></tr></thead><tbody>' +
+                growth.slice(-12).map(function(g) {
+                    return '<tr><td>' + esc(g.month) + '</td><td style="text-align:right;font-weight:700;color:' + (g.growth_pct > 0 ? 'var(--green)' : g.growth_pct < 0 ? 'var(--red)' : 'var(--muted)') + ';">' + (g.growth_pct > 0 ? '+' : '') + fmtPct(g.growth_pct) + '</td><td style="text-align:right;">' + (g.change > 0 ? '+' : '') + fmtK(g.change) + '</td></tr>';
+                }).join('') +
+                '</tbody></table></div>' : '');
+    }
+
+    /* ══════════════════════════════════════════════════════
+       CASH FLOW
+       ══════════════════════════════════════════════════════ */
+    function renderCashFlow() {
+        var cf = _ecoData.cash_flow || {};
+        var weekly = cf.weekly_inflow_forecast || [];
+        var terms = cf.payment_terms || [];
+        var maxInflow = Math.max.apply(null, weekly.map(function(w) { return w.expected_inflow || 0; }).concat([1]));
+
+        document.getElementById('pane-cashflow').innerHTML =
+            '<div class="card" style="margin-bottom:16px;"><h2>12-Week Cash Inflow Forecast</h2>' +
+                '<div class="kpi" style="text-align:left;padding:0 0 16px;"><div class="kpi-val green" style="font-size:22px;">' + fmtK(cf.total_expected_12_weeks) + '</div><div class="kpi-label">Total Expected Inflow</div></div>' +
+                '<div class="cf-chart">' +
+                    weekly.map(function(w) {
+                        return '<div class="cf-bar-wrap"><div class="cf-bar-val">' + fmtK(w.expected_inflow) + '</div><div class="cf-bar" style="height:' + Math.max((w.expected_inflow/maxInflow)*100, 3) + '%;"></div><div class="cf-bar-label">' + esc(w.label) + '</div></div>';
+                    }).join('') +
+                '</div>' +
+            '</div>' +
+
+            (terms.length ? '<div class="card"><h2>Payment Terms Breakdown</h2>' +
+                '<table class="ctable"><thead><tr><th>Payment Term</th><th style="text-align:right">Invoices</th><th style="text-align:right">Revenue</th><th style="text-align:right">Outstanding</th></tr></thead><tbody>' +
+                terms.map(function(t) {
+                    return '<tr><td>' + esc(t.payment_term) + '</td><td style="text-align:right">' + t.invoice_count + '</td><td style="text-align:right">' + fmtK(t.total_net_revenue) + '</td><td style="text-align:right;color:' + (t.outstanding > 0 ? 'var(--amber)' : 'var(--muted)') + ';">' + fmtK(t.outstanding) + '</td></tr>';
+                }).join('') +
+                '</tbody></table></div>' : '');
+    }
+
+    /* ══════════════════════════════════════════════════════
+       CUSTOMERS
+       ══════════════════════════════════════════════════════ */
+    function renderCustomers() {
+        var customers = (_ecoData.customer_profitability || []).slice(0, 30);
+
+        document.getElementById('pane-customers').innerHTML =
+            '<div class="card"><h2>Customer Profitability Ranking</h2>' +
+                '<table class="ctable"><thead><tr><th>Customer</th><th style="text-align:right">Revenue</th><th>Reliability</th><th style="text-align:right">Invoices</th><th style="text-align:right">Outstanding</th><th style="text-align:right">Monthly Avg</th></tr></thead><tbody>' +
+                customers.map(function(c) {
+                    var rel = c.payment_reliability || 0;
+                    var relClr = rel >= 80 ? 'var(--green)' : rel >= 60 ? 'var(--amber)' : 'var(--red)';
+                    return '<tr><td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + esc(c.name) + '">' + esc(c.name) + '</td>' +
+                        '<td style="text-align:right;font-weight:600;">' + fmtK(c.net_revenue) + '</td>' +
+                        '<td><div class="reliability-bar"><div class="reliability-fill" style="width:' + rel + '%;background:' + relClr + ';"></div></div><span style="font-size:12px;color:' + relClr + ';">' + rel + '</span></td>' +
+                        '<td style="text-align:right">' + c.invoice_count + '</td>' +
+                        '<td style="text-align:right;color:' + (c.outstanding > 0 ? 'var(--amber)' : 'var(--muted)') + ';">' + fmtK(c.outstanding) + '</td>' +
+                        '<td style="text-align:right">' + fmtK(c.monthly_avg_revenue) + '</td></tr>';
+                }).join('') +
+                '</tbody></table>' +
+            '</div>';
+    }
+
+    /* ══════════════════════════════════════════════════════
+       RECEIVABLES
+       ══════════════════════════════════════════════════════ */
+    function renderReceivables() {
+        var ar = _ecoData.accounts_receivable || {};
+        var aging = ar.aging || {};
+        var buckets = [
+            {key: 'current', label: 'Current', color: 'var(--green)'},
+            {key: '1_30_days', label: '1-30 days', color: 'var(--amber)'},
+            {key: '31_60_days', label: '31-60 days', color: '#f97316'},
+            {key: '61_90_days', label: '61-90 days', color: 'var(--red)'},
+            {key: 'over_90_days', label: '90+ days', color: '#dc2626'}
+        ];
+        var maxBucket = Math.max.apply(null, buckets.map(function(b) { return (aging[b.key] && aging[b.key].total) || 0; }).concat([1]));
+        var debtors = ar.worst_debtors || [];
+
+        document.getElementById('pane-receivables').innerHTML =
+            '<div class="card-grid card-grid-2" style="margin-bottom:16px;">' +
+                '<div class="card"><h2>Accounts Receivable Summary</h2>' +
+                    '<div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:16px;">' +
+                        '<div><div style="font-size:28px;font-weight:800;">' + fmtK(ar.total_outstanding) + '</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Total Outstanding</div></div>' +
+                        '<div><div style="font-size:28px;font-weight:800;color:var(--red);">' + fmtK(ar.total_overdue) + '</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Overdue</div></div>' +
+                        '<div><div style="font-size:28px;font-weight:800;">' + fmt(ar.invoice_count) + '</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Open Invoices</div></div>' +
+                    '</div>' +
+                    '<h3>Aging Chart</h3>' +
+                    '<div class="aging-row">' +
+                        buckets.map(function(b) {
+                            var val = (aging[b.key] && aging[b.key].total) || 0;
+                            var cnt = (aging[b.key] && aging[b.key].count) || 0;
+                            return '<div class="aging-col"><div class="aging-val" style="color:' + b.color + ';">' + fmtK(val) + '</div><div class="aging-bar" style="height:' + Math.max((val/maxBucket)*100, 3) + '%;background:' + b.color + ';"></div><div class="aging-label">' + b.label + '<br>(' + cnt + ')</div></div>';
+                        }).join('') +
+                    '</div>' +
+                '</div>' +
+                '<div class="card"><h2>Worst Debtors</h2>' +
+                    (debtors.length ?
+                        '<table class="ctable"><thead><tr><th>Customer</th><th style="text-align:right">Outstanding</th><th style="text-align:right">Invoices</th></tr></thead><tbody>' +
+                        debtors.slice(0, 10).map(function(d) {
+                            return '<tr><td>' + esc(d.name) + '</td><td style="text-align:right;font-weight:700;color:var(--red);">' + fmtK(d.total_outstanding) + '</td><td style="text-align:right">' + d.outstanding_invoices + '</td></tr>';
+                        }).join('') + '</tbody></table>'
+                    : '<p style="color:var(--muted);">No overdue accounts.</p>') +
+                '</div>' +
+            '</div>';
+    }
+
+    /* ══════════════════════════════════════════════════════
+       RECONCILIATION
+       ══════════════════════════════════════════════════════ */
+    function renderReconciliation() {
+        var rc = _reconData.revenue_comparison || {};
+        var cc = _reconData.cash_collection || {};
+        var oa = _reconData.overdue_alert || {};
+        var matchClass = rc.match_status === 'good_match' ? 'good' : (rc.match_status === 'economic_higher' || rc.match_status === 'woo_higher') ? 'warning' : 'bad';
+
+        document.getElementById('pane-reconciliation').innerHTML =
+            '<div class="card" style="margin-bottom:16px;"><h2>WooCommerce vs e-conomic Revenue</h2>' +
+                '<div class="recon-row"><div class="recon-label">WooCommerce Revenue</div><div class="recon-val">' + fmtK(rc.woo_total_revenue) + '</div></div>' +
+                '<div class="recon-row"><div class="recon-label">e-conomic Net Revenue</div><div class="recon-val">' + fmtK(rc.eco_total_net_revenue) + '</div></div>' +
+                '<div class="recon-row"><div class="recon-label">Difference</div><div class="recon-val" style="color:' + (Math.abs(rc.difference_pct || 0) < 5 ? 'var(--green)' : 'var(--amber)') + ';">' + fmtK(rc.difference) + ' (' + fmtPct(rc.difference_pct) + ')</div></div>' +
+                '<div class="recon-row"><div class="recon-label">Match Status</div><div><span class="match-badge ' + matchClass + '">' + esc((rc.match_status || '').replace(/_/g, ' ')) + '</span></div></div>' +
+                (rc.note ? '<p style="font-size:12px;color:var(--muted);margin-top:12px;">' + esc(rc.note) + '</p>' : '') +
+            '</div>' +
+
+            '<div class="card-grid card-grid-2">' +
+                '<div class="card"><h2>Cash Collection</h2>' +
+                    '<div style="display:flex;gap:24px;flex-wrap:wrap;">' +
+                        '<div><div style="font-size:28px;font-weight:800;">' + fmtK(cc.total_invoiced) + '</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Total Invoiced</div></div>' +
+                        '<div><div style="font-size:28px;font-weight:800;color:var(--green);">' + fmtK(cc.total_collected) + '</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Collected</div></div>' +
+                        '<div><div style="font-size:28px;font-weight:800;color:' + (cc.collection_rate_pct > 90 ? 'var(--green)' : 'var(--amber)') + ';">' + fmtPct(cc.collection_rate_pct) + '</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Collection Rate</div></div>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="card"><h2>Overdue Alert</h2>' +
+                    (oa.severity ?
+                        '<div class="alert-banner ' + oa.severity + '"><div class="alert-title">' + esc(oa.message) + '</div><div class="alert-detail">' + fmtK(oa.total_overdue) + ' overdue (' + fmtPct(oa.overdue_pct) + ')</div></div>' +
+                        (oa.top_debtors && oa.top_debtors.length ?
+                            '<h3>Top Debtors</h3><table class="ctable"><thead><tr><th>Customer</th><th style="text-align:right">Outstanding</th></tr></thead><tbody>' +
+                            oa.top_debtors.slice(0, 5).map(function(d) { return '<tr><td>' + esc(d.name) + '</td><td style="text-align:right;color:var(--red);font-weight:700;">' + fmtK(d.total_outstanding) + '</td></tr>'; }).join('') +
+                            '</tbody></table>' : '')
+                    : '<p style="color:var(--green);font-weight:600;">No overdue alerts. Payments are on track.</p>') +
+                '</div>' +
+            '</div>';
+    }
+
+    /* ── Init ── */
+    {% if eco_cache.analysis %}
+    loadData();
+    {% else %}
+    document.getElementById('pane-overview').innerHTML = '<div class="empty-state"><h2>No Financial Data Yet</h2><p>Click <strong>Refresh Data</strong> to connect to e-conomic and pull financial data.</p></div>';
+    {% endif %}
+    </script>
+    {% endif %}
+</body>
+</html>

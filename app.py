@@ -396,6 +396,16 @@ def inventory_dashboard():
     )
 
 
+@app.route("/financials")
+def financials_dashboard():
+    """e-conomic Financial Intelligence dashboard."""
+    return render_template(
+        "financials.html",
+        eco_cache=eco_cache,
+        eco_configured=bool(config.ECONOMIC_APP_SECRET and config.ECONOMIC_GRANT_TOKEN),
+    )
+
+
 @app.route("/api/inventory/refresh", methods=["POST"])
 def inventory_refresh():
     """Trigger a WooCommerce data refresh."""

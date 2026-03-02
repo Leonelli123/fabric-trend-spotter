@@ -6,731 +6,645 @@
     <title>Inventory Intelligence — Fabric Trend Spotter</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
-        /* Inventory Intelligence specific styles */
-        .inv-container { max-width: 1400px; margin: 0 auto; padding: 20px; }
-        .inv-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-        .inv-header h1 { font-size: 24px; font-weight: 700; color: #1a1a2e; }
-        .inv-header .subtitle { font-size: 14px; color: #666; margin-top: 4px; }
-        .inv-nav { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
-        .inv-nav a {
-            padding: 8px 16px; border-radius: 6px; text-decoration: none;
-            font-size: 13px; font-weight: 500; color: #555; background: #f5f5f5;
-            border: 1px solid #e0e0e0; transition: all 0.2s;
+        /* ── Base ── */
+        :root {
+            --bg: #0f1117; --bg-card: #1a1d27; --bg-hover: #22263a;
+            --border: #2a2e3f; --text: #e4e6f0; --muted: #8b8fa3;
+            --green: #22c55e; --red: #ef4444; --amber: #f59e0b;
+            --blue: #3b82f6; --purple: #a855f7; --teal: #14b8a6;
+            --accent: #6c63ff;
         }
-        .inv-nav a:hover, .inv-nav a.active { background: #1a1a2e; color: white; border-color: #1a1a2e; }
-        .inv-nav a.urgent { background: #fff3f3; color: #d32f2f; border-color: #ffcdd2; }
-        .inv-nav a.urgent:hover { background: #d32f2f; color: white; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
 
-        /* Health Score */
-        .health-card {
-            background: white; border-radius: 12px; padding: 24px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 20px;
-            display: flex; align-items: center; gap: 24px;
-        }
-        .health-score {
-            width: 100px; height: 100px; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 32px; font-weight: 800; color: white; flex-shrink: 0;
-        }
-        .health-score.green { background: linear-gradient(135deg, #43a047, #66bb6a); }
-        .health-score.yellow { background: linear-gradient(135deg, #f9a825, #fbc02d); }
-        .health-score.orange { background: linear-gradient(135deg, #ef6c00, #ff9800); }
-        .health-score.red { background: linear-gradient(135deg, #c62828, #e53935); }
-        .health-meta h2 { margin: 0 0 8px; font-size: 20px; }
-        .health-meta .metrics { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 12px; }
-        .health-meta .metric { text-align: center; }
-        .health-meta .metric-value { font-size: 22px; font-weight: 700; color: #1a1a2e; }
-        .health-meta .metric-label { font-size: 11px; color: #888; text-transform: uppercase; }
+        /* ── Header ── */
+        .page-header { padding: 20px 24px 0; max-width: 1400px; margin: 0 auto; }
+        .header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+        .header-row h1 { font-size: 22px; font-weight: 700; }
+        .header-row .back { color: var(--muted); text-decoration: none; font-size: 13px; }
+        .header-row .back:hover { color: var(--text); }
+        .meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
+        .btn { padding: 8px 18px; border-radius: 8px; border: none; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .2s; }
+        .btn-primary { background: var(--accent); color: #fff; }
+        .btn-primary:hover { filter: brightness(1.15); }
+        .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+        .btn-outline { background: var(--bg-card); color: var(--text); border: 1px solid var(--border); }
+        .btn-outline:hover { border-color: var(--accent); }
 
-        /* KPI Grid */
-        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
-        .kpi-card {
-            background: white; border-radius: 10px; padding: 18px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.06);
-        }
-        .kpi-card .kpi-value { font-size: 28px; font-weight: 800; color: #1a1a2e; }
-        .kpi-card .kpi-label { font-size: 12px; color: #888; text-transform: uppercase; margin-top: 4px; }
-        .kpi-card .kpi-sub { font-size: 12px; color: #666; margin-top: 6px; }
-        .kpi-card.danger .kpi-value { color: #d32f2f; }
-        .kpi-card.success .kpi-value { color: #2e7d32; }
-        .kpi-card.warning .kpi-value { color: #e65100; }
+        /* ── Tabs ── */
+        .tab-bar { display: flex; gap: 2px; max-width: 1400px; margin: 16px auto 0; padding: 0 24px; border-bottom: 1px solid var(--border); overflow-x: auto; }
+        .tab-btn { padding: 10px 20px; font-size: 13px; font-weight: 600; color: var(--muted); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; transition: all .2s; }
+        .tab-btn:hover { color: var(--text); }
+        .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
 
-        /* Section */
-        .inv-section {
-            background: white; border-radius: 12px; padding: 24px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 24px;
-        }
-        .inv-section h2 { font-size: 18px; margin: 0 0 16px; color: #1a1a2e; border-bottom: 2px solid #f0f0f0; padding-bottom: 8px; }
-        .inv-section h3 { font-size: 15px; margin: 16px 0 10px; color: #333; }
+        /* ── Content ── */
+        .content { max-width: 1400px; margin: 0 auto; padding: 24px; }
+        .pane { display: none; }
+        .pane.active { display: block; }
 
-        /* Priority List */
-        .priority-list { list-style: none; padding: 0; }
-        .priority-item {
-            display: flex; align-items: flex-start; gap: 12px;
-            padding: 12px 0; border-bottom: 1px solid #f5f5f5;
-        }
-        .priority-badge {
-            padding: 3px 10px; border-radius: 4px; font-size: 11px;
-            font-weight: 700; text-transform: uppercase; white-space: nowrap;
-        }
-        .priority-badge.today { background: #ffebee; color: #c62828; }
-        .priority-badge.this_week { background: #fff3e0; color: #e65100; }
-        .priority-badge.planning { background: #e3f2fd; color: #1565c0; }
-        .priority-title { font-weight: 600; font-size: 14px; }
-        .priority-action { font-size: 13px; color: #555; margin-top: 4px; }
+        /* ── Cards ── */
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+        .card-grid { display: grid; gap: 16px; }
+        .card-grid-2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+        .card-grid-4 { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+        .card h2 { font-size: 16px; font-weight: 700; margin-bottom: 12px; }
+        .card h3 { font-size: 14px; font-weight: 600; margin: 16px 0 8px; color: var(--text); }
 
-        /* Product Action Table */
-        .product-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        .product-table th {
-            text-align: left; padding: 10px 8px; font-size: 11px;
-            text-transform: uppercase; color: #888; border-bottom: 2px solid #eee;
-        }
-        .product-table td { padding: 10px 8px; border-bottom: 1px solid #f5f5f5; }
-        .product-table tr:hover td { background: #fafafa; }
-        .action-badge {
-            display: inline-block; padding: 3px 8px; border-radius: 4px;
-            font-size: 11px; font-weight: 600; text-transform: uppercase;
-        }
-        .action-badge.reorder_now { background: #e8f5e9; color: #2e7d32; }
-        .action-badge.reorder_soon { background: #f1f8e9; color: #558b2f; }
-        .action-badge.discount_now { background: #ffebee; color: #c62828; }
-        .action-badge.discount_light { background: #fff3e0; color: #e65100; }
-        .action-badge.hold { background: #f5f5f5; color: #616161; }
-        .action-badge.watch { background: #e3f2fd; color: #1565c0; }
-        .action-badge.remove { background: #fce4ec; color: #880e4f; }
-        .action-badge.seasonal_hold { background: #f3e5f5; color: #6a1b9a; }
-        .action-badge.promote { background: #e0f7fa; color: #00695c; }
+        /* ── Health Ring ── */
+        .health-row { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
+        .health-ring { width: 130px; height: 130px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .health-inner { width: 100px; height: 100px; border-radius: 50%; background: var(--bg-card); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .health-inner .score { font-size: 36px; font-weight: 800; }
+        .health-inner .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+        .health-text h2 { font-size: 18px; margin-bottom: 4px; }
+        .health-text p { color: var(--muted); font-size: 13px; max-width: 500px; }
+        .health-recs { margin-top: 10px; list-style: none; }
+        .health-recs li { font-size: 12px; color: var(--muted); padding: 2px 0; }
+        .health-recs li::before { content: "\2192  "; color: var(--accent); }
 
-        /* Direction indicators */
-        .dir-up { color: #2e7d32; }
-        .dir-down { color: #c62828; }
-        .dir-flat { color: #888; }
+        /* ── KPI Tiles ── */
+        .kpi { text-align: center; padding: 16px; }
+        .kpi-val { font-size: 26px; font-weight: 800; }
+        .kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-top: 2px; }
+        .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+        .kpi-val.green { color: var(--green); }
+        .kpi-val.red { color: var(--red); }
+        .kpi-val.amber { color: var(--amber); }
+        .kpi-val.blue { color: var(--blue); }
 
-        /* Strategy cards */
-        .strategy-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
-        .strategy-card {
-            background: #fafafa; border-radius: 8px; padding: 16px;
-            border-left: 4px solid #1a1a2e;
-        }
-        .strategy-card.critical { border-left-color: #d32f2f; }
-        .strategy-card.warning { border-left-color: #ff9800; }
-        .strategy-card.insight { border-left-color: #1976d2; }
-        .strategy-card.planning { border-left-color: #7b1fa2; }
-        .strategy-card h4 { margin: 0 0 8px; font-size: 14px; }
-        .strategy-card p { margin: 0 0 8px; font-size: 13px; color: #555; }
-        .strategy-card .action-text { font-size: 13px; color: #1a1a2e; font-weight: 500; }
+        /* ── Priority list ── */
+        .priority-list { list-style: none; }
+        .priority-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+        .priority-item:last-child { border-bottom: none; }
+        .urgency { padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; white-space: nowrap; }
+        .urgency.today { background: rgba(239,68,68,.15); color: var(--red); }
+        .urgency.this_week { background: rgba(245,158,11,.15); color: var(--amber); }
+        .urgency.planning { background: rgba(59,130,246,.15); color: var(--blue); }
+        .priority-text .title { font-weight: 600; font-size: 13px; }
+        .priority-text .action { font-size: 12px; color: var(--muted); }
 
-        /* Attribute bars */
-        .attr-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-        .attr-name { width: 120px; font-size: 13px; font-weight: 500; text-transform: capitalize; }
-        .attr-bar {
-            flex: 1; height: 24px; background: #f0f0f0; border-radius: 4px;
-            overflow: hidden; position: relative;
-        }
-        .attr-bar-fill {
-            height: 100%; border-radius: 4px;
-            background: linear-gradient(90deg, #1a1a2e, #3a3a5e);
-            transition: width 0.5s ease;
-        }
-        .attr-bar-label {
-            position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
-            font-size: 11px; font-weight: 600; color: #555;
-        }
+        /* ── Mini product rows ── */
+        .mini-list { list-style: none; }
+        .mini-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.04); font-size: 13px; }
+        .mini-item:last-child { border-bottom: none; }
+        .mini-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+        .mini-stat { font-weight: 600; font-size: 12px; margin-left: 12px; white-space: nowrap; }
+        .dir-up { color: var(--green); }
+        .dir-down { color: var(--red); }
+        .dir-flat { color: var(--muted); }
 
-        /* Cash flow meter */
-        .cash-meter {
-            height: 20px; background: #f0f0f0; border-radius: 10px;
-            overflow: hidden; margin: 8px 0;
-        }
-        .cash-meter-fill {
-            height: 100%; border-radius: 10px;
-            transition: width 0.5s ease;
-        }
-        .cash-meter-fill.green { background: linear-gradient(90deg, #43a047, #66bb6a); }
-        .cash-meter-fill.yellow { background: linear-gradient(90deg, #f9a825, #fbc02d); }
-        .cash-meter-fill.orange { background: linear-gradient(90deg, #ef6c00, #ff9800); }
-        .cash-meter-fill.red { background: linear-gradient(90deg, #c62828, #e53935); }
+        /* ── Action badges ── */
+        .abadge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+        .abadge.reorder_now, .abadge.reorder_soon { background: rgba(34,197,94,.15); color: var(--green); }
+        .abadge.discount_now, .abadge.remove { background: rgba(239,68,68,.15); color: var(--red); }
+        .abadge.discount_light { background: rgba(245,158,11,.15); color: var(--amber); }
+        .abadge.hold { background: rgba(255,255,255,.06); color: var(--muted); }
+        .abadge.watch, .abadge.promote { background: rgba(59,130,246,.15); color: var(--blue); }
+        .abadge.seasonal_hold { background: rgba(168,85,247,.15); color: var(--purple); }
 
-        /* Seasonal calendar */
-        .seasonal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
-        .month-card {
-            background: #fafafa; border-radius: 8px; padding: 12px;
-            border: 1px solid #eee; font-size: 12px;
-        }
-        .month-card.current { border-color: #1a1a2e; background: #f0f0ff; }
-        .month-card .month-name { font-weight: 700; font-size: 14px; margin-bottom: 6px; }
-        .month-card .month-rev { font-size: 18px; font-weight: 700; color: #1a1a2e; }
-        .month-card .month-tags { margin-top: 6px; }
-        .month-tag {
-            display: inline-block; padding: 2px 6px; border-radius: 3px;
-            font-size: 10px; margin: 2px; background: #e8f5e9; color: #2e7d32;
-        }
-        .month-tag.low { background: #ffebee; color: #c62828; }
+        /* ── Product table ── */
+        .filter-bar { display: flex; gap: 6px; flex-wrap: wrap; }
+        .filter-btn { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border); background: none; color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer; transition: all .2s; }
+        .filter-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .filter-btn:hover { border-color: var(--accent); color: var(--text); }
+        .search-box { padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 13px; width: 240px; }
+        .ptable { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .ptable th { text-align: left; padding: 8px; font-size: 10px; text-transform: uppercase; color: var(--muted); letter-spacing: .05em; border-bottom: 1px solid var(--border); }
+        .ptable td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,.03); }
+        .ptable tr:hover td { background: var(--bg-hover); }
+        .ptable .name { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .show-more { display: block; margin: 16px auto 0; }
+        .count-label { font-size: 12px; color: var(--muted); margin-top: 8px; }
 
-        /* Discount tiers */
-        .discount-tier { margin-bottom: 16px; }
-        .discount-tier h4 { font-size: 14px; margin: 0 0 8px; }
-        .discount-tier .tier-item {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 8px 12px; background: #fafafa; border-radius: 6px; margin-bottom: 4px;
-            font-size: 13px;
-        }
-        .discount-tier .old-price { text-decoration: line-through; color: #999; }
-        .discount-tier .new-price { font-weight: 700; color: #d32f2f; }
-        .discount-tier .capital { font-size: 12px; color: #888; }
+        /* ── Bar charts ── */
+        .bar-section { margin-bottom: 20px; }
+        .bar-section h3 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 10px; }
+        .bar-row { display: flex; align-items: center; gap: 10px; padding: 5px 0; }
+        .bar-label { width: 110px; font-size: 12px; font-weight: 500; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+        .bar-track { flex: 1; height: 22px; background: rgba(255,255,255,.04); border-radius: 4px; overflow: hidden; position: relative; }
+        .bar-fill { height: 100%; border-radius: 4px; display: flex; align-items: center; padding-left: 8px; font-size: 10px; font-weight: 600; color: #fff; transition: width .6s ease; min-width: 2%; }
+        .bar-fill.green { background: linear-gradient(90deg, rgba(34,197,94,.7), rgba(34,197,94,.4)); }
+        .bar-fill.blue { background: linear-gradient(90deg, rgba(59,130,246,.7), rgba(59,130,246,.4)); }
+        .bar-fill.purple { background: linear-gradient(90deg, rgba(168,85,247,.7), rgba(168,85,247,.4)); }
+        .bar-fill.teal { background: linear-gradient(90deg, rgba(20,184,166,.7), rgba(20,184,166,.4)); }
+        .bar-meta { font-size: 11px; color: var(--muted); width: 80px; text-align: right; flex-shrink: 0; }
 
-        /* Projection chart (CSS-only simple bar chart) */
-        .proj-bars { display: flex; align-items: flex-end; gap: 4px; height: 150px; margin: 16px 0; }
-        .proj-bar {
-            flex: 1; background: linear-gradient(180deg, #3a3a5e, #1a1a2e);
-            border-radius: 4px 4px 0 0; min-width: 20px; position: relative;
-            transition: height 0.5s ease;
-        }
-        .proj-bar-label {
-            position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%);
-            font-size: 9px; color: #888; white-space: nowrap;
-        }
-        .proj-bar-value {
-            position: absolute; top: -18px; left: 50%; transform: translateX(-50%);
-            font-size: 10px; font-weight: 600; color: #333; white-space: nowrap;
-        }
+        /* ── Category cards ── */
+        .cat-card { display: flex; justify-content: space-between; align-items: center; padding: 14px; border-bottom: 1px solid var(--border); }
+        .cat-card:last-child { border-bottom: none; }
+        .cat-name { font-weight: 600; font-size: 14px; }
+        .cat-stats { display: flex; gap: 20px; font-size: 12px; color: var(--muted); }
+        .cat-stats span strong { color: var(--text); }
+        .dead-bar { width: 60px; height: 6px; background: rgba(255,255,255,.06); border-radius: 3px; overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 4px; }
+        .dead-bar-fill { height: 100%; border-radius: 3px; }
 
-        /* Setup prompt */
-        .setup-card {
-            background: linear-gradient(135deg, #f5f5ff, #fff);
-            border: 2px dashed #c5c5e0; border-radius: 16px; padding: 40px;
-            text-align: center; margin: 40px 0;
-        }
-        .setup-card h2 { font-size: 22px; margin-bottom: 16px; }
-        .setup-card p { font-size: 14px; color: #666; max-width: 600px; margin: 0 auto 20px; }
-        .setup-card code {
-            display: block; background: #1a1a2e; color: #a5d6a7; padding: 16px;
-            border-radius: 8px; text-align: left; font-size: 13px;
-            max-width: 600px; margin: 16px auto; white-space: pre-line;
-        }
-        .setup-card .note { font-size: 12px; color: #888; margin-top: 16px; }
+        /* ── Geo ── */
+        .geo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+        .geo-card { padding: 16px; text-align: center; border: 1px solid var(--border); border-radius: 10px; }
+        .geo-card .val { font-size: 24px; font-weight: 800; }
+        .geo-card .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; }
 
-        /* Loading state */
-        .loading-overlay {
-            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(255,255,255,0.85); z-index: 1000;
-            justify-content: center; align-items: center;
-        }
-        .loading-overlay.active { display: flex; }
-        .loading-spinner {
-            text-align: center; font-size: 16px; color: #1a1a2e;
-        }
-        .loading-spinner::before {
-            content: ""; display: block; width: 48px; height: 48px;
-            margin: 0 auto 16px; border: 4px solid #eee;
-            border-top-color: #1a1a2e; border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
+        /* ── Buying / Discount ── */
+        .reorder-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .reorder-table th { text-align: left; padding: 6px 8px; font-size: 10px; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border); }
+        .reorder-table td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,.03); }
+        .signal-chip { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; margin: 2px; }
+        .signal-chip.buy { background: rgba(34,197,94,.12); color: var(--green); }
+        .signal-chip.avoid { background: rgba(239,68,68,.12); color: var(--red); }
+        .tier-badge { padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+        .tier-deep { background: rgba(239,68,68,.15); color: var(--red); }
+        .tier-med { background: rgba(245,158,11,.15); color: var(--amber); }
+        .tier-light { background: rgba(59,130,246,.15); color: var(--blue); }
+
+        /* ── Revenue chart ── */
+        .rev-chart { display: flex; align-items: flex-end; gap: 6px; height: 160px; padding: 0 4px; }
+        .rev-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
+        .rev-bar { width: 100%; border-radius: 4px 4px 0 0; background: linear-gradient(180deg, var(--accent), rgba(108,99,255,.4)); min-height: 3px; transition: height .6s ease; }
+        .rev-bar-label { font-size: 9px; color: var(--muted); margin-top: 4px; text-align: center; }
+        .rev-bar-val { font-size: 9px; color: var(--text); margin-bottom: 3px; font-weight: 600; }
+
+        /* ── Season cards ── */
+        .season-row { display: flex; gap: 16px; flex-wrap: wrap; }
+        .season-card { flex: 1; min-width: 200px; padding: 16px; border: 1px solid var(--border); border-radius: 10px; }
+        .season-card.current { border-color: var(--accent); box-shadow: 0 0 12px rgba(108,99,255,.15); }
+        .season-card h4 { font-size: 14px; margin-bottom: 8px; }
+        .season-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+        .season-tag { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+        .season-tag.high { background: rgba(34,197,94,.12); color: var(--green); }
+        .season-tag.low { background: rgba(239,68,68,.12); color: var(--red); }
+
+        /* ── Risk alerts ── */
+        .risk-card { padding: 12px 16px; border-left: 3px solid; border-radius: 0 8px 8px 0; margin-bottom: 8px; background: var(--bg-card); }
+        .risk-card.critical { border-color: var(--red); }
+        .risk-card.warning { border-color: var(--amber); }
+        .risk-card.info { border-color: var(--blue); }
+        .risk-title { font-weight: 600; font-size: 13px; }
+        .risk-detail { font-size: 12px; color: var(--muted); margin-top: 2px; }
+        .risk-action { font-size: 12px; color: var(--accent); margin-top: 4px; }
+
+        /* ── Action plan ── */
+        .plan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+        .plan-col { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+        .plan-col-header { padding: 10px 16px; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+        .plan-col-header.week { background: rgba(239,68,68,.1); color: var(--red); }
+        .plan-col-header.month { background: rgba(245,158,11,.1); color: var(--amber); }
+        .plan-col-header.quarter { background: rgba(59,130,246,.1); color: var(--blue); }
+        .plan-item { padding: 10px 16px; border-bottom: 1px solid rgba(255,255,255,.03); font-size: 12px; color: var(--muted); }
+        .plan-item:last-child { border-bottom: none; }
+        .plan-item strong { display: block; font-size: 13px; margin-bottom: 2px; color: var(--text); }
+
+        /* ── Loading ── */
+        .loading-overlay { text-align: center; padding: 80px 20px; }
+        .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 16px; }
         @keyframes spin { to { transform: rotate(360deg); } }
+        .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+        .empty-state h2 { color: var(--text); margin-bottom: 8px; }
 
-        /* Back link */
-        .back-link {
-            display: inline-flex; align-items: center; gap: 6px;
-            color: #1a1a2e; text-decoration: none; font-size: 13px;
-            margin-bottom: 16px; opacity: 0.7;
-        }
-        .back-link:hover { opacity: 1; }
-
-        /* Responsive */
+        /* ── Responsive ── */
         @media (max-width: 768px) {
-            .health-card { flex-direction: column; text-align: center; }
-            .kpi-grid { grid-template-columns: repeat(2, 1fr); }
-            .strategy-grid { grid-template-columns: 1fr; }
-            .inv-nav { overflow-x: auto; flex-wrap: nowrap; }
+            .health-row { flex-direction: column; align-items: flex-start; }
+            .card-grid-4 { grid-template-columns: 1fr 1fr; }
+            .geo-grid { grid-template-columns: 1fr; }
+            .plan-grid { grid-template-columns: 1fr; }
+            .bar-label { width: 80px; font-size: 11px; }
+            .tab-btn { padding: 8px 14px; font-size: 12px; }
         }
     </style>
 </head>
 <body>
-    <div class="inv-container">
-        <a href="/" class="back-link">&larr; Back to Trend Dashboard</a>
-
-        <div class="inv-header">
+    <!-- Header -->
+    <div class="page-header">
+        <div class="header-row">
             <div>
+                <a href="/" class="back">&larr; Back to Dashboard</a>
                 <h1>Inventory Intelligence</h1>
-                <div class="subtitle">Your WooCommerce data, analyzed. What to buy, discount, hold, or cut.</div>
             </div>
-            <div>
-                {% if woo_configured %}
-                <button id="refreshBtn" onclick="refreshData()" class="btn-primary"
-                    style="padding: 10px 20px; border-radius: 8px; border: none; background: #1a1a2e; color: white; cursor: pointer; font-weight: 600;">
-                    Refresh Data
-                </button>
-                {% endif %}
+            <div style="display:flex;align-items:center;gap:12px;">
+                <a href="/financials" class="btn btn-outline">Financial Intel &rarr;</a>
+                <button id="refreshBtn" class="btn btn-primary" onclick="refreshData()">Refresh Data</button>
             </div>
         </div>
+        <p class="meta" id="lastRefresh">
+            {% if woo_cache.last_refresh %}Last updated: {{ woo_cache.last_refresh[:16] }}{% else %}No data yet &mdash; click Refresh{% endif %}
+        </p>
+    </div>
 
-        {% if not woo_configured %}
-        <!-- Setup Instructions -->
-        <div class="setup-card">
-            <h2>Connect Your WooCommerce Store</h2>
-            <p>
-                This tool analyzes your real sales data to tell you what to buy,
-                what to discount, and where your cash is tied up. Connect your
-                WooCommerce store to get started.
-            </p>
-            <p style="font-weight: 600; font-size: 15px;">Setup in 3 steps:</p>
-            <p style="text-align: left; max-width: 600px; margin: 0 auto;">
-                <strong>1.</strong> In WooCommerce &rarr; Settings &rarr; Advanced &rarr; REST API, create a new key with <strong>Read</strong> permissions.<br><br>
-                <strong>2.</strong> Set these environment variables:
-            </p>
-            <code>export WOOCOMMERCE_URL="https://your-shop.com"
-export WOOCOMMERCE_KEY="ck_your_consumer_key"
-export WOOCOMMERCE_SECRET="cs_your_consumer_secret"</code>
-            <p><strong>3.</strong> Restart the app and click <strong>Refresh Data</strong>.</p>
-            <p class="note">
-                Read-only access. We never modify your store data.
-                All analysis runs locally.
-            </p>
+    {% if not woo_configured %}
+    <div class="content">
+        <div class="card empty-state">
+            <h2>WooCommerce Not Configured</h2>
+            <p>Set <code>WOOCOMMERCE_URL</code>, <code>WOOCOMMERCE_KEY</code>, and <code>WOOCOMMERCE_SECRET</code> environment variables.</p>
         </div>
-        {% else %}
+    </div>
+    {% else %}
 
-        <!-- Loading Overlay -->
-        <div id="loadingOverlay" class="loading-overlay">
-            <div class="loading-spinner">Analyzing your store data...</div>
+    <!-- Tab Navigation -->
+    <div class="tab-bar">
+        <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">Overview</button>
+        <button class="tab-btn" data-tab="products" onclick="switchTab('products')">Products</button>
+        <button class="tab-btn" data-tab="performance" onclick="switchTab('performance')">Performance</button>
+        <button class="tab-btn" data-tab="buying" onclick="switchTab('buying')">Buying &amp; Pricing</button>
+        <button class="tab-btn" data-tab="forecast" onclick="switchTab('forecast')">Forecast</button>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+        <div id="pane-overview" class="pane active"></div>
+        <div id="pane-products" class="pane"></div>
+        <div id="pane-performance" class="pane"></div>
+        <div id="pane-buying" class="pane"></div>
+        <div id="pane-forecast" class="pane"></div>
+
+        <div id="loadingState" class="loading-overlay" style="display:none;">
+            <div class="spinner"></div>
+            <p>Analyzing your inventory...</p>
         </div>
-
-        <!-- Dashboard content (populated by JS) -->
-        <div id="dashboardContent">
-            {% if woo_cache.analysis %}
-            <p style="color: #888; font-size: 13px;">
-                Last refresh: {{ woo_cache.last_refresh[:16] if woo_cache.last_refresh else 'Never' }}
-                — Click Refresh to update
-            </p>
-            {% else %}
-            <div class="setup-card" style="border-style: solid; border-color: #e0e0e0;">
-                <h2>Ready to Analyze</h2>
-                <p>Your WooCommerce store is connected. Click <strong>Refresh Data</strong> to pull products and orders and generate your first analysis.</p>
-            </div>
-            {% endif %}
-        </div>
-
-        <!-- Dashboard sections (filled by JavaScript) -->
-        <div id="healthSection"></div>
-        <div id="kpiSection"></div>
-        <div id="navSection"></div>
-        <div id="forecastSection"></div>
-        <div id="prioritySection"></div>
-        <div id="strategicSection"></div>
-        <div id="productSection"></div>
-        <div id="attributeSection"></div>
-        <div id="discountSection"></div>
-        <div id="buyingSection"></div>
-        <div id="seasonalSection"></div>
-        <div id="geographySection"></div>
-        <div id="projectionSection"></div>
-
-        {% endif %}
     </div>
 
     <script>
-    let pollTimer = null;
+    /* ── Helpers ── */
+    function fmt(n) { return (n == null || isNaN(n)) ? '\u2014' : Math.round(n).toLocaleString('da-DK'); }
+    function fmtK(n) { if (n == null || isNaN(n)) return '\u2014'; return n >= 1000 ? (n/1000).toFixed(1).replace('.', ',') + 'k' : Math.round(n).toString(); }
+    function esc(s) { var d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+    function dirIcon(d) {
+        if (d === 'accelerating') return '<span class="dir-up">\u25B2</span>';
+        if (d === 'decelerating') return '<span class="dir-down">\u25BC</span>';
+        if (d === 'no_sales') return '<span class="dir-down">\u2715</span>';
+        return '<span class="dir-flat">\u2192</span>';
+    }
+    function healthColor(score) {
+        if (score >= 80) return 'var(--green)';
+        if (score >= 60) return 'var(--amber)';
+        if (score >= 40) return 'var(--amber)';
+        return 'var(--red)';
+    }
 
+    var _allData = null, _forecast = null, _productFilter = 'all', _productSearch = '';
+
+    /* ── Tab switching ── */
+    function switchTab(id) {
+        document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.tab === id); });
+        document.querySelectorAll('.pane').forEach(function(p) { p.classList.toggle('active', p.id === 'pane-' + id); });
+    }
+
+    /* ── Data loading ── */
     function refreshData() {
-        const btn = document.getElementById('refreshBtn');
-        btn.disabled = true;
-        btn.textContent = 'Analyzing...';
-        document.getElementById('loadingOverlay').classList.add('active');
-
-        fetch('/api/inventory/refresh', { method: 'POST' })
-            .then(r => r.json())
-            .then(data => {
-                if (data.status === 'started') {
-                    pollTimer = setInterval(checkStatus, 2000);
-                } else {
-                    alert(data.message || 'Could not start analysis');
-                    btn.disabled = false;
-                    btn.textContent = 'Refresh Data';
-                    document.getElementById('loadingOverlay').classList.remove('active');
-                }
-            })
-            .catch(err => {
-                alert('Error: ' + err);
-                btn.disabled = false;
-                btn.textContent = 'Refresh Data';
-                document.getElementById('loadingOverlay').classList.remove('active');
-            });
+        var btn = document.getElementById('refreshBtn');
+        btn.disabled = true; btn.textContent = 'Refreshing...';
+        document.getElementById('loadingState').style.display = 'block';
+        fetch('/api/inventory/refresh', {method: 'POST'}).then(function(r) { return r.json(); }).then(function() { pollStatus(); }).catch(function() { btn.disabled = false; btn.textContent = 'Refresh Data'; });
     }
 
-    function checkStatus() {
-        fetch('/api/inventory/status')
-            .then(r => r.json())
-            .then(data => {
-                if (!data.refreshing) {
-                    clearInterval(pollTimer);
-                    document.getElementById('loadingOverlay').classList.remove('active');
-                    const btn = document.getElementById('refreshBtn');
-                    btn.disabled = false;
-                    btn.textContent = 'Refresh Data';
-                    if (data.error) {
-                        alert('Analysis failed: ' + data.error);
-                    } else if (data.has_data) {
-                        loadDashboard();
-                    }
-                }
-            });
-    }
-
-    function loadDashboard() {
-        fetch('/api/inventory/data')
-            .then(r => r.json())
-            .then(data => {
-                if (data.error) return;
-                renderDashboard(data);
-            });
-    }
-
-    function fmt(n) {
-        if (n === undefined || n === null) return '0';
-        return Number(n).toLocaleString('da-DK', { maximumFractionDigits: 0 });
-    }
-
-    function renderDashboard(data) {
-        const a = data.analysis;
-        const r = data.recommendations;
-        const p = data.projections;
-        const s = a.summary;
-
-        // Clear setup card
-        document.getElementById('dashboardContent').innerHTML =
-            `<p style="color:#888;font-size:13px;">Last refresh: ${data.last_refresh?.substring(0,16) || 'N/A'}</p>`;
-
-        // Health Score
-        const cf = p.cash_flow;
-        document.getElementById('healthSection').innerHTML = `
-            <div class="health-card">
-                <div class="health-score ${cf.color}">${cf.health_score}</div>
-                <div class="health-meta">
-                    <h2>Cash Flow Health: ${cf.rating}</h2>
-                    <div class="metrics">
-                        <div class="metric"><div class="metric-value">${fmt(cf.metrics.inventory_turnover)}x</div><div class="metric-label">Turnover</div></div>
-                        <div class="metric"><div class="metric-value">${fmt(cf.metrics.days_of_inventory)}d</div><div class="metric-label">Days of Stock</div></div>
-                        <div class="metric"><div class="metric-value">${cf.metrics.working_capital_tied_pct}%</div><div class="metric-label">Dead Capital</div></div>
-                        <div class="metric"><div class="metric-value">${fmt(cf.metrics.avg_order_value)}</div><div class="metric-label">Avg Order</div></div>
-                    </div>
-                    ${cf.recommendations.map(r => `<p style="font-size:13px;color:#555;margin:8px 0 0;">&bull; ${r}</p>`).join('')}
-                </div>
-            </div>`;
-
-        // KPIs
-        document.getElementById('kpiSection').innerHTML = `
-            <div class="kpi-grid">
-                <div class="kpi-card"><div class="kpi-value">${fmt(s.total_products)}</div><div class="kpi-label">Products</div><div class="kpi-sub">${fmt(s.active_products)} active, ${fmt(s.zero_sales_products)} never sold</div></div>
-                <div class="kpi-card"><div class="kpi-value">${fmt(s.total_orders)}</div><div class="kpi-label">Orders (12mo)</div></div>
-                <div class="kpi-card success"><div class="kpi-value">${fmt(s.total_revenue)}</div><div class="kpi-label">Revenue (12mo)</div></div>
-                <div class="kpi-card"><div class="kpi-value">${fmt(s.total_inventory_value)}</div><div class="kpi-label">Inventory Value</div></div>
-                <div class="kpi-card ${s.dead_stock_ratio > 0.3 ? 'danger' : s.dead_stock_ratio > 0.15 ? 'warning' : ''}"><div class="kpi-value">${fmt(s.dead_stock_capital)}</div><div class="kpi-label">Dead Stock Capital</div><div class="kpi-sub">${(s.dead_stock_ratio * 100).toFixed(1)}% of inventory</div></div>
-                <div class="kpi-card success"><div class="kpi-value">${fmt(p.revenue.projected_total)}</div><div class="kpi-label">12-Week Forecast</div><div class="kpi-sub">${p.revenue.confidence} confidence</div></div>
-            </div>`;
-
-        // Navigation
-        document.getElementById('navSection').innerHTML = `
-            <div class="inv-nav">
-                <a href="#forecast" class="urgent">Strategic Forecast</a>
-                <a href="#priorities">This Week</a>
-                <a href="#strategy">Strategy</a>
-                <a href="#products">All Products</a>
-                <a href="#winners">Winners</a>
-                <a href="#deadstock" class="urgent">Dead Stock</a>
-                <a href="#attributes">Colors & Patterns</a>
-                <a href="#discounts">Discount Plan</a>
-                <a href="#buying">Buying Plan</a>
-                <a href="#seasonal">Seasonal</a>
-                <a href="#geography">Geography</a>
-                <a href="#projections">Projections</a>
-            </div>`;
-
-        // Priority List
-        const priorities = r.priorities || [];
-        document.getElementById('prioritySection').innerHTML = `
-            <div class="inv-section" id="priorities">
-                <h2>This Week's Priorities</h2>
-                <ul class="priority-list">
-                    ${priorities.map(p => `
-                        <li class="priority-item">
-                            <span class="priority-badge ${p.urgency}">${p.urgency.replace('_', ' ')}</span>
-                            <div>
-                                <div class="priority-title">${p.title}</div>
-                                <div class="priority-action">${p.action}</div>
-                            </div>
-                        </li>
-                    `).join('')}
-                    ${priorities.length === 0 ? '<li style="color:#888;padding:12px;">No urgent actions right now.</li>' : ''}
-                </ul>
-            </div>`;
-
-        // Strategic Recs
-        const strat = r.strategic || [];
-        document.getElementById('strategicSection').innerHTML = `
-            <div class="inv-section" id="strategy">
-                <h2>Strategic Insights</h2>
-                <div class="strategy-grid">
-                    ${strat.map(s => `
-                        <div class="strategy-card ${s.priority}">
-                            <h4>${s.title}</h4>
-                            <p>${s.detail}</p>
-                            <div class="action-text">${s.action}</div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>`;
-
-        // Product Action Table
-        const prods = r.product_recommendations || [];
-        document.getElementById('productSection').innerHTML = `
-            <div class="inv-section" id="products">
-                <h2>Product Actions (${prods.length} products)</h2>
-                <div style="overflow-x:auto;">
-                <table class="product-table">
-                    <thead><tr>
-                        <th>Product</th><th>Action</th><th>Price</th><th>Stock</th>
-                        <th>Sold/Week</th><th>Total Sold</th><th>Days Since Sale</th>
-                        <th>Direction</th><th>Reason</th>
-                    </tr></thead>
-                    <tbody>
-                        ${prods.slice(0, 100).map(p => `
-                            <tr>
-                                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;" title="${p.name}">${p.name}</td>
-                                <td><span class="action-badge ${p.action.toLowerCase()}">${p.action.replace(/_/g, ' ')}</span></td>
-                                <td>${fmt(p.price)}</td>
-                                <td>${p.stock_quantity}</td>
-                                <td>${p.qty_per_week.toFixed(1)}</td>
-                                <td>${p.total_sold}</td>
-                                <td>${p.days_since_last_sale}</td>
-                                <td><span class="${p.direction === 'accelerating' ? 'dir-up' : p.direction === 'decelerating' ? 'dir-down' : 'dir-flat'}">${p.direction}</span></td>
-                                <td style="max-width:250px;font-size:12px;color:#666;">${p.reason}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-                </div>
-            </div>`;
-
-        // Attribute Performance
-        const attrs = a.attributes || {};
-        const renderBars = (items, label) => {
-            if (!items || items.length === 0) return `<p style="color:#888">No ${label} data</p>`;
-            const max = items[0].total_revenue || 1;
-            return items.slice(0, 10).map(i => `
-                <div class="attr-bar-row">
-                    <div class="attr-name">${i.name}</div>
-                    <div class="attr-bar">
-                        <div class="attr-bar-fill" style="width:${Math.max((i.total_revenue/max)*100, 2)}%"></div>
-                        <div class="attr-bar-label">${fmt(i.total_revenue)} (${i.product_count} products)</div>
-                    </div>
-                    <span class="${i.dominant_direction === 'accelerating' ? 'dir-up' : i.dominant_direction === 'decelerating' ? 'dir-down' : 'dir-flat'}">${i.dominant_direction}</span>
-                </div>
-            `).join('');
-        };
-
-        document.getElementById('attributeSection').innerHTML = `
-            <div class="inv-section" id="attributes">
-                <h2>Color, Pattern & Fabric Performance</h2>
-                <h3>Colors</h3>
-                ${renderBars(attrs.colors, 'color')}
-                <h3 style="margin-top:24px;">Patterns</h3>
-                ${renderBars(attrs.patterns, 'pattern')}
-                <h3 style="margin-top:24px;">Fabric Types</h3>
-                ${renderBars(attrs.fabrics, 'fabric')}
-            </div>`;
-
-        // Discount Plan
-        const dp = r.discount_plan || {};
-        const renderDiscountTier = (items, label, pct) => {
-            if (!items || items.length === 0) return '';
-            return `<div class="discount-tier">
-                <h4>${label} (${items.length} items)</h4>
-                ${items.slice(0, 10).map(i => `
-                    <div class="tier-item">
-                        <span style="flex:1;">${i.name}</span>
-                        <span class="old-price">${fmt(i.current_price)}</span>
-                        <span class="new-price">${fmt(i.suggested_price || i.current_price * (1-pct))}</span>
-                        <span class="capital">${fmt(i.capital_at_stake)} tied up</span>
-                    </div>
-                `).join('')}
-            </div>`;
-        };
-
-        document.getElementById('discountSection').innerHTML = `
-            <div class="inv-section" id="discounts">
-                <h2>Discount Plan</h2>
-                <p style="font-size:14px;color:#555;margin-bottom:16px;">${dp.summary || ''}</p>
-                <div class="kpi-grid" style="margin-bottom:16px;">
-                    <div class="kpi-card danger"><div class="kpi-value">${fmt(dp.total_recoverable_capital)}</div><div class="kpi-label">Total Capital to Recover</div></div>
-                </div>
-                ${renderDiscountTier(dp.deep_discount, 'Deep Discount (50-70% off)', 0.6)}
-                ${renderDiscountTier(dp.medium_discount, 'Medium Discount (25-40% off)', 0.35)}
-                ${renderDiscountTier(dp.light_discount, 'Light Discount (15-25% off)', 0.2)}
-                ${renderDiscountTier(dp.bundle_candidates, 'Bundle Candidates (seasonal)', 0)}
-            </div>`;
-
-        // Buying Plan
-        const bp = r.buying_plan || {};
-        document.getElementById('buyingSection').innerHTML = `
-            <div class="inv-section" id="buying">
-                <h2>Buying Plan</h2>
-                <h3>Reorder NOW</h3>
-                ${(bp.reorder_now || []).length === 0 ? '<p style="color:#888">No urgent reorders needed</p>' :
-                `<table class="product-table"><thead><tr>
-                    <th>Product</th><th>Current Stock</th><th>Weeks Left</th><th>Suggested Order</th><th>Urgency</th>
-                </tr></thead><tbody>
-                ${(bp.reorder_now || []).map(r => `
-                    <tr>
-                        <td>${r.name}</td>
-                        <td>${r.current_stock}</td>
-                        <td style="color:${r.weeks_left < 2 ? '#c62828' : '#e65100'};font-weight:700;">${r.weeks_left.toFixed(1)}</td>
-                        <td style="font-weight:700;">${r.suggested_quantity}</td>
-                        <td><span class="action-badge ${r.urgency === 'critical' ? 'discount_now' : 'reorder_soon'}">${r.urgency}</span></td>
-                    </tr>
-                `).join('')}
-                </tbody></table>`}
-                <h3>Buy More Of</h3>
-                ${(bp.buy_more_of || []).map(b => `
-                    <div style="padding:6px 0;font-size:13px;"><strong>${b.type}:</strong> ${b.name} — ${b.reason}</div>
-                `).join('') || '<p style="color:#888">No strong buy signals</p>'}
-                <h3>Avoid Buying</h3>
-                ${(bp.avoid_buying || []).map(a => `
-                    <div style="padding:6px 0;font-size:13px;color:#c62828;"><strong>${a.type}:</strong> ${a.name} — ${a.reason}</div>
-                `).join('') || '<p style="color:#888">No avoid signals</p>'}
-            </div>`;
-
-        // Seasonal
-        const sea = a.seasonal || {};
-        const currentMonth = new Date().getMonth() + 1;
-        document.getElementById('seasonalSection').innerHTML = `
-            <div class="inv-section" id="seasonal">
-                <h2>Seasonal Patterns</h2>
-                <div class="seasonal-grid">
-                    ${(sea.monthly || []).map(m => `
-                        <div class="month-card ${m.month === currentMonth ? 'current' : ''}">
-                            <div class="month-name">${m.month_name}</div>
-                            <div class="month-rev">${fmt(m.revenue)}</div>
-                            <div style="font-size:11px;color:#888;">${m.orders} orders</div>
-                            <div class="month-tags">
-                                ${m.high_demand_fabrics.slice(0,3).map(f => `<span class="month-tag">${f}</span>`).join('')}
-                                ${m.low_demand_fabrics.slice(0,2).map(f => `<span class="month-tag low">${f}</span>`).join('')}
-                            </div>
-                            ${m.nordic_note ? `<div style="font-size:10px;color:#6a1b9a;margin-top:4px;">${m.nordic_note}</div>` : ''}
-                        </div>
-                    `).join('')}
-                </div>
-            </div>`;
-
-        // Geography
-        const geo = a.geography || {};
-        document.getElementById('geographySection').innerHTML = `
-            <div class="inv-section" id="geography">
-                <h2>Geography & Channels</h2>
-                <div class="kpi-grid">
-                    <div class="kpi-card"><div class="kpi-value">${fmt(geo.b2b?.revenue)}</div><div class="kpi-label">B2B Revenue</div><div class="kpi-sub">${geo.b2b?.orders || 0} orders, avg ${fmt(geo.b2b?.avg_order_value)}</div></div>
-                    <div class="kpi-card"><div class="kpi-value">${fmt(geo.b2c?.revenue)}</div><div class="kpi-label">B2C Revenue</div><div class="kpi-sub">${geo.b2c?.orders || 0} orders, avg ${fmt(geo.b2c?.avg_order_value)}</div></div>
-                </div>
-                <h3>Revenue by Country</h3>
-                ${(geo.countries || []).slice(0, 10).map(c => {
-                    const max = (geo.countries[0]?.revenue || 1);
-                    return `<div class="attr-bar-row">
-                        <div class="attr-name">${c.country}</div>
-                        <div class="attr-bar">
-                            <div class="attr-bar-fill" style="width:${Math.max((c.revenue/max)*100, 2)}%"></div>
-                            <div class="attr-bar-label">${fmt(c.revenue)} (${c.orders} orders)</div>
-                        </div>
-                    </div>`;
-                }).join('')}
-            </div>`;
-
-        // Projections
-        const proj = p.revenue || {};
-        const weeks = proj.weekly || [];
-        const maxRev = Math.max(...weeks.map(w => w.projected_revenue), 1);
-        document.getElementById('projectionSection').innerHTML = `
-            <div class="inv-section" id="projections">
-                <h2>Revenue Projections (${proj.weeks_ahead || 12} Weeks)</h2>
-                <div class="kpi-grid">
-                    <div class="kpi-card"><div class="kpi-value">${fmt(proj.current_weekly_revenue)}</div><div class="kpi-label">Current Weekly Revenue</div></div>
-                    <div class="kpi-card success"><div class="kpi-value">${fmt(proj.projected_total)}</div><div class="kpi-label">12-Week Projection</div></div>
-                </div>
-                <div class="proj-bars">
-                    ${weeks.map(w => `
-                        <div class="proj-bar" style="height:${Math.max((w.projected_revenue/maxRev)*100, 3)}%;">
-                            <div class="proj-bar-value">${fmt(w.projected_revenue)}</div>
-                            <div class="proj-bar-label">W${w.week}</div>
-                        </div>
-                    `).join('')}
-                </div>
-                <p style="font-size:12px;color:#888;margin-top:24px;">${proj.note || ''}</p>
-            </div>`;
-
-        // Strategic Forecast (async — loads from /api/forecast)
-        fetch('/api/forecast').then(r => r.json()).then(fc => {
-            const cr = fc.cash_runway || {};
-            const ri = fc.risk_alerts || [];
-            const plan = fc.action_plan_90_day || {};
-            const bs = fc.buying_signals || {};
-            const ma = fc.margin_analysis || {};
-
-            document.getElementById('forecastSection').innerHTML = `
-                <div class="inv-section" id="forecast">
-                    <h2>Strategic Forecast (Combined WooCommerce + e-conomic)</h2>
-                    <p style="font-size:12px;color:#888;margin-bottom:16px;">Auto-refreshes every 6 hours. Last: ${fc.generated_at ? new Date(fc.generated_at).toLocaleString('da-DK') : 'N/A'}</p>
-
-                    <h3>Cash Runway</h3>
-                    <div class="kpi-grid">
-                        <div class="kpi-card success"><div class="kpi-value">${fmt(cr.est_weekly_profit)}</div><div class="kpi-label">Est. Weekly Profit</div></div>
-                        <div class="kpi-card"><div class="kpi-value">${fmt(cr.avg_monthly_revenue)}</div><div class="kpi-label">Avg Monthly Revenue</div></div>
-                        <div class="kpi-card ${cr.overdue_receivables > 200000 ? 'danger' : 'warning'}"><div class="kpi-value">${fmt(cr.overdue_receivables)}</div><div class="kpi-label">Overdue Receivables</div></div>
-                        <div class="kpi-card"><div class="kpi-value">${fmt(cr.expected_inflow_4_weeks)}</div><div class="kpi-label">Expected Inflow 4W</div></div>
-                    </div>
-                    ${(cr.assessment || []).map(a => '<p style="margin:6px 0;font-size:13px;color:#333;">&#x26A0; ' + a + '</p>').join('')}
-
-                    ${ri.length > 0 ? '<h3>Risk Alerts</h3>' + ri.map(a =>
-                        '<div class="strategy-card ' + a.severity + '" style="margin-bottom:10px;">' +
-                        '<h4>[' + a.severity.toUpperCase() + '] ' + a.risk + '</h4>' +
-                        '<p>' + a.detail + '</p>' +
-                        '<div class="action-text">' + a.action + '</div></div>'
-                    ).join('') : ''}
-
-                    <h3>Buying Signals</h3>
-                    <p style="font-size:13px;color:#555;">${bs.summary || ''}</p>
-                    ${(bs.aggressive_buy || []).length > 0 ? '<h4 style="color:#2e7d32;margin-top:12px;">Buy Aggressively</h4><table class="product-table" style="font-size:12px;"><tr><th>Product</th><th>Stock</th><th>Velocity/wk</th><th>Order Qty</th><th>Urgency</th></tr>' + (bs.aggressive_buy || []).slice(0, 10).map(p => '<tr><td>' + p.name.substring(0, 40) + '</td><td>' + p.current_stock + '</td><td>' + p.weekly_velocity + '</td><td><strong>' + p.suggested_order + '</strong></td><td style="color:#c62828;">' + p.urgency + '</td></tr>').join('') + '</table>' : ''}
-
-                    <h3>Margin Erosion</h3>
-                    <p style="font-size:13px;color:#555;">${ma.summary || ''}</p>
-
-                    <h3>90-Day Action Plan</h3>
-                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;">
-                        <div style="background:#fff3f3;border-radius:8px;padding:16px;">
-                            <h4 style="color:#c62828;margin:0 0 8px;">This Week</h4>
-                            <ul style="padding-left:16px;margin:0;">
-                                ${(plan.this_week || []).map(a => '<li style="margin:6px 0;font-size:13px;"><strong>' + a.action + '</strong><br><span style="color:#666;">' + (a.detail || '').substring(0, 100) + '</span></li>').join('')}
-                            </ul>
-                        </div>
-                        <div style="background:#fff8e1;border-radius:8px;padding:16px;">
-                            <h4 style="color:#e65100;margin:0 0 8px;">This Month</h4>
-                            <ul style="padding-left:16px;margin:0;">
-                                ${(plan.this_month || []).map(a => '<li style="margin:6px 0;font-size:13px;"><strong>' + a.action + '</strong><br><span style="color:#666;">' + (a.detail || '').substring(0, 100) + '</span></li>').join('')}
-                            </ul>
-                        </div>
-                        <div style="background:#e8f5e9;border-radius:8px;padding:16px;">
-                            <h4 style="color:#2e7d32;margin:0 0 8px;">This Quarter</h4>
-                            <ul style="padding-left:16px;margin:0;">
-                                ${(plan.this_quarter || []).map(a => '<li style="margin:6px 0;font-size:13px;"><strong>' + a.action + '</strong><br><span style="color:#666;">' + (a.detail || '').substring(0, 100) + '</span></li>').join('')}
-                            </ul>
-                        </div>
-                    </div>
-                </div>`;
-        }).catch(e => {
-            document.getElementById('forecastSection').innerHTML = '<div class="inv-section"><p style="color:#888;">Strategic forecast loading... Refresh both data sources first.</p></div>';
+    function pollStatus() {
+        fetch('/api/inventory/status').then(function(r) { return r.json(); }).then(function(s) {
+            if (s.refreshing) { setTimeout(pollStatus, 2000); return; }
+            if (s.error) { alert('Error: ' + s.error); }
+            document.getElementById('refreshBtn').disabled = false;
+            document.getElementById('refreshBtn').textContent = 'Refresh Data';
+            document.getElementById('loadingState').style.display = 'none';
+            if (s.has_data) loadData();
         });
     }
 
-    // Load existing data on page load if available
+    function loadData() {
+        fetch('/api/inventory/data').then(function(r) { return r.json(); }).then(function(data) {
+            _allData = data;
+            renderAll(data);
+            fetch('/api/forecast').then(function(r) { return r.json(); }).then(function(fc) {
+                _forecast = fc;
+                renderForecastPane(data, fc);
+            }).catch(function() {});
+        });
+    }
+
+    function renderAll(data) {
+        var a = data.analysis || {}, r = data.recommendations || {}, p = data.projections || {};
+        renderOverview(a, r, p);
+        renderProducts(r);
+        renderPerformance(a);
+        renderBuying(a, r);
+        renderForecastPane(data, _forecast);
+    }
+
+    /* ══════════════════════════════════════════════════════
+       OVERVIEW TAB
+       ══════════════════════════════════════════════════════ */
+    function renderOverview(a, r, p) {
+        var s = a.summary || {};
+        var cf = p.cash_flow || {};
+        var score = cf.health_score || 0;
+        var clr = healthColor(score);
+        var pct = Math.min(score, 100) * 3.6;
+        var winners = (a.winners || {}).top_by_revenue || [];
+        var deadstock = (a.dead_stock || []).slice(0, 5);
+        var priorities = (r.priorities || []).slice(0, 6);
+        var recs = (cf.recommendations || []).slice(0, 3);
+
+        document.getElementById('pane-overview').innerHTML =
+            '<div class="card" style="margin-bottom:16px;">' +
+                '<div class="health-row">' +
+                    '<div class="health-ring" style="background:conic-gradient(' + clr + ' ' + pct + 'deg, rgba(255,255,255,.06) 0);">' +
+                        '<div class="health-inner"><div class="score" style="color:' + clr + '">' + score + '</div><div class="label">/ 100</div></div>' +
+                    '</div>' +
+                    '<div class="health-text">' +
+                        '<h2>Inventory Health: ' + esc(cf.rating || 'Unknown') + '</h2>' +
+                        '<p>Turnover ' + (cf.metrics && cf.metrics.inventory_turnover != null ? cf.metrics.inventory_turnover.toFixed(1) : '\u2014') + 'x/yr \u00B7 ' + fmt(cf.metrics && cf.metrics.days_of_inventory) + ' days of stock \u00B7 ' + ((s.dead_stock_ratio || 0) * 100).toFixed(0) + '% dead stock by value</p>' +
+                        '<ul class="health-recs">' + recs.map(function(r) { return '<li>' + esc(r) + '</li>'; }).join('') + '</ul>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+
+            '<div class="card-grid card-grid-4" style="margin-bottom:16px;">' +
+                '<div class="card kpi"><div class="kpi-val green">' + fmtK(s.total_revenue) + '</div><div class="kpi-label">Revenue (12mo)</div><div class="kpi-sub">' + fmt(s.total_orders) + ' orders</div></div>' +
+                '<div class="card kpi"><div class="kpi-val">' + fmtK(s.total_inventory_value) + '</div><div class="kpi-label">Inventory Value</div><div class="kpi-sub">' + fmt(s.total_products) + ' products</div></div>' +
+                '<div class="card kpi"><div class="kpi-val ' + (s.dead_stock_ratio > .25 ? 'red' : s.dead_stock_ratio > .15 ? 'amber' : 'green') + '">' + fmtK(s.dead_stock_capital) + '</div><div class="kpi-label">Dead Stock Capital</div><div class="kpi-sub">' + ((s.dead_stock_ratio || 0) * 100).toFixed(0) + '% of inventory</div></div>' +
+                '<div class="card kpi"><div class="kpi-val blue">' + fmtK(p.revenue && p.revenue.projected_total) + '</div><div class="kpi-label">12-Week Forecast</div><div class="kpi-sub">' + esc(p.revenue && p.revenue.confidence || '') + ' confidence</div></div>' +
+            '</div>' +
+
+            '<div class="card-grid card-grid-2">' +
+                '<div class="card"><h2>This Week\'s Priorities</h2><ul class="priority-list">' +
+                    (priorities.length ? priorities.map(function(p) {
+                        return '<li class="priority-item"><span class="urgency ' + p.urgency + '">' + esc(p.urgency).replace('_', ' ') + '</span><div class="priority-text"><div class="title">' + esc(p.title) + '</div><div class="action">' + esc(p.action) + '</div></div></li>';
+                    }).join('') : '<li style="color:var(--muted);padding:12px;">No urgent actions right now.</li>') +
+                '</ul></div>' +
+                '<div>' +
+                    '<div class="card" style="margin-bottom:16px;"><h2 style="color:var(--green);">Top Winners</h2><ul class="mini-list">' +
+                        (winners.slice(0, 5).map(function(w) {
+                            return '<li class="mini-item"><span class="mini-name">' + esc(w.name) + '</span><span class="mini-stat">' + dirIcon(w.direction) + ' ' + (w.qty_per_week != null ? w.qty_per_week.toFixed(1) : '0') + '/wk</span><span class="mini-stat" style="width:70px;text-align:right;">' + fmtK(w.total_revenue) + '</span></li>';
+                        }).join('') || '<li class="mini-item" style="color:var(--muted);">No sales data yet</li>') +
+                    '</ul></div>' +
+                    '<div class="card"><h2 style="color:var(--red);">Needs Attention</h2><ul class="mini-list">' +
+                        (deadstock.map(function(d) {
+                            return '<li class="mini-item"><span class="mini-name">' + esc(d.name) + '</span><span class="abadge ' + d.severity + '">' + d.severity + '</span><span class="mini-stat" style="width:70px;text-align:right;">' + fmtK(d.capital_tied) + '</span></li>';
+                        }).join('') || '<li class="mini-item" style="color:var(--muted);">No dead stock detected</li>') +
+                    '</ul></div>' +
+                '</div>' +
+            '</div>';
+    }
+
+    /* ══════════════════════════════════════════════════════
+       PRODUCTS TAB
+       ══════════════════════════════════════════════════════ */
+    function renderProducts(r) { renderProductTable(r.product_recommendations || []); }
+
+    function renderProductTable(allProducts) {
+        var products = allProducts;
+        if (_productFilter !== 'all') products = products.filter(function(p) { return p.action.toLowerCase().indexOf(_productFilter) !== -1; });
+        if (_productSearch) { var q = _productSearch.toLowerCase(); products = products.filter(function(p) { return ((p.name||'')+(p.sku||'')).toLowerCase().indexOf(q) !== -1; }); }
+        var shown = products.slice(0, 30);
+        var counts = {reorder:0, discount:0, hold:0, remove:0};
+        allProducts.forEach(function(p) {
+            var a = p.action.toLowerCase();
+            if (a.indexOf('reorder') !== -1) counts.reorder++;
+            else if (a.indexOf('discount') !== -1) counts.discount++;
+            else if (a.indexOf('remove') !== -1) counts.remove++;
+            else counts.hold++;
+        });
+
+        document.getElementById('pane-products').innerHTML =
+            '<div class="card">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px;">' +
+                    '<div class="filter-bar">' +
+                        '<button class="filter-btn ' + (_productFilter === 'all' ? 'active' : '') + '" onclick="filterProducts(\'all\')">All (' + allProducts.length + ')</button>' +
+                        '<button class="filter-btn ' + (_productFilter === 'reorder' ? 'active' : '') + '" onclick="filterProducts(\'reorder\')" style="border-color:rgba(34,197,94,.3);">Reorder (' + counts.reorder + ')</button>' +
+                        '<button class="filter-btn ' + (_productFilter === 'discount' ? 'active' : '') + '" onclick="filterProducts(\'discount\')" style="border-color:rgba(239,68,68,.3);">Discount (' + counts.discount + ')</button>' +
+                        '<button class="filter-btn ' + (_productFilter === 'hold' ? 'active' : '') + '" onclick="filterProducts(\'hold\')">Hold/Watch (' + counts.hold + ')</button>' +
+                        '<button class="filter-btn ' + (_productFilter === 'remove' ? 'active' : '') + '" onclick="filterProducts(\'remove\')" style="border-color:rgba(239,68,68,.3);">Remove (' + counts.remove + ')</button>' +
+                    '</div>' +
+                    '<input class="search-box" type="text" placeholder="Search by name or SKU..." value="' + esc(_productSearch) + '" oninput="searchProducts(this.value)">' +
+                '</div>' +
+                '<table class="ptable"><thead><tr>' +
+                    '<th>Product</th><th>Action</th><th style="text-align:right">Stock</th><th style="text-align:right">Sales/wk</th><th style="text-align:right">Revenue</th><th>Trend</th>' +
+                '</tr></thead><tbody>' +
+                    shown.map(function(p) {
+                        return '<tr><td class="name" title="' + esc(p.name) + '">' + esc(p.name) + '</td>' +
+                            '<td><span class="abadge ' + p.action.toLowerCase() + '">' + p.action.replace(/_/g, ' ') + '</span></td>' +
+                            '<td style="text-align:right;font-weight:600;">' + (p.stock_quantity != null ? p.stock_quantity : '\u2014') + '</td>' +
+                            '<td style="text-align:right;">' + (p.qty_per_week != null ? p.qty_per_week.toFixed(1) : '\u2014') + '</td>' +
+                            '<td style="text-align:right;">' + fmtK(p.total_sold * (p.price || 0)) + '</td>' +
+                            '<td>' + dirIcon(p.direction) + '</td></tr>';
+                    }).join('') +
+                '</tbody></table>' +
+                '<div class="count-label">Showing ' + shown.length + ' of ' + products.length + ' products</div>' +
+                (products.length > 30 ? '<button class="btn btn-primary show-more" onclick="showAllProducts()">Show All ' + products.length + '</button>' : '') +
+            '</div>';
+    }
+
+    function filterProducts(f) { _productFilter = f; if (_allData) renderProducts(_allData.recommendations || {}); }
+    function searchProducts(q) { _productSearch = q; if (_allData) renderProducts(_allData.recommendations || {}); }
+    function showAllProducts() {
+        var products = (_allData && _allData.recommendations && _allData.recommendations.product_recommendations) || [];
+        if (_productFilter !== 'all') products = products.filter(function(p) { return p.action.toLowerCase().indexOf(_productFilter) !== -1; });
+        if (_productSearch) { var q = _productSearch.toLowerCase(); products = products.filter(function(p) { return ((p.name||'')+(p.sku||'')).toLowerCase().indexOf(q) !== -1; }); }
+        var tbody = document.querySelector('.ptable tbody');
+        tbody.innerHTML = products.map(function(p) {
+            return '<tr><td class="name" title="' + esc(p.name) + '">' + esc(p.name) + '</td><td><span class="abadge ' + p.action.toLowerCase() + '">' + p.action.replace(/_/g, ' ') + '</span></td><td style="text-align:right;font-weight:600;">' + (p.stock_quantity != null ? p.stock_quantity : '\u2014') + '</td><td style="text-align:right;">' + (p.qty_per_week != null ? p.qty_per_week.toFixed(1) : '\u2014') + '</td><td style="text-align:right;">' + fmtK(p.total_sold * (p.price || 0)) + '</td><td>' + dirIcon(p.direction) + '</td></tr>';
+        }).join('');
+        document.querySelector('.count-label').textContent = 'Showing ' + products.length + ' of ' + products.length + ' products';
+        var btn = document.querySelector('.show-more'); if (btn) btn.remove();
+    }
+
+    /* ══════════════════════════════════════════════════════
+       PERFORMANCE TAB
+       ══════════════════════════════════════════════════════ */
+    function renderPerformance(a) {
+        var colors = (a.attributes && a.attributes.colors || []).slice(0, 8);
+        var patterns = (a.attributes && a.attributes.patterns || []).slice(0, 8);
+        var fabrics = (a.attributes && a.attributes.fabrics || []).slice(0, 8);
+        var cats = a.categories || [];
+        var geo = a.geography || {};
+
+        function barRows(items, clr) {
+            var max = (items[0] && items[0].total_revenue) || 1;
+            return items.map(function(i) {
+                return '<div class="bar-row"><div class="bar-label">' + esc(i.name) + '</div><div class="bar-track"><div class="bar-fill ' + clr + '" style="width:' + Math.max((i.total_revenue/max)*100, 3) + '%">' + fmtK(i.total_revenue) + '</div></div><div class="bar-meta">' + i.product_count + ' products ' + dirIcon(i.dominant_direction) + '</div></div>';
+            }).join('');
+        }
+
+        document.getElementById('pane-performance').innerHTML =
+            '<div class="card-grid card-grid-2">' +
+                '<div class="card"><h2>Revenue by Attribute</h2>' +
+                    '<div class="bar-section"><h3>Colors</h3>' + barRows(colors, 'teal') + '</div>' +
+                    '<div class="bar-section"><h3>Patterns</h3>' + barRows(patterns, 'purple') + '</div>' +
+                    '<div class="bar-section"><h3>Fabrics</h3>' + barRows(fabrics, 'blue') + '</div>' +
+                '</div>' +
+                '<div>' +
+                    '<div class="card" style="margin-bottom:16px;"><h2>Categories</h2>' +
+                        cats.map(function(c) {
+                            var dr = (c.dead_ratio || 0);
+                            return '<div class="cat-card"><div><div class="cat-name">' + esc(c.category) + '</div><div class="cat-stats"><span><strong>' + fmtK(c.total_revenue) + '</strong> revenue</span><span><strong>' + c.product_count + '</strong> products</span></div></div><div style="text-align:right;"><div style="font-size:11px;color:var(--muted);">Dead: ' + (dr*100).toFixed(0) + '%</div><div class="dead-bar"><div class="dead-bar-fill" style="width:' + Math.min(dr*100,100) + '%;background:' + (dr>.3?'var(--red)':dr>.15?'var(--amber)':'var(--green)') + ';"></div></div></div></div>';
+                        }).join('') +
+                    '</div>' +
+                    '<div class="card"><h2>Geography &amp; Channels</h2>' +
+                        '<div class="geo-grid">' +
+                            '<div class="geo-card"><div class="val" style="color:var(--green);">' + fmtK(geo.b2b && geo.b2b.revenue) + '</div><div class="lbl">B2B Revenue</div><div style="font-size:11px;color:var(--muted);">' + ((geo.b2b && geo.b2b.orders) || 0) + ' orders</div></div>' +
+                            '<div class="geo-card"><div class="val" style="color:var(--blue);">' + fmtK(geo.b2c && geo.b2c.revenue) + '</div><div class="lbl">B2C Revenue</div><div style="font-size:11px;color:var(--muted);">' + ((geo.b2c && geo.b2c.orders) || 0) + ' orders</div></div>' +
+                        '</div>' +
+                        (function() {
+                            var countries = (geo.countries || []).slice(0, 6);
+                            var maxC = (countries[0] && countries[0].revenue) || 1;
+                            return countries.map(function(c) {
+                                return '<div class="bar-row"><div class="bar-label">' + esc(c.country) + '</div><div class="bar-track"><div class="bar-fill green" style="width:' + Math.max((c.revenue/maxC)*100, 3) + '%">' + fmtK(c.revenue) + '</div></div><div class="bar-meta">' + c.orders + ' orders</div></div>';
+                            }).join('');
+                        })() +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+    }
+
+    /* ══════════════════════════════════════════════════════
+       BUYING & PRICING TAB
+       ══════════════════════════════════════════════════════ */
+    function renderBuying(a, r) {
+        var reorders = ((a.winners && a.winners.reorder_alerts) || []).slice(0, 10);
+        var buyMore = ((r.buying_plan && r.buying_plan.buy_more_of) || []).slice(0, 8);
+        var avoid = ((r.buying_plan && r.buying_plan.avoid_buying) || []).slice(0, 8);
+        var seasonal = (r.buying_plan && r.buying_plan.seasonal_prep) || {};
+        var dp = r.discount_plan || {};
+        var recovery = r.cash_recovery || {};
+        var allDiscounts = [].concat(
+            (dp.deep_discount || []).map(function(d) { return Object.assign({}, d, {tier:'Deep', tierClass:'tier-deep'}); }),
+            (dp.medium_discount || []).map(function(d) { return Object.assign({}, d, {tier:'Medium', tierClass:'tier-med'}); }),
+            (dp.light_discount || []).map(function(d) { return Object.assign({}, d, {tier:'Light', tierClass:'tier-light'}); })
+        ).slice(0, 15);
+
+        document.getElementById('pane-buying').innerHTML =
+            '<div class="card-grid card-grid-2">' +
+                '<div class="card"><h2 style="color:var(--green);">Reorder Alerts</h2>' +
+                    (reorders.length ?
+                        '<table class="reorder-table"><thead><tr><th>Product</th><th style="text-align:right">Stock</th><th style="text-align:right">Weeks Left</th><th style="text-align:right">Order Qty</th><th>Urgency</th></tr></thead><tbody>' +
+                        reorders.map(function(r) {
+                            var wl = r.weeks_of_stock != null ? r.weeks_of_stock : 0;
+                            return '<tr><td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + esc(r.name) + '">' + esc(r.name) + '</td><td style="text-align:right">' + r.stock_quantity + '</td><td style="text-align:right;font-weight:600;color:' + (wl<2?'var(--red)':wl<4?'var(--amber)':'var(--green)') + ';">' + wl.toFixed(1) + '</td><td style="text-align:right;font-weight:600;">' + r.suggested_reorder + '</td><td><span class="urgency ' + (r.urgency === 'critical' ? 'today' : 'this_week') + '">' + r.urgency + '</span></td></tr>';
+                        }).join('') +
+                        '</tbody></table>'
+                    : '<p style="color:var(--muted);">No reorder alerts right now.</p>') +
+                '</div>' +
+                '<div class="card"><h2>Buying Signals</h2>' +
+                    '<h3 style="color:var(--green);">Buy More</h3><div style="margin-bottom:12px;">' +
+                        (buyMore.map(function(b) { return '<span class="signal-chip buy">' + esc(b.type) + ': ' + esc(b.name) + '</span>'; }).join('') || '<span style="color:var(--muted);font-size:13px;">No strong buy signals</span>') +
+                    '</div>' +
+                    '<h3 style="color:var(--red);">Avoid Buying</h3><div style="margin-bottom:12px;">' +
+                        (avoid.map(function(a) { return '<span class="signal-chip avoid">' + esc(a.type) + ': ' + esc(a.name) + '</span>'; }).join('') || '<span style="color:var(--muted);font-size:13px;">No avoid signals</span>') +
+                    '</div>' +
+                    (seasonal.note ? '<h3 style="color:var(--purple);">Seasonal Prep</h3><p style="font-size:13px;color:var(--muted);">' + esc(seasonal.note) + '</p><div style="margin-top:6px;">' + (seasonal.stock_up || []).map(function(s) { return '<span class="signal-chip buy">' + esc(s) + '</span>'; }).join('') + '</div><div style="margin-top:4px;">' + (seasonal.reduce || []).map(function(s) { return '<span class="signal-chip avoid">' + esc(s) + '</span>'; }).join('') + '</div>' : '') +
+                '</div>' +
+            '</div>' +
+
+            '<div class="card" style="margin-top:16px;">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-bottom:16px;">' +
+                    '<h2>Discount &amp; Recovery Plan</h2>' +
+                    '<div style="display:flex;gap:16px;">' +
+                        '<div class="kpi" style="padding:0;text-align:right;"><div class="kpi-val red" style="font-size:20px;">' + fmtK(dp.total_recoverable_capital) + '</div><div class="kpi-label">Recoverable Capital</div></div>' +
+                        (recovery.total_expected_recovery ? '<div class="kpi" style="padding:0;text-align:right;"><div class="kpi-val green" style="font-size:20px;">' + fmtK(recovery.total_expected_recovery) + '</div><div class="kpi-label">Expected Recovery</div></div>' : '') +
+                    '</div>' +
+                '</div>' +
+                (dp.summary ? '<p style="font-size:13px;color:var(--muted);margin-bottom:16px;">' + esc(dp.summary) + '</p>' : '') +
+                '<table class="ptable"><thead><tr><th>Product</th><th>Tier</th><th style="text-align:right">Current</th><th style="text-align:right">Suggested</th><th style="text-align:right">Capital at Stake</th></tr></thead><tbody>' +
+                allDiscounts.map(function(d) {
+                    return '<tr><td class="name" title="' + esc(d.name) + '">' + esc(d.name) + '</td><td><span class="tier-badge ' + d.tierClass + '">' + d.tier + '</span></td><td style="text-align:right">' + fmt(d.current_price) + '</td><td style="text-align:right;font-weight:600;">' + fmt(d.suggested_price) + '</td><td style="text-align:right;color:var(--red);">' + fmtK(d.capital_at_stake) + '</td></tr>';
+                }).join('') +
+                '</tbody></table>' +
+            '</div>';
+    }
+
+    /* ══════════════════════════════════════════════════════
+       FORECAST TAB
+       ══════════════════════════════════════════════════════ */
+    function renderForecastPane(data, fc) {
+        var p = (data && data.projections) || {};
+        var a = (data && data.analysis) || {};
+        var proj = p.revenue || {};
+        var weeks = proj.weekly || [];
+        var seasonal = a.seasonal || {};
+        var curMonth = new Date().getMonth() + 1;
+        var curMonthData = (seasonal.monthly || []).find(function(m) { return m.month === curMonth; });
+        var nextMonthData = (seasonal.monthly || []).find(function(m) { return m.month === (curMonth % 12) + 1; });
+        var maxRev = Math.max.apply(null, weeks.map(function(w) { return w.projected_revenue || 0; }).concat([1]));
+
+        var forecastHTML = '';
+        if (fc) {
+            var ri = fc.risk_alerts || [];
+            var plan = fc.action_plan_90_day || {};
+            var cr = fc.cash_runway || {};
+
+            forecastHTML =
+                '<div class="card" style="margin-bottom:16px;"><h2>Cash Position</h2>' +
+                    '<div class="card-grid card-grid-4" style="margin-top:12px;">' +
+                        '<div class="kpi"><div class="kpi-val green">' + fmtK(cr.est_weekly_profit) + '</div><div class="kpi-label">Weekly Profit</div></div>' +
+                        '<div class="kpi"><div class="kpi-val">' + fmtK(cr.avg_monthly_revenue) + '</div><div class="kpi-label">Avg Monthly Revenue</div></div>' +
+                        '<div class="kpi"><div class="kpi-val ' + (cr.overdue_receivables > 200000 ? 'red' : 'amber') + '">' + fmtK(cr.overdue_receivables) + '</div><div class="kpi-label">Overdue Receivables</div></div>' +
+                        '<div class="kpi"><div class="kpi-val blue">' + fmtK(cr.expected_inflow_12_weeks) + '</div><div class="kpi-label">Expected 12-wk Inflow</div></div>' +
+                    '</div>' +
+                    ((cr.assessment||[]).length ? '<div style="margin-top:12px;">' + cr.assessment.map(function(a) { return '<p style="font-size:12px;color:var(--muted);padding:2px 0;">\u2192 ' + esc(a) + '</p>'; }).join('') + '</div>' : '') +
+                '</div>' +
+
+                (ri.length ? '<div class="card" style="margin-bottom:16px;"><h2>Risk Alerts</h2>' +
+                    ri.slice(0, 5).map(function(r) {
+                        return '<div class="risk-card ' + r.severity + '"><div class="risk-title">' + esc(r.risk) + '</div><div class="risk-detail">' + esc(r.detail) + '</div><div class="risk-action">\u2192 ' + esc(r.action) + '</div></div>';
+                    }).join('') +
+                '</div>' : '') +
+
+                '<div class="card" style="margin-bottom:16px;"><h2>90-Day Action Plan</h2>' +
+                    '<div class="plan-grid">' +
+                        '<div class="plan-col"><div class="plan-col-header week">This Week</div>' + ((plan.this_week||[]).slice(0,4).map(function(i) { return '<div class="plan-item"><strong>' + esc(i.action) + '</strong>' + esc(i.detail) + '</div>'; }).join('') || '<div class="plan-item" style="color:var(--muted);">No actions</div>') + '</div>' +
+                        '<div class="plan-col"><div class="plan-col-header month">This Month</div>' + ((plan.this_month||[]).slice(0,4).map(function(i) { return '<div class="plan-item"><strong>' + esc(i.action) + '</strong>' + esc(i.detail) + '</div>'; }).join('') || '<div class="plan-item" style="color:var(--muted);">No actions</div>') + '</div>' +
+                        '<div class="plan-col"><div class="plan-col-header quarter">This Quarter</div>' + ((plan.this_quarter||[]).slice(0,4).map(function(i) { return '<div class="plan-item"><strong>' + esc(i.action) + '</strong>' + esc(i.detail) + '</div>'; }).join('') || '<div class="plan-item" style="color:var(--muted);">No actions</div>') + '</div>' +
+                    '</div>' +
+                '</div>';
+        }
+
+        var revChartHTML = '';
+        if (weeks.length) {
+            revChartHTML = '<div class="card" style="margin-bottom:16px;">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-bottom:16px;">' +
+                    '<h2>12-Week Revenue Projection</h2>' +
+                    '<div style="display:flex;gap:20px;">' +
+                        '<div class="kpi" style="padding:0;text-align:right;"><div class="kpi-val" style="font-size:18px;">' + fmtK(proj.current_weekly_revenue) + '</div><div class="kpi-label">Current Weekly</div></div>' +
+                        '<div class="kpi" style="padding:0;text-align:right;"><div class="kpi-val blue" style="font-size:18px;">' + fmtK(proj.projected_total) + '</div><div class="kpi-label">12-Week Total</div></div>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="rev-chart">' +
+                    weeks.map(function(w) {
+                        return '<div class="rev-bar-wrap"><div class="rev-bar-val">' + fmtK(w.projected_revenue) + '</div><div class="rev-bar" style="height:' + Math.max((w.projected_revenue/maxRev)*100, 3) + '%;"></div><div class="rev-bar-label">W' + w.week + '</div></div>';
+                    }).join('') +
+                '</div>' +
+                (proj.note ? '<p style="font-size:12px;color:var(--muted);margin-top:12px;">' + esc(proj.note) + '</p>' : '') +
+            '</div>';
+        }
+
+        var seasonHTML = '';
+        if (curMonthData || nextMonthData) {
+            seasonHTML = '<div class="card"><h2>Seasonal Insights</h2><div class="season-row">';
+            if (curMonthData) {
+                seasonHTML += '<div class="season-card current"><h4>Now: ' + esc(curMonthData.month_name) + '</h4>' +
+                    '<p style="font-size:12px;color:var(--muted);">' + esc(curMonthData.industry_note || '') + '</p>' +
+                    (curMonthData.nordic_note ? '<p style="font-size:11px;color:var(--purple);margin-top:4px;">' + esc(curMonthData.nordic_note) + '</p>' : '') +
+                    '<div class="season-tags">' + (curMonthData.high_demand_fabrics||[]).map(function(f) { return '<span class="season-tag high">' + esc(f) + '</span>'; }).join('') + (curMonthData.low_demand_fabrics||[]).map(function(f) { return '<span class="season-tag low">' + esc(f) + '</span>'; }).join('') + '</div></div>';
+            }
+            if (nextMonthData) {
+                seasonHTML += '<div class="season-card"><h4>Next: ' + esc(nextMonthData.month_name) + '</h4>' +
+                    '<p style="font-size:12px;color:var(--muted);">' + esc(nextMonthData.industry_note || '') + '</p>' +
+                    (nextMonthData.nordic_note ? '<p style="font-size:11px;color:var(--purple);margin-top:4px;">' + esc(nextMonthData.nordic_note) + '</p>' : '') +
+                    '<div class="season-tags">' + (nextMonthData.high_demand_fabrics||[]).map(function(f) { return '<span class="season-tag high">' + esc(f) + '</span>'; }).join('') + (nextMonthData.low_demand_fabrics||[]).map(function(f) { return '<span class="season-tag low">' + esc(f) + '</span>'; }).join('') + '</div></div>';
+            }
+            seasonHTML += '</div></div>';
+        }
+
+        document.getElementById('pane-forecast').innerHTML = forecastHTML + revChartHTML + seasonHTML;
+
+        if (!fc && !weeks.length) {
+            document.getElementById('pane-forecast').innerHTML = '<div class="empty-state"><h2>No Forecast Data Yet</h2><p>Click Refresh Data to generate projections. Both WooCommerce and e-conomic data are needed for the full strategic forecast.</p></div>';
+        }
+    }
+
+    /* ── Init ── */
     {% if woo_cache.analysis %}
-    document.addEventListener('DOMContentLoaded', loadDashboard);
+    loadData();
+    {% else %}
+    document.getElementById('pane-overview').innerHTML = '<div class="empty-state"><h2>No Data Yet</h2><p>Click <strong>Refresh Data</strong> to pull inventory from WooCommerce and generate analysis.</p></div>';
     {% endif %}
     </script>
+    {% endif %}
 </body>
 </html>
