@@ -1,5 +1,6 @@
 """Flask web application for the Fabric Trend Spotter dashboard."""
 
+import gc
 import logging
 import threading
 from datetime import datetime, timedelta
@@ -658,6 +659,10 @@ def _run_eco_analysis():
             analysis.get("summary", {}).get("total_net_revenue", 0),
         )
 
+        # Free raw API data (analysis results are kept in cache)
+        del invoices, customers, products, drafts, analyzer, reconciler, eco
+        gc.collect()
+
     except Exception as e:
         logger.error("e-conomic analysis failed: %s", e, exc_info=True)
         eco_cache["error"] = str(e)
@@ -706,6 +711,13 @@ def _run_woo_analysis():
             "category_turnover": projector.get_inventory_turnover_by_category(),
         }
 
+        # Trim large lists before caching to save memory
+        # (API endpoints already cap these, but the cache itself was unbounded)
+        if "velocity" in analysis:
+            analysis["velocity"] = analysis["velocity"][:200]
+        if "dead_stock" in analysis:
+            analysis["dead_stock"] = analysis["dead_stock"][:100]
+
         woo_cache["analysis"] = analysis
         woo_cache["recommendations"] = recommendations
         woo_cache["projections"] = projections
@@ -717,6 +729,10 @@ def _run_woo_analysis():
             len(products), len(orders),
             len(recommendations.get("product_recommendations", [])),
         )
+
+        # Free raw API data (analysis results are kept in cache)
+        del products, orders, analyzer, recommender, projector, woo
+        gc.collect()
 
     except Exception as e:
         logger.error("WooCommerce analysis failed: %s", e, exc_info=True)
@@ -1004,8 +1020,8 @@ def _run_scrape():
         )
         result = analyze_trends(all_listings, google_data)
 
-        # Store insights for dashboard action board
-        scrape_status["insights"] = result.get("insights", [])
+        # Store insights for dashboard action board (cap to save memory)
+        scrape_status["insights"] = result.get("insights", [])[:50]
 
         # Step 5: Run forecasting
         logger.info("Running trend forecasts...")
@@ -1160,6 +1176,14 @@ def _run_scrape():
             eu_result.get("total_countries", 0), len(forecasts),
             ok_sources, failed_sources,
         )
+
+        # --- Memory cleanup: free large temp lists after analysis ---
+        del all_listings, eu_listings, seed_listings
+        del eu_shop_listings, competitor_listings
+        del forecasts, google_data, result, eu_result
+        del pinterest_result, trend_report
+        gc.collect()
+        logger.info("Memory cleanup: freed temporary scrape data")
 
     except Exception as e:
         logger.error("Scrape failed: %s", e, exc_info=True)
