@@ -20,6 +20,7 @@ from datetime import datetime
 
 from woo_intel.analyzer import (
     SEASONAL_FABRIC_PATTERNS,
+    SEASONAL_COLOR_PATTERNS,
     NORDIC_SEASONAL_NOTES,
 )
 
@@ -123,13 +124,25 @@ class ActionRecommender:
         days_since = v["days_since_last_sale"]
         total_sold = v["total_sold"]
         fabric = (v.get("fabric_type") or "").lower()
+        color = (v.get("color") or "").lower()
         name = v["name"]
 
-        # Check if upcoming season favors this fabric
+        # Check if upcoming season favors this fabric OR color
         next_high = self._next_seasonal[0]
-        is_upcoming_season = any(h in fabric for h in next_high)
+        is_upcoming_fabric = any(h in fabric for h in next_high) if fabric else False
+        next_high_colors = SEASONAL_COLOR_PATTERNS.get(self._next_month, ([], []))[0]
+        is_upcoming_color = any(
+            hc in color or color in hc for hc in next_high_colors
+        ) if color else False
+        is_upcoming_season = is_upcoming_fabric or is_upcoming_color
+
         current_low = self._seasonal[1]
-        is_off_season = any(h in fabric for h in current_low)
+        is_off_season_fabric = any(h in fabric for h in current_low) if fabric else False
+        current_low_colors = SEASONAL_COLOR_PATTERNS.get(self._current_month, ([], []))[1]
+        is_off_season_color = any(
+            lc in color or color in lc for lc in current_low_colors
+        ) if color else False
+        is_off_season = is_off_season_fabric or is_off_season_color
 
         # Decision tree
         if needs_reorder and direction in ("accelerating", "stable"):

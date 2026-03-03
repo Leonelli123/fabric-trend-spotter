@@ -14,7 +14,9 @@ import logging
 from collections import defaultdict
 from datetime import datetime, timedelta
 
-from woo_intel.analyzer import SEASONAL_FABRIC_PATTERNS, NORDIC_SEASONAL_NOTES
+from woo_intel.analyzer import (
+    SEASONAL_FABRIC_PATTERNS, SEASONAL_COLOR_PATTERNS, NORDIC_SEASONAL_NOTES,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -440,6 +442,14 @@ class SmartAnalyzer:
                 0.10 * history_signal
             )
 
+            # Seasonal protection: if this product's fabric or color has
+            # strong upcoming seasonal demand, cap the remove score.
+            # You don't liquidate inventory right before its selling season.
+            if seasonal_signal <= 15:
+                remove_score = min(remove_score, 40)  # below threshold — won't remove
+            elif seasonal_signal <= 30:
+                remove_score = min(remove_score, 55)  # marginal — only if other signals very strong
+
             if remove_score < 50:
                 continue  # Not a removal candidate
 
@@ -480,25 +490,66 @@ class SmartAnalyzer:
         return candidates
 
     def _seasonal_remove_signal(self, v: dict) -> float:
-        """0 = keep (good season ahead), 100 = remove (no seasonal hope)."""
+        """0 = keep (good season ahead), 100 = remove (no seasonal hope).
+
+        Checks BOTH fabric type AND color against upcoming seasonal demand.
+        Unicolor/solid items get color-season protection.
+        """
         fabric = (v.get("fabric_type") or "").lower()
+        color = (v.get("color") or "").lower()
+
+        # Check fabric seasonality
+        fabric_score = self._check_fabric_season(fabric)
+
+        # Check color seasonality — especially important for unicolor items
+        color_score = self._check_color_season(color)
+
+        # Use the more favorable (lower) score — if either fabric or color
+        # has an upcoming season, protect the product
+        return min(fabric_score, color_score)
+
+    def _check_fabric_season(self, fabric: str) -> float:
+        """Check fabric type against seasonal patterns."""
         if not fabric:
-            return 50  # unknown — neutral
+            return 50
 
-        next_high = SEASONAL_FABRIC_PATTERNS.get(self._next_month, ([], [], ""))[0]
+        # Look ahead 3 months for seasonal demand
+        for offset in range(1, 4):
+            future = ((self._current_month - 1 + offset) % 12) + 1
+            high = SEASONAL_FABRIC_PATTERNS.get(future, ([], [], ""))[0]
+            for h in high:
+                if h in fabric:
+                    return max(5, 10 * offset)  # sooner = stronger protection
+
+        # Currently low-demand?
         current_low = SEASONAL_FABRIC_PATTERNS.get(self._current_month, ([], [], ""))[1]
-
-        # If upcoming season favors this fabric, reduce remove signal
-        for h in next_high:
-            if h in fabric:
-                return 10  # season is coming — don't remove
-
-        # If currently low-demand and next month isn't better
         for low in current_low:
             if low in fabric:
-                return 70  # off-season, no relief coming
+                return 70
+        return 50
 
-        return 50  # neutral
+    def _check_color_season(self, color: str) -> float:
+        """Check color against seasonal color patterns.
+
+        Protects unicolor/solid items whose color is about to come into season.
+        """
+        if not color:
+            return 50
+
+        # Look ahead 3 months for color demand
+        for offset in range(1, 4):
+            future = ((self._current_month - 1 + offset) % 12) + 1
+            high_colors = SEASONAL_COLOR_PATTERNS.get(future, ([], []))[0]
+            for hc in high_colors:
+                if hc in color or color in hc:
+                    return max(5, 10 * offset)  # sooner = stronger protection
+
+        # Currently off-season for this color?
+        current_low = SEASONAL_COLOR_PATTERNS.get(self._current_month, ([], []))[1]
+        for lc in current_low:
+            if lc in color or color in lc:
+                return 65
+        return 50
 
     def _remove_reasons(self, v, staleness, velocity_sig, capital_sig,
                         cat_sig, seasonal_sig, history_sig, capital) -> list[str]:
@@ -675,21 +726,37 @@ class SmartAnalyzer:
         return candidates
 
     def _seasonal_keep_signal(self, v: dict) -> float:
-        """0 = no seasonal hope, 100 = strong seasonal returner."""
+        """0 = no seasonal hope, 100 = strong seasonal returner.
+
+        Checks both fabric type AND color — a solid pastel jersey in February
+        should score high because spring pastels are coming.
+        """
         fabric = (v.get("fabric_type") or "").lower()
+        color = (v.get("color") or "").lower()
 
-        # Check next 3 months for seasonal demand
-        score = 0
+        fabric_score = 0
+        color_score = 0
+
+        # Check fabric season (next 3 months)
         for offset in range(1, 4):
-            future_month = ((self._current_month - 1 + offset) % 12) + 1
-            seasonal = SEASONAL_FABRIC_PATTERNS.get(future_month, ([], [], ""))
+            future = ((self._current_month - 1 + offset) % 12) + 1
+            seasonal = SEASONAL_FABRIC_PATTERNS.get(future, ([], [], ""))
             for high in seasonal[0]:
-                if high in fabric:
-                    # Sooner = higher score
-                    score = max(score, 100 - (offset - 1) * 20)
+                if fabric and high in fabric:
+                    fabric_score = max(fabric_score, 100 - (offset - 1) * 20)
 
-        # Also check if it sold well historically (total_sold > 5 suggests
-        # it's not a dud, just seasonal)
+        # Check color season (next 3 months)
+        for offset in range(1, 4):
+            future = ((self._current_month - 1 + offset) % 12) + 1
+            high_colors = SEASONAL_COLOR_PATTERNS.get(future, ([], []))[0]
+            for hc in high_colors:
+                if color and (hc in color or color in hc):
+                    color_score = max(color_score, 100 - (offset - 1) * 20)
+
+        # Use the best signal from either fabric or color
+        score = max(fabric_score, color_score)
+
+        # Boost if product has proven it sells (not a dud, just seasonal)
         if score > 0 and v["total_sold"] >= 5:
             score = min(score + 15, 100)
 

@@ -69,6 +69,35 @@ NORDIC_SEASONAL_NOTES = {
     12: "Scandinavia: January sale culture means discount timing matters",
 }
 
+# Color seasonality — which colors peak in which months
+# month -> (high-demand colors, low-demand colors)
+SEASONAL_COLOR_PATTERNS = {
+    1:  (["dark", "navy", "charcoal", "black", "burgundy", "forest", "mørk"],
+         ["pastel", "neon", "coral", "mint", "lyserød"]),
+    2:  (["red", "pink", "rose", "rød", "lyserød", "bordeaux"],
+         ["neon", "tropical"]),
+    3:  (["pastel", "mint", "baby blue", "soft pink", "lavender", "sage", "lys"],
+         ["dark", "burgundy", "mørk"]),
+    4:  (["pastel", "floral", "mint", "coral", "yellow", "lys", "gul", "rosa"],
+         ["dark", "charcoal", "mørk", "sort"]),
+    5:  (["bright", "coral", "turquoise", "yellow", "white", "gul", "hvid", "turkis"],
+         ["dark", "burgundy", "mørk"]),
+    6:  (["bright", "bold", "coral", "turquoise", "tropical", "orange", "turkis"],
+         ["dark", "muted", "charcoal", "mørk"]),
+    7:  (["bright", "bold", "blue", "turquoise", "white", "blå", "hvid"],
+         ["dark", "muted", "mørk"]),
+    8:  (["earth", "rust", "mustard", "olive", "warm", "rust", "sennep"],
+         ["pastel", "neon"]),
+    9:  (["rust", "mustard", "burgundy", "olive", "earth", "terracotta", "sennep", "bordeaux"],
+         ["pastel", "mint", "baby blue"]),
+    10: (["dark", "orange", "rust", "burgundy", "forest", "mørk", "bordeaux"],
+         ["pastel", "coral", "tropical"]),
+    11: (["red", "green", "gold", "navy", "forest", "rød", "grøn", "guld"],
+         ["pastel", "neon", "tropical"]),
+    12: (["red", "green", "gold", "silver", "navy", "rød", "grøn", "sølv"],
+         ["pastel", "tropical", "neon"]),
+}
+
 
 class InventoryAnalyzer:
     """Crunches product + order data into actionable intelligence."""

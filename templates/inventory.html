@@ -471,32 +471,32 @@
         var max = Math.max.apply(null, vals);
         var min = Math.min.apply(null, vals);
         var range = max - min || 1;
-        var w = 100, h = 60, padX = 4, padY = 12;
+        var w = 600, h = 80, padX = 25, padY = 16;
         var pts = vals.map(function(v, i) {
-            return ((i / 11) * (w - padX*2) + padX) + ',' + (h - padY - ((v - min) / range) * (h - padY*2));
+            return ((i / 11) * (w - padX*2) + padX).toFixed(1) + ',' + (h - padY - ((v - min) / range) * (h - padY*2 - 8)).toFixed(1);
         });
         var areapts = padX + ',' + (h - padY) + ' ' + pts.join(' ') + ' ' + (w - padX) + ',' + (h - padY);
         var labels = months.map(function(m, i) {
             var x = (i / 11) * (w - padX*2) + padX;
-            return '<text x="' + x + '" y="' + (h - 1) + '" class="curve-label">' + m + '</text>';
+            return '<text x="' + x.toFixed(1) + '" y="' + (h - 2) + '" class="curve-label">' + m + '</text>';
         }).join('');
         var dots = vals.map(function(v, i) {
             var x = (i / 11) * (w - padX*2) + padX;
-            var y = h - padY - ((v - min) / range) * (h - padY*2);
+            var y = h - padY - ((v - min) / range) * (h - padY*2 - 8);
             var cls = (i + 1) === currentMonth ? 'curve-dot current' : 'curve-dot';
-            var r = (i + 1) === currentMonth ? 3 : 1.5;
-            return '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" class="' + cls + '"/>';
+            var r = (i + 1) === currentMonth ? 4 : 2;
+            return '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + r + '" class="' + cls + '"/>';
         }).join('');
         var valLabels = vals.map(function(v, i) {
             if ((i + 1) === currentMonth || i === 0 || i === 11 || v === max || v === min) {
                 var x = (i / 11) * (w - padX*2) + padX;
-                var y = h - padY - ((v - min) / range) * (h - padY*2) - 4;
-                return '<text x="' + x + '" y="' + y + '" class="curve-val">' + v + '</text>';
+                var y = h - padY - ((v - min) / range) * (h - padY*2 - 8) - 6;
+                return '<text x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" class="curve-val">' + v + '</text>';
             }
             return '';
         }).join('');
         return '<div class="demand-curve"><h3>Seasonal Demand Curve</h3>' +
-            '<svg viewBox="0 0 ' + w + ' ' + h + '" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">' +
+            '<svg viewBox="0 0 ' + w + ' ' + h + '" xmlns="http://www.w3.org/2000/svg">' +
             '<defs><linearGradient id="demandGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--accent)" stop-opacity=".3"/><stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>' +
             '<polygon points="' + areapts + '" class="curve-area"/>' +
             '<polyline points="' + pts.join(' ') + '" class="curve-line"/>' +
