@@ -458,7 +458,7 @@
     }
 
     /* ══════════════════════════════════════════════════════
-       ACTIONS (actionable intelligence)
+       ACTIONS (AI Business Advisor)
        ══════════════════════════════════════════════════════ */
     function renderActions() {
         if (!_actions) {
@@ -468,25 +468,50 @@
         var s = _actions.summary || {};
         var conc = _actions.revenue_concentration || {};
         var guidance = _actions.expense_guidance || [];
+        var briefing = _actions.ai_briefing || [];
+        var concColor = conc.risk_level === 'critical' ? 'var(--red)' : conc.risk_level === 'warning' ? 'var(--amber)' : 'var(--green)';
 
-        function actionCards(items, maxShow) {
-            if (!items || !items.length) return '<p style="color:var(--muted);padding:12px;">None right now.</p>';
-            return items.slice(0, maxShow || 10).map(function(c) {
-                var sev = c.severity || 'info';
-                return '<div class="action-card">' +
-                    '<div class="severity-dot ' + sev + '"></div>' +
-                    '<div class="action-customer" title="' + esc(c.name) + '">' + esc(c.name) + '</div>' +
-                    '<div class="action-reason">' + esc(c.reason) + '</div>' +
-                    '<div class="action-stats">' +
-                        '<div><div class="action-stat-val">' + fmtK(c.net_revenue) + '</div><div class="action-stat-label">Revenue</div></div>' +
-                        (c.outstanding > 0 ? '<div><div class="action-stat-val" style="color:var(--red);">' + fmtK(c.outstanding) + '</div><div class="action-stat-label">Owes</div></div>' : '') +
-                        (c.revenue_share_pct ? '<div><div class="action-stat-val">' + c.revenue_share_pct + '%</div><div class="action-stat-label">Share</div></div>' : '') +
-                    '</div></div>';
-            }).join('');
+        // Helper: customer action row
+        function custRow(c, accentColor) {
+            return '<div class="action-card">' +
+                '<div class="severity-dot ' + (c.severity || c.priority || 'info') + '"></div>' +
+                '<div class="action-customer" title="' + esc(c.name) + '">' + esc(c.name) + '</div>' +
+                '<div class="action-reason">' + esc(c.recommendation) + '</div>' +
+                '<div class="action-stats">' +
+                    '<div><div class="action-stat-val">' + fmtK(c.net_revenue) + '</div><div class="action-stat-label">Revenue</div></div>' +
+                    (c.outstanding > 0 ? '<div><div class="action-stat-val" style="color:var(--red);">' + fmtK(c.outstanding) + '</div><div class="action-stat-label">Owes</div></div>' : '') +
+                    (c.projected_value ? '<div><div class="action-stat-val" style="color:var(--green);">' + fmtK(c.projected_value) + '</div><div class="action-stat-label">Projected</div></div>' : '') +
+                    (c.revenue_share_pct > 0 ? '<div><div class="action-stat-val">' + c.revenue_share_pct + '%</div><div class="action-stat-label">Share</div></div>' : '') +
+                '</div></div>';
         }
 
-        // Concentration bar
-        var concColor = conc.risk_level === 'critical' ? 'var(--red)' : conc.risk_level === 'warning' ? 'var(--amber)' : 'var(--green)';
+        function custList(items, maxShow) {
+            if (!items || !items.length) return '<p style="color:var(--muted);padding:12px 16px;">None right now.</p>';
+            return items.slice(0, maxShow || 10).map(function(c) { return custRow(c); }).join('');
+        }
+
+        // ── AI Briefing (top priority actions) ──
+        var briefIcons = {money:'&#128176;', alert:'&#9888;', invest:'&#9733;', cut:'&#9986;', warning:'&#9888;', guidance:'&#9881;', good:'&#10003;', info:'&#8505;'};
+        var briefHTML = briefing.map(function(b) {
+            var sevColor = b.severity === 'critical' ? 'var(--red)' : b.severity === 'warning' ? 'var(--amber)' : b.severity === 'good' ? 'var(--green)' : 'var(--blue)';
+            return '<div style="display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--border);">' +
+                '<div style="width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.04);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">' + (briefIcons[b.icon] || '&#8226;') + '</div>' +
+                '<div style="flex:1;">' +
+                    '<div style="font-weight:700;font-size:14px;color:' + sevColor + ';">' + esc(b.title) + '</div>' +
+                    '<div style="font-size:13px;color:var(--muted);margin-top:3px;line-height:1.5;">' + esc(b.detail) + '</div>' +
+                '</div></div>';
+        }).join('');
+
+        // ── Guidance (what to do) ──
+        var guidanceHTML = guidance.map(function(g) {
+            var pc = g.priority === 'critical' ? 'var(--red)' : g.priority === 'warning' ? 'var(--amber)' : g.priority === 'good' ? 'var(--green)' : 'var(--blue)';
+            return '<div class="guidance-card">' +
+                '<div class="severity-dot ' + g.priority + '" style="margin-top:4px;"></div>' +
+                '<div class="guidance-area" style="color:' + pc + ';">' + esc(g.area) + '</div>' +
+                '<div class="guidance-text">' + esc(g.action) + '</div></div>';
+        }).join('');
+
+        // ── Concentration bars ──
         var concBars = '';
         if (conc.top_customers && conc.top_customers.length) {
             concBars = conc.top_customers.slice(0, 8).map(function(tc) {
@@ -497,90 +522,77 @@
             }).join('');
         }
 
-        // Guidance cards
-        var guidanceHTML = guidance.map(function(g) {
-            var pc = g.priority === 'critical' ? 'var(--red)' : g.priority === 'warning' ? 'var(--amber)' : g.priority === 'good' ? 'var(--green)' : 'var(--blue)';
-            return '<div class="guidance-card">' +
-                '<div class="severity-dot ' + g.priority + '" style="margin-top:4px;"></div>' +
-                '<div class="guidance-area" style="color:' + pc + ';">' + esc(g.area) + '</div>' +
-                '<div class="guidance-text">' + esc(g.action) + '</div></div>';
-        }).join('');
+        // ── Invest sub-type badges ──
+        var subBadge = {rising_star:'Rising', loyal_vip:'VIP', new_promising:'New', sleeping_giant:'Sleeping'};
+        var subColor = {rising_star:'var(--green)', loyal_vip:'var(--blue)', new_promising:'var(--purple)', sleeping_giant:'var(--amber)'};
 
         document.getElementById('pane-actions').innerHTML =
-            // Summary counters
+            // ── Summary counters ──
             '<div class="action-summary-grid">' +
-                '<div class="action-summary-card"><div class="num" style="color:var(--green);">' + s.rising_star_count + '</div><div class="lbl">Rising Stars</div></div>' +
-                '<div class="action-summary-card"><div class="num" style="color:var(--blue);">' + s.nurture_count + '</div><div class="lbl">Nurture</div></div>' +
-                '<div class="action-summary-card"><div class="num" style="color:var(--amber);">' + s.churn_risk_count + '</div><div class="lbl">Churn Risk</div></div>' +
-                '<div class="action-summary-card"><div class="num" style="color:var(--red);">' + s.chase_payment_count + '</div><div class="lbl">Chase Payment</div></div>' +
-                '<div class="action-summary-card"><div class="num" style="color:var(--purple);">' + s.new_potential_count + '</div><div class="lbl">New Potential</div></div>' +
+                '<div class="action-summary-card"><div class="num" style="color:var(--green);">' + s.invest_count + '</div><div class="lbl">Invest In</div></div>' +
+                '<div class="action-summary-card"><div class="num" style="color:var(--red);">' + s.stop_spending_count + '</div><div class="lbl">Stop Spending</div></div>' +
+                '<div class="action-summary-card"><div class="num" style="color:var(--amber);">' + s.chase_payment_count + '</div><div class="lbl">Chase Payment</div></div>' +
+                '<div class="action-summary-card"><div class="num" style="color:var(--purple);">' + s.churn_risk_count + '</div><div class="lbl">Churn Risk</div></div>' +
                 '<div class="action-summary-card"><div class="num" style="color:' + concColor + ';">' + esc(conc.risk_level || '?').toUpperCase() + '</div><div class="lbl">Concentration</div></div>' +
+                (s.total_overdue > 0 ? '<div class="action-summary-card"><div class="num" style="color:var(--red);">' + fmtK(s.total_overdue) + '</div><div class="lbl">Total Overdue</div></div>' : '') +
             '</div>' +
 
-            // Guidance section
+            // ── AI Briefing ──
+            '<div class="action-section"><div class="card ai-card" style="border-left:3px solid var(--accent);">' +
+                '<div class="action-section-header"><div class="action-icon" style="background:rgba(108,99,255,.15);color:var(--accent);"><span class="ai-label">AI</span></div><h2>Your Business Briefing</h2></div>' +
+                '<p style="font-size:12px;color:var(--muted);margin-bottom:8px;padding:0 4px;">Top priorities ranked by business impact — do these first.</p>' +
+                briefHTML +
+            '</div></div>' +
+
+            // ── Spend Guidance ──
             '<div class="action-section"><div class="card" style="border-left:3px solid var(--accent);">' +
-                '<div class="action-section-header"><div class="action-icon" style="background:rgba(108,99,255,.15);color:var(--accent);">&#9881;</div><h2>What To Do Right Now</h2></div>' +
+                '<div class="action-section-header"><div class="action-icon" style="background:rgba(108,99,255,.15);color:var(--accent);">&#9881;</div><h2>Where To Spend, Where To Cut</h2></div>' +
                 guidanceHTML +
             '</div></div>' +
 
-            // Chase Payment
-            ((_actions.chase_payment || []).length ? '<div class="action-section"><div class="card" style="border-left:3px solid var(--red);">' +
-                '<div class="action-section-header"><div class="action-icon" style="background:rgba(239,68,68,.15);color:var(--red);">&#9888;</div><h2>Chase Payment</h2><span class="count-badge" style="background:rgba(239,68,68,.12);color:var(--red);">' + s.chase_payment_count + '</span></div>' +
-                actionCards(_actions.chase_payment, 8) +
-            '</div></div>' : '') +
-
-            // Churn Risk
-            ((_actions.churn_risk || []).length ? '<div class="action-section"><div class="card" style="border-left:3px solid var(--amber);">' +
-                '<div class="action-section-header"><div class="action-icon" style="background:rgba(245,158,11,.15);color:var(--amber);">&#9888;</div><h2>Churn Risk — Win Them Back</h2><span class="count-badge" style="background:rgba(245,158,11,.12);color:var(--amber);">' + s.churn_risk_count + '</span></div>' +
-                actionCards(_actions.churn_risk, 8) +
-            '</div></div>' : '') +
-
-            // Rising Stars
-            ((_actions.rising_stars || []).length ? '<div class="action-section"><div class="card" style="border-left:3px solid var(--green);">' +
-                '<div class="action-section-header"><div class="action-icon" style="background:rgba(34,197,94,.15);color:var(--green);">&#9733;</div><h2>Rising Stars — Bet On These</h2><span class="count-badge" style="background:rgba(34,197,94,.12);color:var(--green);">' + s.rising_star_count + '</span></div>' +
-                (_actions.rising_stars || []).slice(0, 8).map(function(c) {
+            // ── INVEST: customers worth spending more on ──
+            ((_actions.invest || []).length ?
+            '<div class="action-section"><div class="card" style="border-left:3px solid var(--green);">' +
+                '<div class="action-section-header"><div class="action-icon" style="background:rgba(34,197,94,.15);color:var(--green);">&#9650;</div><h2>Invest In These Customers</h2><span class="count-badge" style="background:rgba(34,197,94,.12);color:var(--green);">' + s.invest_count + '</span></div>' +
+                '<p style="font-size:12px;color:var(--muted);margin-bottom:8px;padding:0 16px;">Spend more time, offer better terms, prioritize these relationships.</p>' +
+                (_actions.invest || []).slice(0, 10).map(function(c) {
+                    var st = c.sub_type || 'unknown';
                     return '<div class="action-card">' +
-                        '<div class="severity-dot good"></div>' +
+                        '<div style="margin-top:4px;"><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,.06);color:' + (subColor[st] || 'var(--muted)') + ';">' + (subBadge[st] || st) + '</span></div>' +
                         '<div class="action-customer" title="' + esc(c.name) + '">' + esc(c.name) + '</div>' +
-                        '<div class="action-reason">' + esc(c.reason) + '</div>' +
+                        '<div class="action-reason">' + esc(c.recommendation) + '</div>' +
                         '<div class="action-stats">' +
-                            '<div><div class="action-stat-val" style="color:var(--green);">+' + (c.growth_pct || 0) + '%</div><div class="action-stat-label">Growth</div></div>' +
                             '<div><div class="action-stat-val">' + fmtK(c.net_revenue) + '</div><div class="action-stat-label">Revenue</div></div>' +
+                            (c.projected_value ? '<div><div class="action-stat-val" style="color:var(--green);">' + fmtK(c.projected_value) + '</div><div class="action-stat-label">Projected</div></div>' : '') +
+                            (c.growth_pct > 0 ? '<div><div class="action-stat-val" style="color:var(--green);">+' + c.growth_pct + '%</div><div class="action-stat-label">Growth</div></div>' : '') +
                         '</div></div>';
                 }).join('') +
             '</div></div>' : '') +
 
-            // Nurture
-            ((_actions.nurture || []).length ? '<div class="action-section"><div class="card" style="border-left:3px solid var(--blue);">' +
-                '<div class="action-section-header"><div class="action-icon" style="background:rgba(59,130,246,.15);color:var(--blue);">&#9829;</div><h2>Nurture — Protect These Relationships</h2><span class="count-badge" style="background:rgba(59,130,246,.12);color:var(--blue);">' + s.nurture_count + '</span></div>' +
-                (_actions.nurture || []).slice(0, 8).map(function(c) {
-                    return '<div class="action-card">' +
-                        '<div class="severity-dot info"></div>' +
-                        '<div class="action-customer" title="' + esc(c.name) + '">' + esc(c.name) + '</div>' +
-                        '<div class="action-reason">' + esc(c.reason) + '</div>' +
-                        '<div class="action-stats">' +
-                            '<div><div class="action-stat-val">' + fmtK(c.net_revenue) + '</div><div class="action-stat-label">Revenue</div></div>' +
-                            '<div><div class="action-stat-val">' + c.revenue_share_pct + '%</div><div class="action-stat-label">Share</div></div>' +
-                        '</div></div>';
-                }).join('') +
+            // ── STOP SPENDING: customers draining resources ──
+            ((_actions.stop_spending || []).length ?
+            '<div class="action-section"><div class="card" style="border-left:3px solid var(--red);">' +
+                '<div class="action-section-header"><div class="action-icon" style="background:rgba(239,68,68,.15);color:var(--red);">&#9660;</div><h2>Stop Spending On These</h2><span class="count-badge" style="background:rgba(239,68,68,.12);color:var(--red);">' + s.stop_spending_count + '</span></div>' +
+                '<p style="font-size:12px;color:var(--muted);margin-bottom:8px;padding:0 16px;">These customers cost more than they\'re worth. Deprioritize or cut terms.</p>' +
+                custList(_actions.stop_spending, 10) +
             '</div></div>' : '') +
 
-            // New Potential
-            ((_actions.new_potential || []).length ? '<div class="action-section"><div class="card" style="border-left:3px solid var(--purple);">' +
-                '<div class="action-section-header"><div class="action-icon" style="background:rgba(168,85,247,.15);color:var(--purple);">&#10024;</div><h2>New Potential — Nurture Early</h2><span class="count-badge" style="background:rgba(168,85,247,.12);color:var(--purple);">' + s.new_potential_count + '</span></div>' +
-                (_actions.new_potential || []).slice(0, 8).map(function(c) {
-                    return '<div class="action-card">' +
-                        '<div class="severity-dot info"></div>' +
-                        '<div class="action-customer" title="' + esc(c.name) + '">' + esc(c.name) + '</div>' +
-                        '<div class="action-reason">' + esc(c.reason) + '</div>' +
-                        '<div class="action-stats">' +
-                            '<div><div class="action-stat-val">' + fmtK(c.net_revenue) + '</div><div class="action-stat-label">Revenue</div></div>' +
-                            '<div><div class="action-stat-val">' + c.invoice_count + '</div><div class="action-stat-label">Orders</div></div>' +
-                        '</div></div>';
-                }).join('') +
+            // ── CHASE PAYMENT ──
+            ((_actions.chase_payment || []).length ?
+            '<div class="action-section"><div class="card" style="border-left:3px solid var(--amber);">' +
+                '<div class="action-section-header"><div class="action-icon" style="background:rgba(245,158,11,.15);color:var(--amber);">&#128176;</div><h2>Chase Payment</h2><span class="count-badge" style="background:rgba(245,158,11,.12);color:var(--amber);">' + s.chase_payment_count + '</span></div>' +
+                custList(_actions.chase_payment, 10) +
             '</div></div>' : '') +
 
-            // Revenue Concentration
+            // ── CHURN RISK ──
+            ((_actions.churn_risk || []).length ?
+            '<div class="action-section"><div class="card" style="border-left:3px solid var(--purple);">' +
+                '<div class="action-section-header"><div class="action-icon" style="background:rgba(168,85,247,.15);color:var(--purple);">&#9888;</div><h2>Churn Risk — Win Back or Write Off</h2><span class="count-badge" style="background:rgba(168,85,247,.12);color:var(--purple);">' + s.churn_risk_count + '</span></div>' +
+                '<p style="font-size:12px;color:var(--muted);margin-bottom:8px;padding:0 16px;">Each customer includes a specific recommendation: win them back, or stop wasting time.</p>' +
+                custList(_actions.churn_risk, 10) +
+            '</div></div>' : '') +
+
+            // ── Revenue Concentration ──
             '<div class="action-section"><div class="card" style="border-left:3px solid ' + concColor + ';">' +
                 '<div class="action-section-header"><div class="action-icon" style="background:rgba(255,255,255,.06);">&#9878;</div><h2>Revenue Concentration</h2><span class="count-badge" style="background:rgba(255,255,255,.06);color:' + concColor + ';">' + esc(conc.risk_level || '').toUpperCase() + '</span></div>' +
                 '<p style="font-size:13px;color:var(--muted);margin-bottom:12px;padding:0 16px;">' + esc(conc.advice) + '</p>' +

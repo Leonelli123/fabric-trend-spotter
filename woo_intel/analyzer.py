@@ -131,8 +131,19 @@ class InventoryAnalyzer:
     # ------------------------------------------------------------------
 
     def get_sales_velocity(self) -> list[dict]:
-        """Per-product sales velocity with trend direction."""
+        """Per-product sales velocity with trend direction.
+
+        Calculates three velocity windows:
+          - Overall: full history (first sale to last sale)
+          - Recent 90d: last 3 months only (what's happening NOW)
+          - Previous 90d: 3-6 months ago (what WAS happening)
+        This prevents seasonal products from being penalized in their
+        off-season and gives a much better picture of current momentum.
+        """
+        cutoff_90d = self._now - timedelta(days=90)
+        cutoff_180d = self._now - timedelta(days=180)
         results = []
+
         for pid, product in self.products.items():
             sales = sorted(self._sales_by_product.get(pid, []),
                            key=lambda s: s["date"])
@@ -147,25 +158,41 @@ class InventoryAnalyzer:
             days_since_last = (self._now - last_sale).days
             active_days = max((last_sale - first_sale).days, 1)
 
-            # Weekly velocity
+            # Overall weekly velocity (full history)
             weeks = max(active_days / 7, 1)
             qty_per_week = total_qty / weeks
             rev_per_week = total_rev / weeks
 
-            # Recent vs older velocity (trend direction)
-            midpoint = first_sale + timedelta(days=active_days // 2)
-            recent = [s for s in sales if s["date"] >= midpoint]
-            older = [s for s in sales if s["date"] < midpoint]
-            recent_weeks = max((self._now - midpoint).days / 7, 1)
-            older_weeks = max((midpoint - first_sale).days / 7, 1)
+            # ── Recent 90-day window (what's happening NOW) ──
+            recent_90d = [s for s in sales if s["date"] >= cutoff_90d]
+            recent_90d_qty = sum(s["quantity"] for s in recent_90d)
+            recent_90d_rev = sum(s["revenue"] for s in recent_90d)
+            recent_90d_rate = recent_90d_qty / (90 / 7)  # per week
 
-            recent_rate = sum(s["quantity"] for s in recent) / recent_weeks
-            older_rate = sum(s["quantity"] for s in older) / older_weeks if older else 0
+            # ── Previous 90-day window (3-6 months ago) ──
+            prev_90d = [s for s in sales
+                        if cutoff_180d <= s["date"] < cutoff_90d]
+            prev_90d_qty = sum(s["quantity"] for s in prev_90d)
+            prev_90d_rate = prev_90d_qty / (90 / 7)
 
-            if older_rate > 0:
-                velocity_change = (recent_rate - older_rate) / older_rate
+            # ── Direction: compare recent 90d vs previous 90d ──
+            # This is much better than splitting the full history in half,
+            # because it compares the SAME time window sizes
+            if prev_90d_rate > 0:
+                velocity_change = (recent_90d_rate - prev_90d_rate) / prev_90d_rate
+            elif recent_90d_rate > 0:
+                velocity_change = 1.0  # new momentum
             else:
-                velocity_change = 1.0 if recent_rate > 0 else 0.0
+                # Neither period has sales — check the older midpoint method
+                # for products that sold long ago
+                midpoint = first_sale + timedelta(days=active_days // 2)
+                recent_half = [s for s in sales if s["date"] >= midpoint]
+                older_half = [s for s in sales if s["date"] < midpoint]
+                rh_weeks = max((self._now - midpoint).days / 7, 1)
+                oh_weeks = max((midpoint - first_sale).days / 7, 1)
+                rh_rate = sum(s["quantity"] for s in recent_half) / rh_weeks
+                oh_rate = sum(s["quantity"] for s in older_half) / oh_weeks if older_half else 0
+                velocity_change = ((rh_rate - oh_rate) / oh_rate) if oh_rate > 0 else 0.0
 
             if velocity_change > 0.15:
                 direction = "accelerating"
@@ -194,8 +221,13 @@ class InventoryAnalyzer:
                 "sale_count": len(sales),
                 "direction": direction,
                 "velocity_change": round(velocity_change, 3),
-                "recent_rate": round(recent_rate, 2),
-                "older_rate": round(older_rate, 2),
+                "recent_rate": round(recent_90d_rate, 2),
+                "older_rate": round(prev_90d_rate, 2),
+                # New fields for smarter decisions
+                "recent_90d_qty": recent_90d_qty,
+                "recent_90d_rev": round(recent_90d_rev, 2),
+                "prev_90d_qty": prev_90d_qty,
+                "has_recent_sales": recent_90d_qty > 0,
             })
 
         return sorted(results, key=lambda r: r["rev_per_week"], reverse=True)
@@ -233,42 +265,116 @@ class InventoryAnalyzer:
     # ------------------------------------------------------------------
 
     def get_dead_stock(self, stale_days: int = 60) -> list[dict]:
-        """Products that haven't sold in N days with capital tied up."""
+        """Products that haven't sold recently with capital tied up.
+
+        Uses a smarter approach than flat stale_days:
+          - Products with recent 90-day sales are NEVER flagged as dead
+          - Seasonal products get extra grace (matched by fabric + color)
+          - Products that sold well historically but stopped get "warning"
+            instead of "critical" during their first off-season
+          - The stale_days threshold adapts: products with a strong sales
+            history get more patience than products that barely sold
+        """
         velocity = self.get_sales_velocity()
         dead = []
+
+        current_month = self._now.month
+        next_month = (current_month % 12) + 1
+        seasonal = SEASONAL_FABRIC_PATTERNS.get(current_month, ([], [], ""))
+        low_demand_fabrics = seasonal[1]
+        next_seasonal = SEASONAL_FABRIC_PATTERNS.get(next_month, ([], [], ""))
+        next_high_fabrics = next_seasonal[0]
+
+        # Color seasonality
+        current_low_colors = SEASONAL_COLOR_PATTERNS.get(current_month, ([], []))[1]
+        next_high_colors = SEASONAL_COLOR_PATTERNS.get(next_month, ([], []))[0]
+
         for v in velocity:
-            if v["days_since_last_sale"] < stale_days and v["sale_count"] > 0:
-                continue
             if v["stock_quantity"] <= 0:
                 continue
+
+            # Products with sales in the last 90 days are NOT dead stock
+            if v.get("has_recent_sales", False):
+                continue
+
+            # Never-sold products: use the original stale_days
+            if v["sale_count"] == 0 and v["days_since_last_sale"] < stale_days:
+                continue
+
+            # Products that HAVE sold: use adaptive threshold
+            # Strong sellers (10+ sales) get more patience (90 days)
+            # Weak sellers (2-3 sales) use standard threshold
+            if v["sale_count"] > 0:
+                adaptive_stale = stale_days
+                if v["sale_count"] >= 10:
+                    adaptive_stale = 90
+                elif v["sale_count"] >= 5:
+                    adaptive_stale = 75
+                if v["days_since_last_sale"] < adaptive_stale:
+                    continue
 
             capital_tied = v["price"] * v["stock_quantity"]
             product = self.products.get(v["product_id"], {})
 
-            # Classify severity
+            # Seasonal checks: fabric + color
+            fabric = (v.get("fabric_type", "") or "").lower()
+            color = (v.get("color", "") or "").lower()
+
+            is_off_season_fabric = any(ld in fabric for ld in low_demand_fabrics) if fabric else False
+            is_off_season_color = any(
+                lc in color or color in lc for lc in current_low_colors
+            ) if color else False
+            is_seasonal_dip = is_off_season_fabric or is_off_season_color
+
+            is_upcoming_fabric = any(h in fabric for h in next_high_fabrics) if fabric else False
+            is_upcoming_color = any(
+                hc in color or color in hc for hc in next_high_colors
+            ) if color else False
+            is_upcoming_season = is_upcoming_fabric or is_upcoming_color
+
+            # Classify severity — much more nuanced now
             if v["sale_count"] == 0:
                 severity = "critical"
                 reason = "Never sold — consider removing or deep discount"
+            elif is_seasonal_dip and is_upcoming_season:
+                # Off-season NOW but demand coming back soon — hold
+                severity = "seasonal"
+                reason = (
+                    f"Off-season slow period ({v['days_since_last_sale']} days since "
+                    f"last sale, sold {v['total_sold']} total). Demand expected to "
+                    f"return next month — hold stock."
+                )
+            elif is_seasonal_dip:
+                # Off-season, not immediately coming back — light concern
+                severity = "seasonal"
+                reason = (
+                    f"Likely seasonal dip ({v['days_since_last_sale']} days since "
+                    f"last sale). Has sold {v['total_sold']} units historically. "
+                    f"Monitor, don't deep discount yet."
+                )
             elif v["days_since_last_sale"] > 180:
                 severity = "critical"
                 reason = f"No sales in {v['days_since_last_sale']} days"
+            elif v["days_since_last_sale"] > 120:
+                # Check if it had a decent run before stopping
+                if v["total_sold"] >= 5:
+                    severity = "warning"
+                    reason = (
+                        f"Was a decent seller ({v['total_sold']} units) but no sales "
+                        f"in {v['days_since_last_sale']} days. Try light discount first."
+                    )
+                else:
+                    severity = "warning"
+                    reason = f"No sales in {v['days_since_last_sale']} days"
             elif v["days_since_last_sale"] > 90:
-                severity = "warning"
-                reason = f"No sales in {v['days_since_last_sale']} days"
+                severity = "watch"
+                reason = (
+                    f"Slowing — {v['days_since_last_sale']} days since last sale "
+                    f"({v['total_sold']} sold total)"
+                )
             else:
                 severity = "watch"
                 reason = f"Slowing — {v['days_since_last_sale']} days since last sale"
-
-            # Seasonal check: is this fabric simply out of season?
-            current_month = self._now.month
-            seasonal = SEASONAL_FABRIC_PATTERNS.get(current_month, ([], [], ""))
-            low_demand = seasonal[1]
-            fabric = (v.get("fabric_type", "") or "").lower()
-            is_seasonal_dip = any(ld in fabric for ld in low_demand)
-
-            if is_seasonal_dip and severity != "critical":
-                severity = "seasonal"
-                reason += " (likely seasonal — demand expected to return)"
 
             dead.append({
                 **v,
@@ -276,6 +382,7 @@ class InventoryAnalyzer:
                 "severity": severity,
                 "reason": reason,
                 "is_seasonal_dip": is_seasonal_dip,
+                "is_upcoming_season": is_upcoming_season,
                 "on_sale": product.get("on_sale", False),
                 "images": product.get("images", [])[:1],
             })

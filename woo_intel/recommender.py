@@ -116,7 +116,13 @@ class ActionRecommender:
 
     def _classify_single(self, v: dict, is_dead: bool, needs_reorder: bool,
                           is_rising: bool) -> dict:
-        """Classify a single product into an action bucket."""
+        """Classify a single product into an action bucket.
+
+        Uses the new 90-day velocity windows to make smarter decisions:
+        - Products that sold recently (last 90d) are treated more gently
+        - Products with strong history get more patience
+        - Seasonal products are protected from aggressive discounting
+        """
         pid = v["product_id"]
         stock = v["stock_quantity"]
         qty_week = v["qty_per_week"]
@@ -126,6 +132,9 @@ class ActionRecommender:
         fabric = (v.get("fabric_type") or "").lower()
         color = (v.get("color") or "").lower()
         name = v["name"]
+        has_recent = v.get("has_recent_sales", False)
+        recent_90d_qty = v.get("recent_90d_qty", 0)
+        prev_90d_qty = v.get("prev_90d_qty", 0)
 
         # Check if upcoming season favors this fabric OR color
         next_high = self._next_seasonal[0]
@@ -144,29 +153,31 @@ class ActionRecommender:
         ) if color else False
         is_off_season = is_off_season_fabric or is_off_season_color
 
-        # Decision tree
+        # Decision tree — now uses recent momentum, not just overall average
         if needs_reorder and direction in ("accelerating", "stable"):
             weeks_left = stock / qty_week if qty_week > 0 else 999
             action = "REORDER_NOW"
             reason = (
-                f"Selling {qty_week:.1f}/week, only {weeks_left:.0f} weeks of "
-                f"stock left. Buy aggressively — this is a proven winner."
+                f"Selling {qty_week:.1f}/week ({recent_90d_qty} in last 90 days), "
+                f"only {weeks_left:.0f} weeks of stock left. "
+                f"Buy aggressively — this is a proven winner."
             )
         elif is_rising and stock > 0:
             action = "REORDER_SOON"
             reason = (
-                f"Rising star — velocity up {v['velocity_change']:.0%}. "
+                f"Rising star — velocity up {v['velocity_change']:.0%} "
+                f"({recent_90d_qty} sold last 90 days vs {prev_90d_qty} previous). "
                 f"Watch next 2 weeks and reorder if trend continues."
             )
         elif total_sold == 0 and stock > 0:
             if is_upcoming_season:
                 action = "SEASONAL_HOLD"
                 reason = (
-                    f"Never sold, but {fabric} demand rises next month. "
+                    f"Never sold, but {fabric or color} demand rises next month. "
                     f"Hold until season, then discount if still no sales."
                 )
             else:
-                created_days = days_since  # days_since_last_sale = days since created
+                created_days = days_since
                 if created_days > 120:
                     action = "REMOVE"
                     reason = (
@@ -184,11 +195,21 @@ class ActionRecommender:
                     reason = f"New listing ({created_days} days). Give it time."
 
         elif is_dead and stock > 0:
+            # Dead stock — but HOW dead? Check history and seasonality
             if is_off_season and is_upcoming_season:
                 action = "SEASONAL_HOLD"
                 reason = (
-                    f"Currently off-season for {fabric}. "
-                    f"Demand expected to return. Hold and promote when season turns."
+                    f"Off-season for {fabric or color} but demand returns next month. "
+                    f"Sold {total_sold} units historically. "
+                    f"Hold and promote when season turns."
+                )
+            elif is_off_season and total_sold >= 5:
+                # Decent seller, just off-season — don't panic
+                action = "SEASONAL_HOLD"
+                reason = (
+                    f"Seasonal slowdown ({days_since} days since last sale). "
+                    f"But this product has sold {total_sold} units and is a "
+                    f"known performer. Hold — don't destroy margin with discounts."
                 )
             elif is_off_season:
                 action = "DISCOUNT_LIGHT"
@@ -196,18 +217,44 @@ class ActionRecommender:
                     f"Off-season slow period. Light discount (15-25%) to "
                     f"maintain visibility without destroying margin."
                 )
-            elif days_since > 120:
+            elif days_since > 180 and total_sold <= 3:
+                # Long dead AND barely sold = real dead stock
                 action = "DISCOUNT_NOW"
                 reason = (
-                    f"No sales in {days_since} days. "
+                    f"Only {total_sold} sales ever, none in {days_since} days. "
                     f"Discount 30-50% to free up {v['price'] * stock:.0f} in capital."
                 )
+            elif days_since > 120:
+                if total_sold >= 8:
+                    # Was popular, might just need a nudge
+                    action = "DISCOUNT_LIGHT"
+                    reason = (
+                        f"Former strong seller ({total_sold} units) but quiet "
+                        f"for {days_since} days. Try 15-20% discount or "
+                        f"feature in a 'back by demand' campaign first."
+                    )
+                else:
+                    action = "DISCOUNT_NOW"
+                    reason = (
+                        f"No sales in {days_since} days (only {total_sold} total). "
+                        f"Discount 30-50% to free up {v['price'] * stock:.0f} in capital."
+                    )
             else:
                 action = "DISCOUNT_LIGHT"
                 reason = (
-                    f"Slowing down — {days_since} days since last sale. "
+                    f"Slowing down — {days_since} days since last sale "
+                    f"({total_sold} sold total). "
                     f"Try 15-25% discount or bundle with winners."
                 )
+
+        elif has_recent and direction == "decelerating" and stock > 0:
+            # Still selling recently, just slowing — don't overreact
+            action = "WATCH"
+            reason = (
+                f"Sales slowing ({v['velocity_change']:.0%} change) but still "
+                f"active — {recent_90d_qty} sold in last 90 days. "
+                f"Don't reorder, let current stock sell through."
+            )
 
         elif direction == "decelerating" and stock > 0:
             action = "WATCH"
@@ -219,14 +266,15 @@ class ActionRecommender:
         elif direction == "accelerating" and stock > 5:
             action = "PROMOTE"
             reason = (
-                f"Sales accelerating! Push this in marketing — "
-                f"feature in email, social, homepage."
+                f"Sales accelerating ({recent_90d_qty} in last 90 days)! "
+                f"Push this in marketing — feature in email, social, homepage."
             )
 
         elif direction == "stable" and qty_week >= 0.5:
             action = "HOLD"
             reason = (
-                f"Steady performer at {qty_week:.1f}/week. "
+                f"Steady performer at {qty_week:.1f}/week "
+                f"({recent_90d_qty} in last 90 days). "
                 f"Keep stocked, no action needed."
             )
 
@@ -250,6 +298,8 @@ class ActionRecommender:
             "color": v.get("color", ""),
             "pattern": v.get("pattern", ""),
             "fabric_type": v.get("fabric_type", ""),
+            "recent_90d_qty": recent_90d_qty,
+            "has_recent_sales": has_recent,
         }
 
     # ------------------------------------------------------------------

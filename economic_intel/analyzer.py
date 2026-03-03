@@ -368,20 +368,20 @@ class FinancialAnalyzer:
         }
 
     # ------------------------------------------------------------------
-    # Customer Actions (actionable intelligence)
+    # Customer Actions (actionable intelligence — the AI advisor)
     # ------------------------------------------------------------------
 
     def get_customer_actions(self) -> dict:
-        """Classify every customer into actionable buckets.
+        """AI business advisor: tells you exactly what to do with each customer.
 
-        Returns a dict of action lists:
-          - rising_stars: growing fast, invest in them
-          - nurture: high-value loyal customers to protect
-          - churn_risk: were active, gone quiet — win them back
-          - chase_payment: owe money, pay late
-          - new_potential: recently appeared, show promise
-          - revenue_concentration: dependency risk analysis
-          - expense_guidance: overall spending/collection recommendations
+        Returns:
+          - ai_briefing: top priority actions ranked by business impact
+          - invest: customers to spend MORE on (rising, loyal, high-potential)
+          - stop_spending: customers draining money (low value, bad payers)
+          - chase_payment: owes money, ranked by urgency
+          - churn_risk: were active, gone quiet — with win-back vs write-off advice
+          - revenue_concentration: dependency risk
+          - expense_guidance: where to cut costs, where to invest
         """
         customers = self.get_customer_profitability()
         if not customers:
@@ -390,6 +390,7 @@ class FinancialAnalyzer:
         # ── Build per-customer monthly revenue series ──
         customer_monthly = defaultdict(lambda: defaultdict(float))
         customer_invoice_dates = defaultdict(list)
+        customer_invoice_amounts = defaultdict(list)
         for inv in self.invoices:
             cnum = inv["customer_number"]
             if not cnum:
@@ -400,26 +401,21 @@ class FinancialAnalyzer:
             key = date.strftime("%Y-%m")
             customer_monthly[cnum][key] += inv["net_amount"]
             customer_invoice_dates[cnum].append(date)
+            customer_invoice_amounts[cnum].append(inv["net_amount"])
 
-        # Recent vs older split: last 3 months vs previous 3 months
         three_months_ago = self._now - timedelta(days=90)
         six_months_ago = self._now - timedelta(days=180)
-
         total_revenue = sum(c["net_revenue"] for c in customers) or 1
+        avg_revenue_per_customer = total_revenue / max(len(customers), 1)
 
-        rising_stars = []
-        nurture = []
-        churn_risk = []
-        chase_payment = []
-        new_potential = []
-
+        # Pre-compute per-customer metrics
+        enriched = []
         for c in customers:
             cnum = c["customer_number"]
             dates = sorted(customer_invoice_dates.get(cnum, []))
             if not dates:
                 continue
 
-            # Revenue in recent 3mo vs previous 3mo
             recent_rev = sum(
                 amt for month, amt in customer_monthly[cnum].items()
                 if _parse_date(month + "-01") and _parse_date(month + "-01") >= three_months_ago
@@ -433,121 +429,313 @@ class FinancialAnalyzer:
             last_invoice = _parse_date(c["last_invoice"]) if c["last_invoice"] else None
             first_invoice = _parse_date(c["first_invoice"]) if c["first_invoice"] else None
             days_since_last = (self._now - last_invoice).days if last_invoice else 999
+            days_as_customer = (self._now - first_invoice).days if first_invoice else 0
             revenue_share = c["net_revenue"] / total_revenue * 100
+            amounts = customer_invoice_amounts.get(cnum, [])
+            avg_order = sum(amounts) / len(amounts) if amounts else 0
 
-            # ── CHASE PAYMENT: owes money and pays late ──
-            if c["outstanding"] > 0 and c["payment_reliability"] < 70:
-                severity = "critical" if c["overdue_invoices"] >= 3 or c["outstanding"] > 10000 else "warning"
-                chase_payment.append({
-                    **c,
-                    "action": "CHASE_PAYMENT",
-                    "severity": severity,
-                    "reason": (
-                        f"Owes {c['outstanding']:,.0f} with {c['overdue_invoices']} overdue invoices. "
-                        f"Reliability score: {c['payment_reliability']}/100. "
-                        f"{'Demand prepayment or tighten terms.' if severity == 'critical' else 'Send reminder and follow up.'}"
-                    ),
-                    "revenue_share_pct": round(revenue_share, 1),
-                })
-            elif c["outstanding"] > 0 and c["overdue_invoices"] > 0:
-                chase_payment.append({
-                    **c,
-                    "action": "CHASE_PAYMENT",
-                    "severity": "info",
-                    "reason": (
-                        f"Owes {c['outstanding']:,.0f} — {c['overdue_invoices']} overdue. "
-                        f"Reliability {c['payment_reliability']}/100. Gentle reminder."
-                    ),
-                    "revenue_share_pct": round(revenue_share, 1),
-                })
-
-            # ── RISING STAR: revenue growing significantly ──
-            if (older_rev > 0 and recent_rev > older_rev * 1.3
-                    and c["invoice_count"] >= 3 and recent_rev > 0):
+            growth_pct = 0.0
+            if older_rev > 0:
                 growth_pct = (recent_rev - older_rev) / older_rev * 100
-                rising_stars.append({
-                    **c,
-                    "action": "RISING_STAR",
-                    "recent_revenue": round(recent_rev, 2),
-                    "previous_revenue": round(older_rev, 2),
-                    "growth_pct": round(growth_pct, 1),
-                    "reason": (
-                        f"Revenue up {growth_pct:.0f}% in the last 3 months "
-                        f"({recent_rev:,.0f} vs {older_rev:,.0f} previous quarter). "
-                        f"Invest in this relationship — offer volume discounts or priority service."
-                    ),
-                    "revenue_share_pct": round(revenue_share, 1),
-                })
-            # New customer showing promise
-            elif (first_invoice and (self._now - first_invoice).days < 120
-                  and c["invoice_count"] >= 2 and c["net_revenue"] > 0):
-                new_potential.append({
-                    **c,
-                    "action": "NEW_POTENTIAL",
-                    "recent_revenue": round(recent_rev, 2),
-                    "reason": (
-                        f"New customer ({(self._now - first_invoice).days} days), "
-                        f"already {c['invoice_count']} orders for {c['net_revenue']:,.0f}. "
-                        f"Welcome outreach — personal contact, introduction to full range."
-                    ),
-                    "revenue_share_pct": round(revenue_share, 1),
-                })
+            elif recent_rev > 0:
+                growth_pct = 100.0
 
-            # ── NURTURE: high-value, loyal, consistent ──
-            if (c["net_revenue"] > total_revenue * 0.03
+            enriched.append({
+                **c,
+                "recent_rev": round(recent_rev, 2),
+                "older_rev": round(older_rev, 2),
+                "growth_pct": round(growth_pct, 1),
+                "days_since_last": days_since_last,
+                "days_as_customer": days_as_customer,
+                "revenue_share_pct": round(revenue_share, 1),
+                "avg_order_value": round(avg_order, 2),
+            })
+
+        # ══════════════════════════════════════════════════════
+        # INVEST — customers worth spending more money/time on
+        # ══════════════════════════════════════════════════════
+        invest = []
+        for c in enriched:
+            verdict = None
+
+            # Rising star: growing fast
+            if (c["older_rev"] > 0 and c["growth_pct"] > 30
+                    and c["invoice_count"] >= 3 and c["recent_rev"] > 0):
+                projected_annual = c["recent_rev"] * 4
+                verdict = {
+                    "sub_type": "rising_star",
+                    "priority": "high",
+                    "recommendation": (
+                        f"Revenue up {c['growth_pct']:.0f}% this quarter "
+                        f"({c['recent_rev']:,.0f} vs {c['older_rev']:,.0f}). "
+                        f"At this rate, projected annual value: {projected_annual:,.0f}. "
+                        f"Offer volume discount or dedicated account contact to lock in growth."
+                    ),
+                    "projected_value": round(projected_annual, 2),
+                }
+
+            # Loyal high-value: big spender, reliable, recent
+            elif (c["net_revenue"] > total_revenue * 0.03
                     and c["payment_reliability"] >= 80
                     and c["invoice_count"] >= 4
-                    and days_since_last < 90):
-                nurture.append({
-                    **c,
-                    "action": "NURTURE",
-                    "reason": (
-                        f"Top customer — {revenue_share:.1f}% of your revenue, "
-                        f"{c['invoice_count']} orders, reliability {c['payment_reliability']}/100. "
-                        f"Protect this relationship. Consider loyalty pricing or early access to new stock."
+                    and c["days_since_last"] < 90):
+                verdict = {
+                    "sub_type": "loyal_vip",
+                    "priority": "high",
+                    "recommendation": (
+                        f"VIP — {c['revenue_share_pct']}% of total revenue, "
+                        f"{c['invoice_count']} orders, always pays (reliability {c['payment_reliability']}/100). "
+                        f"Protect at all costs: loyalty pricing, early access to new collections, "
+                        f"personal check-in quarterly."
                     ),
-                    "revenue_share_pct": round(revenue_share, 1),
+                    "projected_value": round(c["monthly_avg_revenue"] * 12, 2),
+                }
+
+            # New & promising: fresh customer, already repeat ordering
+            elif (c["days_as_customer"] < 120 and c["invoice_count"] >= 2
+                  and c["net_revenue"] > 0 and c["payment_reliability"] >= 60):
+                run_rate = c["net_revenue"] / max(c["days_as_customer"], 1) * 365
+                verdict = {
+                    "sub_type": "new_promising",
+                    "priority": "medium",
+                    "recommendation": (
+                        f"New customer ({c['days_as_customer']} days), already "
+                        f"{c['invoice_count']} orders for {c['net_revenue']:,.0f}. "
+                        f"Annualized run-rate: {run_rate:,.0f}. "
+                        f"Personal welcome call, introduce full product range, "
+                        f"offer first-year loyalty incentive."
+                    ),
+                    "projected_value": round(run_rate, 2),
+                }
+
+            # Sleeping giant: big historical spender but slowing down
+            elif (c["net_revenue"] > total_revenue * 0.02
+                    and 60 < c["days_since_last"] <= 150
+                    and c["invoice_count"] >= 3):
+                verdict = {
+                    "sub_type": "sleeping_giant",
+                    "priority": "high",
+                    "recommendation": (
+                        f"Was a big spender ({c['net_revenue']:,.0f} total, "
+                        f"{c['revenue_share_pct']}% of revenue) but hasn't ordered "
+                        f"in {c['days_since_last']} days. Still winnable — call "
+                        f"this week. Offer a \"welcome back\" deal or ask what's changed."
+                    ),
+                    "projected_value": round(c["monthly_avg_revenue"] * 12, 2),
+                }
+
+            if verdict:
+                invest.append({**c, **verdict})
+
+        invest.sort(key=lambda x: (-1 if x["priority"] == "high" else 0,
+                                    -x.get("projected_value", 0)))
+
+        # ══════════════════════════════════════════════════════
+        # STOP SPENDING — customers draining money
+        # ══════════════════════════════════════════════════════
+        stop_spending = []
+        for c in enriched:
+            reasons = []
+            severity = "info"
+
+            # Tiny spender + bad payer = not worth it
+            if (c["net_revenue"] < avg_revenue_per_customer * 0.2
+                    and c["payment_reliability"] < 60
+                    and c["invoice_count"] >= 2):
+                reasons.append(
+                    f"Low value ({c['net_revenue']:,.0f} total across "
+                    f"{c['invoice_count']} orders) AND unreliable payer "
+                    f"(score {c['payment_reliability']}/100)"
+                )
+                severity = "warning"
+
+            # Owes more than they've ever been worth
+            if c["outstanding"] > 0 and c["outstanding"] > c["net_revenue"] * 0.5:
+                reasons.append(
+                    f"Currently owes {c['outstanding']:,.0f} — that's "
+                    f"{c['outstanding'] / max(c['net_revenue'], 1) * 100:.0f}% of "
+                    f"their total lifetime revenue"
+                )
+                severity = "critical"
+
+            # Declining + small = not worth chasing
+            if (c["growth_pct"] < -30 and c["net_revenue"] < avg_revenue_per_customer * 0.5
+                    and c["invoice_count"] >= 3):
+                reasons.append(
+                    f"Spending declining {c['growth_pct']:.0f}% and below-average value"
+                )
+
+            # Very old, one-time tiny order = dead weight
+            if (c["invoice_count"] == 1
+                    and c["days_since_last"] > 180
+                    and c["net_revenue"] < avg_revenue_per_customer * 0.3):
+                reasons.append(
+                    f"Single order of {c['net_revenue']:,.0f} over "
+                    f"{c['days_since_last']} days ago — never came back"
+                )
+
+            if reasons:
+                if c["outstanding"] > 0:
+                    action = (
+                        f"Stop extending credit. Collect the {c['outstanding']:,.0f} "
+                        f"owed, then require prepayment for any future orders."
+                    )
+                elif len(reasons) >= 2 or severity == "critical":
+                    action = (
+                        f"Stop investing time and marketing spend on this customer. "
+                        f"Don't chase, don't discount — let them self-serve or move on."
+                    )
+                else:
+                    action = (
+                        f"Deprioritize — no special treatment, discounts, or outreach. "
+                        f"Serve if they order, but don't spend energy chasing."
+                    )
+
+                stop_spending.append({
+                    **c,
+                    "severity": severity,
+                    "problems": reasons,
+                    "recommendation": ". ".join(reasons) + ". " + action,
+                    "money_at_risk": round(c["outstanding"], 2),
                 })
 
-            # ── CHURN RISK: was active, gone quiet ──
-            if (c["invoice_count"] >= 2
-                    and days_since_last > 90
-                    and c["net_revenue"] > total_revenue * 0.01):
-                urgency = "critical" if days_since_last > 180 else "warning"
-                churn_risk.append({
-                    **c,
-                    "action": "CHURN_RISK",
-                    "severity": urgency,
-                    "days_since_last": days_since_last,
-                    "reason": (
-                        f"No orders in {days_since_last} days but previously spent "
-                        f"{c['net_revenue']:,.0f} across {c['invoice_count']} orders. "
-                        f"{'Urgent win-back campaign — call directly.' if urgency == 'critical' else 'Send a personal check-in. Offer a returning-customer incentive.'}"
-                    ),
-                    "revenue_share_pct": round(revenue_share, 1),
-                })
+        stop_spending.sort(key=lambda x: (
+            0 if x["severity"] == "critical" else 1 if x["severity"] == "warning" else 2,
+            -x["money_at_risk"],
+        ))
 
-        # ── REVENUE CONCENTRATION RISK ──
-        sorted_by_rev = sorted(customers, key=lambda c: -c["net_revenue"])
+        # ══════════════════════════════════════════════════════
+        # CHASE PAYMENT — who owes money, ranked by urgency
+        # ══════════════════════════════════════════════════════
+        chase_payment = []
+        for c in enriched:
+            if c["outstanding"] <= 0:
+                continue
+            if c["overdue_invoices"] <= 0 and c["payment_reliability"] >= 80:
+                continue  # Not yet due and reliable — don't nag
+
+            if c["overdue_invoices"] >= 3 or c["outstanding"] > 15000:
+                severity = "critical"
+                action = (
+                    f"URGENT: Owes {c['outstanding']:,.0f} with "
+                    f"{c['overdue_invoices']} overdue invoices. "
+                    f"Call today. If no response within 48h, send formal "
+                    f"demand letter and pause all new orders."
+                )
+            elif c["payment_reliability"] < 50:
+                severity = "critical"
+                action = (
+                    f"Chronic late payer (reliability {c['payment_reliability']}/100) "
+                    f"owes {c['outstanding']:,.0f}. Switch to prepayment terms "
+                    f"for all future orders. Chase current balance now."
+                )
+            elif c["overdue_invoices"] >= 1:
+                severity = "warning"
+                action = (
+                    f"Owes {c['outstanding']:,.0f} — {c['overdue_invoices']} invoice(s) "
+                    f"overdue. Send reminder email today. "
+                    f"Follow up by phone if unpaid within 7 days."
+                )
+            else:
+                severity = "info"
+                action = (
+                    f"Outstanding {c['outstanding']:,.0f} (not yet overdue). "
+                    f"Reliability: {c['payment_reliability']}/100. Monitor."
+                )
+
+            chase_payment.append({
+                **c,
+                "severity": severity,
+                "recommendation": action,
+            })
+
+        chase_payment.sort(key=lambda x: (
+            0 if x["severity"] == "critical" else 1 if x["severity"] == "warning" else 2,
+            -x["outstanding"],
+        ))
+
+        # ══════════════════════════════════════════════════════
+        # CHURN RISK — with win-back vs write-off recommendation
+        # ══════════════════════════════════════════════════════
+        churn_risk = []
+        for c in enriched:
+            if c["days_since_last"] < 90 or c["invoice_count"] < 2:
+                continue
+            if c["net_revenue"] < total_revenue * 0.005:
+                continue  # Too small to worry about
+
+            was_valuable = c["net_revenue"] > avg_revenue_per_customer
+            long_gone = c["days_since_last"] > 180
+
+            if was_valuable and not long_gone:
+                severity = "critical"
+                action = (
+                    f"CALL THIS WEEK. Spent {c['net_revenue']:,.0f} across "
+                    f"{c['invoice_count']} orders but silent for {c['days_since_last']} "
+                    f"days. They were {c['revenue_share_pct']}% of your revenue. "
+                    f"Personal outreach — ask what's changed. Offer a returning customer "
+                    f"incentive worth up to {c['monthly_avg_revenue'] * 0.5:,.0f}."
+                )
+            elif was_valuable and long_gone:
+                severity = "warning"
+                action = (
+                    f"Big former customer ({c['net_revenue']:,.0f} lifetime) gone "
+                    f"{c['days_since_last']} days. Win-back is still worth trying — "
+                    f"send a personal email with new collection preview. "
+                    f"If no response after 2 attempts, mark as lost and stop spending."
+                )
+            elif not was_valuable and long_gone:
+                severity = "info"
+                action = (
+                    f"Small customer ({c['net_revenue']:,.0f}), gone {c['days_since_last']} "
+                    f"days. Write off — don't spend resources chasing. "
+                    f"Include in bulk re-engagement email at most."
+                )
+            else:
+                severity = "info"
+                action = (
+                    f"No orders in {c['days_since_last']} days (spent {c['net_revenue']:,.0f} "
+                    f"previously). Add to automated win-back email sequence."
+                )
+
+            churn_risk.append({
+                **c,
+                "severity": severity,
+                "recommendation": action,
+            })
+
+        churn_risk.sort(key=lambda x: (
+            0 if x["severity"] == "critical" else 1 if x["severity"] == "warning" else 2,
+            -x["net_revenue"],
+        ))
+
+        # ══════════════════════════════════════════════════════
+        # REVENUE CONCENTRATION RISK
+        # ══════════════════════════════════════════════════════
+        sorted_by_rev = sorted(enriched, key=lambda c: -c["net_revenue"])
         top5_rev = sum(c["net_revenue"] for c in sorted_by_rev[:5])
         top5_pct = top5_rev / total_revenue * 100 if total_revenue else 0
         top10_rev = sum(c["net_revenue"] for c in sorted_by_rev[:10])
         top10_pct = top10_rev / total_revenue * 100 if total_revenue else 0
 
-        concentration_risk = "low"
-        concentration_advice = "Revenue is well distributed across customers."
         if top5_pct > 60:
             concentration_risk = "critical"
             concentration_advice = (
-                f"Your top 5 customers make up {top5_pct:.0f}% of all revenue. "
-                f"Losing even one would be devastating. Actively diversify — "
-                f"invest in acquiring new B2B accounts."
+                f"DANGEROUS: Top 5 customers = {top5_pct:.0f}% of all revenue. "
+                f"Losing one could cripple the business. Actively diversify — "
+                f"invest in acquiring new B2B accounts and growing mid-tier customers."
             )
         elif top5_pct > 40:
             concentration_risk = "warning"
             concentration_advice = (
-                f"Top 5 customers = {top5_pct:.0f}% of revenue. "
-                f"Moderate concentration. Focus on growing your mid-tier accounts."
+                f"Top 5 = {top5_pct:.0f}% of revenue. Moderate risk. "
+                f"Focus on growing customers ranked 6-20 to reduce dependency."
+            )
+        else:
+            concentration_risk = "low"
+            concentration_advice = (
+                f"Revenue is well distributed (top 5 = {top5_pct:.0f}%). "
+                f"Healthy diversification."
             )
 
         concentration = {
@@ -568,21 +756,26 @@ class FinancialAnalyzer:
             ],
         }
 
-        # ── EXPENSE / COLLECTION GUIDANCE ──
+        # ══════════════════════════════════════════════════════
+        # EXPENSE GUIDANCE — where to cut, where to spend
+        # ══════════════════════════════════════════════════════
         receivables = self.get_accounts_receivable()
         total_overdue = receivables["total_overdue"]
         total_outstanding = receivables["total_outstanding"]
         overdue_pct = (total_overdue / total_outstanding * 100) if total_outstanding else 0
 
         guidance = []
+
+        # Collection pressure
         if overdue_pct > 30:
             guidance.append({
                 "priority": "critical",
                 "area": "Collections",
                 "action": (
-                    f"{overdue_pct:.0f}% of outstanding invoices are overdue. "
-                    f"This is bleeding cash. Pause new orders for worst offenders "
-                    f"and escalate collection on 90+ day invoices."
+                    f"CUT THE BLEEDING: {overdue_pct:.0f}% of outstanding invoices are "
+                    f"overdue ({total_overdue:,.0f} of {total_outstanding:,.0f}). "
+                    f"Pause new orders for worst offenders. Escalate 90+ day invoices "
+                    f"to formal collection. This is money you've already earned — go get it."
                 ),
             })
         elif overdue_pct > 15:
@@ -590,84 +783,263 @@ class FinancialAnalyzer:
                 "priority": "warning",
                 "area": "Collections",
                 "action": (
-                    f"{overdue_pct:.0f}% overdue rate is above healthy levels. "
-                    f"Set up automated reminders at 7, 14, and 30 days. "
-                    f"Personally call anyone over 60 days."
+                    f"{overdue_pct:.0f}% overdue rate ({total_overdue:,.0f}). "
+                    f"Set up automated reminders at 7, 14, 30 days. "
+                    f"Call anyone over 60 days personally."
                 ),
             })
 
-        # Revenue trend advice
+        # Revenue trend
         revenue = self.get_revenue_summary()
         growth_data = revenue.get("growth", [])
         if len(growth_data) >= 3:
             recent_growth = [g["growth_pct"] for g in growth_data[-3:]]
             avg_growth = sum(recent_growth) / len(recent_growth)
             if avg_growth < -5:
+                # Calculate how much lost
+                monthly_data = revenue.get("monthly", [])
+                if len(monthly_data) >= 4:
+                    peak = max(m.get("net_amount", 0) for m in monthly_data[-6:])
+                    current = monthly_data[-1].get("net_amount", 0) if monthly_data else 0
+                    lost_monthly = peak - current
+                else:
+                    lost_monthly = 0
                 guidance.append({
                     "priority": "critical",
                     "area": "Revenue Decline",
                     "action": (
-                        f"Revenue trending down {avg_growth:.1f}% avg over last 3 months. "
-                        f"Investigate: are you losing customers, or are existing ones ordering less? "
-                        f"Check churn risk list above for leads."
+                        f"INVEST IN SALES: Revenue down {avg_growth:.1f}% avg "
+                        f"over last 3 months"
+                        + (f" (losing ~{lost_monthly:,.0f}/month vs recent peak). " if lost_monthly > 0 else ". ")
+                        + f"Check churn risk list — your lost customers ARE your "
+                        f"growth opportunity. Winning one back is cheaper than "
+                        f"finding a new one."
                     ),
                 })
             elif avg_growth < 0:
                 guidance.append({
                     "priority": "warning",
-                    "area": "Revenue Flat/Declining",
+                    "area": "Revenue Softening",
                     "action": (
-                        f"Revenue slightly declining ({avg_growth:.1f}% avg last 3 months). "
-                        f"Focus on upselling to existing nurture customers and "
-                        f"converting new potential accounts."
+                        f"Revenue drifting down ({avg_growth:.1f}% avg). "
+                        f"Upsell to VIP/nurture customers — they already trust you. "
+                        f"Introduce them to product lines they haven't tried."
+                    ),
+                })
+            elif avg_growth > 10:
+                guidance.append({
+                    "priority": "good",
+                    "area": "Revenue Growth",
+                    "action": (
+                        f"Strong growth ({avg_growth:.1f}% avg last 3 months). "
+                        f"Now is the time to invest — add stock for bestsellers, "
+                        f"lock in your rising stars with volume deals."
                     ),
                 })
 
-        # Payment terms advice
+        # Payment terms
         cash_flow = self.get_cash_flow_timing()
         terms = cash_flow.get("payment_terms", [])
-        long_terms = [t for t in terms if "60" in str(t["payment_term"]) or "90" in str(t["payment_term"])]
+        long_terms = [t for t in terms
+                      if any(x in str(t.get("payment_term", "")) for x in ("60", "90"))]
         if long_terms:
             long_outstanding = sum(t["outstanding"] for t in long_terms)
             if long_outstanding > 0:
                 guidance.append({
                     "priority": "info",
-                    "area": "Payment Terms",
+                    "area": "Cash Flow",
                     "action": (
-                        f"You have {long_outstanding:,.0f} outstanding on long payment terms (60-90 days). "
-                        f"Consider offering 2% early-payment discount to accelerate cash flow."
+                        f"SPEED UP CASH: {long_outstanding:,.0f} tied up in "
+                        f"60-90 day payment terms. Offer 2% early-payment discount "
+                        f"— you'll recover the money faster than any marketing spend."
                     ),
                 })
+
+        # Stop spending advice based on stop_spending list
+        total_at_risk = sum(c["money_at_risk"] for c in stop_spending)
+        if stop_spending and total_at_risk > 0:
+            guidance.append({
+                "priority": "warning",
+                "area": "Cut Losses",
+                "action": (
+                    f"STOP SPENDING on {len(stop_spending)} unprofitable customers "
+                    f"({total_at_risk:,.0f} at risk). "
+                    f"Redirect that energy to your invest list — every hour spent "
+                    f"on a dead-end customer is an hour stolen from a rising star."
+                ),
+            })
+
+        # Invest advice
+        invest_projected = sum(c.get("projected_value", 0) for c in invest[:5])
+        if invest and invest_projected > 0:
+            guidance.append({
+                "priority": "good",
+                "area": "Invest",
+                "action": (
+                    f"DOUBLE DOWN on your top {min(len(invest), 5)} invest targets — "
+                    f"projected combined annual value: {invest_projected:,.0f}. "
+                    f"Personal outreach, volume incentives, and priority service "
+                    f"will compound your returns."
+                ),
+            })
 
         if not guidance:
             guidance.append({
                 "priority": "good",
                 "area": "Overall",
-                "action": "Collections and cash flow look healthy. Keep monitoring monthly.",
+                "action": (
+                    "Business looks healthy. Keep monitoring weekly. "
+                    "Focus on growing mid-tier customers to reduce concentration risk."
+                ),
             })
 
+        # ══════════════════════════════════════════════════════
+        # AI BRIEFING — the 5 most important things right now
+        # ══════════════════════════════════════════════════════
+        briefing = self._build_ai_briefing(
+            invest, stop_spending, chase_payment, churn_risk,
+            concentration, guidance, total_revenue, total_overdue,
+        )
+
         return {
-            "rising_stars": sorted(rising_stars, key=lambda x: -x.get("growth_pct", 0)),
-            "nurture": sorted(nurture, key=lambda x: -x["net_revenue"]),
-            "churn_risk": sorted(churn_risk, key=lambda x: -x["net_revenue"]),
-            "chase_payment": sorted(chase_payment, key=lambda x: -x["outstanding"]),
-            "new_potential": sorted(new_potential, key=lambda x: -x["net_revenue"]),
+            "ai_briefing": briefing,
+            "invest": invest[:15],
+            "stop_spending": stop_spending[:15],
+            "chase_payment": chase_payment[:15],
+            "churn_risk": churn_risk[:15],
             "revenue_concentration": concentration,
             "expense_guidance": guidance,
             "summary": {
-                "rising_star_count": len(rising_stars),
-                "nurture_count": len(nurture),
-                "churn_risk_count": len(churn_risk),
+                "invest_count": len(invest),
+                "stop_spending_count": len(stop_spending),
                 "chase_payment_count": len(chase_payment),
-                "new_potential_count": len(new_potential),
+                "churn_risk_count": len(churn_risk),
                 "concentration_risk": concentration_risk,
+                "total_at_risk": round(total_at_risk, 2),
+                "total_projected_invest": round(invest_projected, 2),
+                "total_overdue": round(total_overdue, 2),
             },
         }
 
+    def _build_ai_briefing(self, invest, stop_spending, chase_payment,
+                           churn_risk, concentration, guidance,
+                           total_revenue, total_overdue) -> list[dict]:
+        """Build the top-priority action list — the morning briefing."""
+        items = []
+
+        # 1. Critical payments to chase
+        critical_chase = [c for c in chase_payment if c["severity"] == "critical"]
+        if critical_chase:
+            total_critical = sum(c["outstanding"] for c in critical_chase)
+            names = ", ".join(c["name"] for c in critical_chase[:3])
+            items.append({
+                "priority": 1,
+                "icon": "money",
+                "severity": "critical",
+                "title": f"Collect {total_critical:,.0f} in critical overdue payments",
+                "detail": (
+                    f"{len(critical_chase)} customer(s) with urgent overdue invoices: "
+                    f"{names}. Call today — every day you wait reduces your "
+                    f"chance of collecting."
+                ),
+            })
+
+        # 2. Critical churn risk (valuable customers going quiet)
+        critical_churn = [c for c in churn_risk if c["severity"] == "critical"]
+        if critical_churn:
+            lost_value = sum(c["net_revenue"] for c in critical_churn)
+            names = ", ".join(c["name"] for c in critical_churn[:3])
+            items.append({
+                "priority": 2,
+                "icon": "alert",
+                "severity": "critical",
+                "title": f"Win back {lost_value:,.0f} in at-risk customer revenue",
+                "detail": (
+                    f"{len(critical_churn)} valuable customer(s) going quiet: {names}. "
+                    f"Personal outreach this week — they represent "
+                    f"{lost_value / total_revenue * 100:.1f}% of your revenue."
+                ),
+            })
+
+        # 3. Invest in rising stars
+        high_invest = [c for c in invest if c["priority"] == "high"]
+        if high_invest:
+            upside = sum(c.get("projected_value", 0) for c in high_invest[:5])
+            names = ", ".join(c["name"] for c in high_invest[:3])
+            items.append({
+                "priority": 3,
+                "icon": "invest",
+                "severity": "good",
+                "title": f"Invest in {len(high_invest)} high-potential customers",
+                "detail": (
+                    f"Your best growth opportunities: {names}. "
+                    f"Projected annual value: {upside:,.0f}. "
+                    f"Volume discounts, personal contact, priority service."
+                ),
+            })
+
+        # 4. Stop spending on drains
+        critical_stops = [c for c in stop_spending if c["severity"] in ("critical", "warning")]
+        if critical_stops:
+            wasted = sum(c["money_at_risk"] for c in critical_stops)
+            items.append({
+                "priority": 4,
+                "icon": "cut",
+                "severity": "warning",
+                "title": f"Stop spending on {len(critical_stops)} unprofitable customers",
+                "detail": (
+                    f"These customers are draining resources with {wasted:,.0f} at risk. "
+                    f"Require prepayment or deprioritize. Redirect effort to invest list."
+                ),
+            })
+
+        # 5. Concentration warning
+        if concentration["risk_level"] == "critical":
+            items.append({
+                "priority": 5,
+                "icon": "warning",
+                "severity": "warning",
+                "title": "Revenue dangerously concentrated",
+                "detail": concentration["advice"],
+            })
+
+        # 6. Top guidance item
+        crit_guidance = [g for g in guidance if g["priority"] == "critical"]
+        for g in crit_guidance:
+            if not any(g["area"].lower() in (i.get("title", "").lower()) for i in items):
+                items.append({
+                    "priority": 6,
+                    "icon": "guidance",
+                    "severity": "critical",
+                    "title": g["area"],
+                    "detail": g["action"],
+                })
+
+        # If nothing urgent, add a positive note
+        if not items:
+            items.append({
+                "priority": 1,
+                "icon": "good",
+                "severity": "good",
+                "title": "Business is in good shape",
+                "detail": (
+                    "No critical actions needed. Focus on growing mid-tier customers "
+                    "and maintaining your VIP relationships."
+                ),
+            })
+
+        items.sort(key=lambda x: x["priority"])
+        return items[:6]
+
     def _empty_actions(self) -> dict:
         return {
-            "rising_stars": [], "nurture": [], "churn_risk": [],
-            "chase_payment": [], "new_potential": [],
+            "ai_briefing": [{
+                "priority": 1, "icon": "info", "severity": "info",
+                "title": "Not enough data yet",
+                "detail": "Load financial data to generate actionable intelligence.",
+            }],
+            "invest": [], "stop_spending": [], "churn_risk": [],
+            "chase_payment": [],
             "revenue_concentration": {
                 "risk_level": "unknown", "advice": "Not enough data.",
                 "top5_revenue": 0, "top5_pct": 0, "top10_revenue": 0,
@@ -675,9 +1047,10 @@ class FinancialAnalyzer:
             },
             "expense_guidance": [],
             "summary": {
-                "rising_star_count": 0, "nurture_count": 0,
-                "churn_risk_count": 0, "chase_payment_count": 0,
-                "new_potential_count": 0, "concentration_risk": "unknown",
+                "invest_count": 0, "stop_spending_count": 0,
+                "chase_payment_count": 0, "churn_risk_count": 0,
+                "concentration_risk": "unknown", "total_at_risk": 0,
+                "total_projected_invest": 0, "total_overdue": 0,
             },
         }
 
