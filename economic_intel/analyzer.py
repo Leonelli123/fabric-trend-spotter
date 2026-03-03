@@ -1077,6 +1077,78 @@ class FinancialAnalyzer:
         total_rev = revenue["total_net_revenue"]
         outstanding = receivables["total_outstanding"]
         overdue = receivables["total_overdue"]
+        active_customers = [c for c in customers if c["invoice_count"] > 0]
+
+        # ── Operational metrics (break-even, margins, efficiency) ──
+        monthly = revenue.get("monthly", [])
+        growth = revenue.get("growth", [])
+
+        # Monthly averages for last 3 months (recent picture)
+        recent_months = monthly[-3:] if len(monthly) >= 3 else monthly
+        avg_recent_monthly = (
+            sum(m["net_amount"] for m in recent_months) / len(recent_months)
+            if recent_months else 0
+        )
+
+        # Revenue per customer
+        revenue_per_customer = total_rev / len(active_customers) if active_customers else 0
+
+        # Average order value
+        avg_order_value = total_rev / revenue["total_invoices"] if revenue["total_invoices"] else 0
+
+        # Collection efficiency: what % of invoiced revenue is collected
+        collected = total_rev - outstanding
+        collection_rate = (collected / total_rev * 100) if total_rev > 0 else 100
+
+        # Customer lifetime (avg months active)
+        lifetimes = []
+        for c in active_customers:
+            if c.get("months_active", 0) > 0:
+                lifetimes.append(c["months_active"])
+        avg_lifetime_months = sum(lifetimes) / len(lifetimes) if lifetimes else 0
+
+        # Revenue growth trajectory
+        if len(growth) >= 3:
+            recent_growth_rates = [g["growth_pct"] for g in growth[-3:]]
+            avg_growth_pct = sum(recent_growth_rates) / len(recent_growth_rates)
+        elif len(growth) >= 1:
+            avg_growth_pct = growth[-1]["growth_pct"]
+        else:
+            avg_growth_pct = 0
+
+        # Break-even estimate (monthly)
+        # Using invoiced revenue as proxy — break-even = fixed costs / margin
+        # Since we don't have expense data, we estimate:
+        #   - If VAT is available, we know gross margin on invoices
+        #   - We calculate break-even as: "how many invoices/month to sustain"
+        total_vat = sum(m.get("vat_amount", 0) for m in monthly)
+        avg_vat_rate = (total_vat / total_rev * 100) if total_rev > 0 else 25
+
+        # Overdue aging summary for quick display
+        aging = receivables.get("aging", {})
+        worst_debtors = receivables.get("worst_debtors", [])
+
+        operational = {
+            "avg_recent_monthly_revenue": round(avg_recent_monthly, 2),
+            "revenue_per_customer": round(revenue_per_customer, 2),
+            "avg_order_value": round(avg_order_value, 2),
+            "collection_rate_pct": round(collection_rate, 1),
+            "avg_customer_lifetime_months": round(avg_lifetime_months, 1),
+            "avg_growth_pct_3mo": round(avg_growth_pct, 1),
+            "avg_vat_rate_pct": round(avg_vat_rate, 1),
+            "invoices_per_month": round(
+                revenue["total_invoices"] / len(monthly) if monthly else 0, 1
+            ),
+            "overdue_ratio_pct": round(
+                overdue / outstanding * 100 if outstanding > 0 else 0, 1
+            ),
+            # Break-even: how many orders/month at avg order value
+            # to match your recent monthly revenue
+            "break_even_orders_per_month": round(
+                avg_recent_monthly / avg_order_value if avg_order_value > 0 else 0, 1
+            ),
+            "break_even_monthly_revenue": round(avg_recent_monthly, 2),
+        }
 
         return {
             "generated_at": self._now.isoformat(),
@@ -1088,8 +1160,9 @@ class FinancialAnalyzer:
                 "total_overdue": overdue,
                 "overdue_ratio": round(overdue / outstanding * 100, 1) if outstanding else 0,
                 "total_customers": len(self.customers),
-                "active_customers": len([c for c in customers if c["invoice_count"] > 0]),
+                "active_customers": len(active_customers),
             },
+            "operational": operational,
             "revenue": revenue,
             "accounts_receivable": receivables,
             "customer_profitability": customers,

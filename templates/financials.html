@@ -364,66 +364,131 @@
         var clr = healthColor(score);
         var pct = Math.min(score, 100) * 3.6;
         var factors = ch.factors || [];
-        var oa = (_reconData && _reconData.overdue_alert) || {};
         var rev = _ecoData.revenue || {};
         var growth = rev.growth || [];
         var lastGrowth = growth.length ? growth[growth.length - 1] : {};
         var monthly = rev.monthly || [];
-
-        // AI digest from strategic forecast
-        var mc = (_forecast && _forecast.market_context) || {};
-        var digest = mc.ai_digest || {};
-        var econ = mc.danish_economy || {};
-        var aiHTML = '';
-        if (digest.headline || mc.ai_narrative || econ.summary) {
-            var insights = digest.insights || [];
-            var actions = digest.actions || [];
-            // Filter to economy/revenue relevant insights for financial page
-            var finInsights = insights.filter(function(i) {
-                return i.category === 'economy' || i.category === 'revenue' || i.category === 'market';
-            });
-
-            aiHTML = '<div class="card ai-card" style="margin-bottom:16px;">' +
-                '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-                    '<h2><span class="ai-label">AI</span> Economic Context</h2>' +
-                    '<button id="copyBtn" class="copy-btn" onclick="copyDigest()">Copy</button>' +
-                '</div>' +
-                '<div id="digestText">' +
-                (digest.headline ? '<div class="ai-headline">' + esc(digest.headline) + '</div>' : '') +
-                '<div class="ai-summary">' + esc(econ.summary || digest.summary || mc.ai_narrative || '') + '</div>' +
-
-                (finInsights.length ? '<ul class="ai-insights">' +
-                    finInsights.map(function(ins) {
-                        return '<li class="ai-insight"><span class="ai-dot ' + (ins.severity || 'info') + '"></span><span>' + esc(ins.text) + '</span></li>';
-                    }).join('') +
-                '</ul>' : '') +
-                '</div>' +
-
-                '<div class="econ-row">' +
-                    '<div class="econ-pill"><div class="val" style="color:var(--green);">+' + (econ.gdp_growth || 2.2) + '%</div><div class="lbl">GDP</div></div>' +
-                    '<div class="econ-pill"><div class="val" style="color:' + ((econ.consumer_confidence || -17.3) < -10 ? 'var(--red)' : 'var(--amber)') + ';">' + (econ.consumer_confidence || -17.3) + '</div><div class="lbl">Confidence</div></div>' +
-                    '<div class="econ-pill"><div class="val" style="color:var(--green);">+' + (econ.retail_sales_growth || 4.7) + '%</div><div class="lbl">Retail</div></div>' +
-                    '<div class="econ-pill"><div class="val">' + (econ.inflation || 1.1) + '%</div><div class="lbl">Inflation</div></div>' +
-                    '<div class="econ-pill"><div class="val" style="color:var(--green);">+' + (econ.real_wage_growth || 2.4) + '%</div><div class="lbl">Wages</div></div>' +
-                    '<div class="econ-pill"><div class="val">' + (econ.unemployment || 2.9) + '%</div><div class="lbl">Unemp.</div></div>' +
-                '</div>' +
-            '</div>';
-        }
-
-        // Revenue sparkline from monthly data
-        var monthlyVals = monthly.map(function(m) { return m.net_amount || 0; });
-
-        // KPI changes
-        var kc = (_forecast && _forecast.kpi_changes) || {};
-        var revMoM = kc.revenue_mom_pct;
-        var overduePct = kc.overdue_pct_of_outstanding;
+        var op = _ecoData.operational || {};
+        var act = _actions || {};
+        var briefing = act.ai_briefing || [];
+        var actSummary = act.summary || {};
+        var ar = _ecoData.accounts_receivable || {};
+        var debtors = ar.worst_debtors || [];
 
         // Data freshness
         var staleHTML = staleBanner('{{ eco_cache.last_refresh if eco_cache else "" }}');
 
-        document.getElementById('pane-overview').innerHTML = staleHTML + aiHTML +
-            (oa.severity === 'critical' ? '<div class="alert-banner critical"><div class="alert-title">' + esc(oa.message) + '</div><div class="alert-detail">Total overdue: ' + fmtK(oa.total_overdue) + ' DKK (' + fmtPct(oa.overdue_pct) + ' of outstanding)</div></div>' : '') +
+        // ── AI Briefing for overview (top 3 actions) ──
+        var briefIcons = {money:'&#128176;', alert:'&#9888;', invest:'&#9733;', cut:'&#9986;', warning:'&#9888;', guidance:'&#9881;', good:'&#10003;', info:'&#8505;'};
+        var briefHTML = '';
+        if (briefing.length) {
+            briefHTML = '<div class="card ai-card" style="margin-bottom:16px;border-left:3px solid var(--accent);">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                    '<h2><span class="ai-label">AI</span> What To Do Right Now</h2>' +
+                    '<a href="#" onclick="switchTab(\'actions\');return false;" style="font-size:12px;color:var(--accent);text-decoration:none;">View all actions &rarr;</a>' +
+                '</div>' +
+                briefing.slice(0, 4).map(function(b) {
+                    var sevColor = b.severity === 'critical' ? 'var(--red)' : b.severity === 'warning' ? 'var(--amber)' : b.severity === 'good' ? 'var(--green)' : 'var(--blue)';
+                    return '<div style="display:flex;gap:14px;padding:12px 0;border-bottom:1px solid var(--border);">' +
+                        '<div style="width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.04);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">' + (briefIcons[b.icon] || '&#8226;') + '</div>' +
+                        '<div style="flex:1;">' +
+                            '<div style="font-weight:700;font-size:13px;color:' + sevColor + ';">' + esc(b.title) + '</div>' +
+                            '<div style="font-size:12px;color:var(--muted);margin-top:2px;line-height:1.4;">' + esc(b.detail) + '</div>' +
+                        '</div></div>';
+                }).join('') +
+            '</div>';
+        }
 
+        // ── Overdue alert with customer names ──
+        var overdueHTML = '';
+        if (s.total_overdue > 0 && debtors.length) {
+            var sevClass = s.overdue_ratio > 30 ? 'critical' : s.overdue_ratio > 15 ? 'warning' : 'info';
+            var chaseList = (act.chase_payment || []).slice(0, 5);
+            overdueHTML = '<div class="alert-banner ' + sevClass + '" style="margin-bottom:16px;">' +
+                '<div class="alert-title">Overdue: ' + fmtK(s.total_overdue) + ' DKK (' + fmtPct(s.overdue_ratio) + ' of outstanding)</div>' +
+                '<div style="margin-top:10px;">' +
+                    debtors.slice(0, 5).map(function(d) {
+                        // Find matching chase action for this customer
+                        var chase = chaseList.find(function(c) { return c.customer_number === d.customer_number; });
+                        var advice = chase ? chase.recommendation : '';
+                        return '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:6px 0;border-top:1px solid rgba(255,255,255,.06);">' +
+                            '<div style="flex:1;">' +
+                                '<span style="font-weight:700;font-size:13px;">' + esc(d.name) + '</span>' +
+                                (advice ? '<div style="font-size:11px;color:var(--muted);margin-top:2px;">' + esc(advice) + '</div>' : '') +
+                            '</div>' +
+                            '<div style="text-align:right;flex-shrink:0;margin-left:16px;">' +
+                                '<div style="font-weight:700;font-size:14px;color:var(--red);">' + fmtK(d.total_outstanding) + '</div>' +
+                                '<div style="font-size:10px;color:var(--muted);">' + d.outstanding_invoices + ' invoices</div>' +
+                            '</div></div>';
+                    }).join('') +
+                '</div></div>';
+        }
+
+        // Revenue sparkline
+        var monthlyVals = monthly.map(function(m) { return m.net_amount || 0; });
+        var kc = (_forecast && _forecast.kpi_changes) || {};
+
+        // ── AI Economic Context (compact) ──
+        var mc = (_forecast && _forecast.market_context) || {};
+        var digest = mc.ai_digest || {};
+        var econ = mc.danish_economy || {};
+        var econHTML = '';
+        if (econ.summary || digest.headline) {
+            econHTML = '<div class="card" style="margin-bottom:16px;border-left:3px solid var(--border);">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                    '<h2 style="font-size:14px;"><span class="ai-label">AI</span> Economic Context</h2>' +
+                    '<button id="copyBtn" class="copy-btn" onclick="copyDigest()">Copy</button>' +
+                '</div>' +
+                '<div id="digestText" style="font-size:12px;color:var(--muted);margin:6px 0;">' + esc(econ.summary || digest.headline || '') + '</div>' +
+                '<div class="econ-row">' +
+                    '<div class="econ-pill"><div class="val" style="color:var(--green);font-size:14px;">+' + (econ.gdp_growth || 2.2) + '%</div><div class="lbl">GDP</div></div>' +
+                    '<div class="econ-pill"><div class="val" style="font-size:14px;color:' + ((econ.consumer_confidence || -17.3) < -10 ? 'var(--red)' : 'var(--amber)') + ';">' + (econ.consumer_confidence || -17.3) + '</div><div class="lbl">Confidence</div></div>' +
+                    '<div class="econ-pill"><div class="val" style="font-size:14px;color:var(--green);">+' + (econ.retail_sales_growth || 4.7) + '%</div><div class="lbl">Retail</div></div>' +
+                    '<div class="econ-pill"><div class="val" style="font-size:14px;">' + (econ.inflation || 1.1) + '%</div><div class="lbl">Inflation</div></div>' +
+                '</div></div>';
+        }
+
+        // ── Rising stars + churn risk compact preview ──
+        var investList = (act.invest || []).slice(0, 3);
+        var churnList = (act.churn_risk || []).slice(0, 3);
+        var customerInsightHTML = '';
+        if (investList.length || churnList.length) {
+            customerInsightHTML = '<div class="card-grid card-grid-2" style="margin-bottom:16px;">';
+            if (investList.length) {
+                customerInsightHTML += '<div class="card" style="border-left:3px solid var(--green);">' +
+                    '<div style="display:flex;justify-content:space-between;align-items:center;"><h2 style="font-size:14px;">Invest In</h2><a href="#" onclick="switchTab(\'actions\');return false;" style="font-size:11px;color:var(--green);text-decoration:none;">' + actSummary.invest_count + ' total &rarr;</a></div>' +
+                    investList.map(function(c) {
+                        var badge = {rising_star:'Rising', loyal_vip:'VIP', new_promising:'New', sleeping_giant:'Sleeping'}[c.sub_type] || '';
+                        var badgeClr = {rising_star:'var(--green)', loyal_vip:'var(--blue)', new_promising:'var(--purple)', sleeping_giant:'var(--amber)'}[c.sub_type] || 'var(--muted)';
+                        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-top:1px solid var(--border);">' +
+                            '<div style="flex:1;min-width:0;"><div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + esc(c.name) + '">' + esc(c.name) + '</div>' +
+                                '<div style="font-size:11px;color:var(--muted);">' + (c.projected_value ? 'Projected: ' + fmtK(c.projected_value) + '/yr' : fmtK(c.net_revenue) + ' revenue') + '</div></div>' +
+                            '<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,.04);color:' + badgeClr + ';margin-left:8px;">' + badge + '</span></div>';
+                    }).join('') +
+                '</div>';
+            }
+            if (churnList.length) {
+                customerInsightHTML += '<div class="card" style="border-left:3px solid var(--amber);">' +
+                    '<div style="display:flex;justify-content:space-between;align-items:center;"><h2 style="font-size:14px;">Churn Risk</h2><a href="#" onclick="switchTab(\'actions\');return false;" style="font-size:11px;color:var(--amber);text-decoration:none;">' + actSummary.churn_risk_count + ' total &rarr;</a></div>' +
+                    churnList.map(function(c) {
+                        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-top:1px solid var(--border);">' +
+                            '<div style="flex:1;min-width:0;"><div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + esc(c.name) + '">' + esc(c.name) + '</div>' +
+                                '<div style="font-size:11px;color:var(--muted);">' + c.days_since_last + ' days silent, was ' + fmtK(c.net_revenue) + '</div></div>' +
+                            '<div class="severity-dot ' + c.severity + '" style="margin-left:8px;"></div></div>';
+                    }).join('') +
+                '</div>';
+            }
+            customerInsightHTML += '</div>';
+        }
+
+        document.getElementById('pane-overview').innerHTML = staleHTML +
+            // AI Briefing — what to do RIGHT NOW (most important thing on the page)
+            briefHTML +
+
+            // Overdue alert with customer names and actions
+            overdueHTML +
+
+            // Health score + KPIs
             '<div class="card" style="margin-bottom:16px;"><div class="health-row">' +
                 '<div class="health-ring" style="background:conic-gradient(' + clr + ' ' + pct + 'deg, rgba(255,255,255,.06) 0);"><div class="health-inner"><div class="score" style="color:' + clr + '">' + score + '</div><div class="label">/ 100</div></div></div>' +
                 '<div class="health-text"><h2>Financial Health: ' + esc(ch.rating || 'Unknown') + '</h2><p>Based on revenue trends, receivables, payment reliability, and WooCommerce reconciliation.</p>' +
@@ -431,30 +496,27 @@
                 '</div>' +
             '</div></div>' +
 
+            // Revenue KPIs
             '<div class="card-grid card-grid-4" style="margin-bottom:16px;">' +
-                '<div class="card kpi"><div class="kpi-val green">' + fmtK(s.total_net_revenue) + '</div><div class="kpi-label">Net Revenue (12mo)</div><div class="kpi-sub">' + fmt(s.total_invoices) + ' invoices</div>' + changeBadge(revMoM, 'MoM') + sparklineSVG(monthlyVals) + '</div>' +
-                '<div class="card kpi"><div class="kpi-val">' + fmtK(s.avg_monthly_revenue) + '</div><div class="kpi-label">Avg Monthly Revenue</div><div class="kpi-sub">' + fmtK(rev.avg_invoice_value) + ' avg invoice</div></div>' +
-                '<div class="card kpi"><div class="kpi-val ' + (s.total_overdue > s.total_outstanding * .3 ? 'red' : 'amber') + '">' + fmtK(s.total_outstanding) + '</div><div class="kpi-label">Outstanding</div><div class="kpi-sub">' + fmtK(s.total_overdue) + ' overdue</div>' + (overduePct != null ? '<div class="change-badge ' + (overduePct > 30 ? 'down' : 'up') + '">' + overduePct + '% overdue</div>' : '') + '</div>' +
+                '<div class="card kpi"><div class="kpi-val green">' + fmtK(s.total_net_revenue) + '</div><div class="kpi-label">Net Revenue (12mo)</div><div class="kpi-sub">' + fmt(s.total_invoices) + ' invoices</div>' + changeBadge(kc.revenue_mom_pct, 'MoM') + sparklineSVG(monthlyVals) + '</div>' +
+                '<div class="card kpi"><div class="kpi-val">' + fmtK(op.avg_recent_monthly_revenue || s.avg_monthly_revenue) + '</div><div class="kpi-label">Avg Monthly (3mo)</div><div class="kpi-sub">' + fmtK(op.avg_order_value || rev.avg_invoice_value) + ' avg order</div></div>' +
+                '<div class="card kpi"><div class="kpi-val ' + (s.total_overdue > s.total_outstanding * .3 ? 'red' : 'amber') + '">' + fmtK(s.total_outstanding) + '</div><div class="kpi-label">Outstanding</div><div class="kpi-sub">' + fmtK(s.total_overdue) + ' overdue (' + fmtPct(op.overdue_ratio_pct) + ')</div></div>' +
                 '<div class="card kpi"><div class="kpi-val ' + (lastGrowth.growth_pct > 0 ? 'green' : lastGrowth.growth_pct < 0 ? 'red' : 'blue') + '">' + fmtPct(lastGrowth.growth_pct) + '</div><div class="kpi-label">Latest Growth</div><div class="kpi-sub">' + esc(lastGrowth.month || '') + '</div>' + sparklineSVG(growth.map(function(g) { return g.growth_pct || 0; })) + '</div>' +
             '</div>' +
 
-            '<div class="card-grid card-grid-2">' +
-                '<div class="card"><h2>Customer Overview</h2>' +
-                    '<div style="display:flex;gap:24px;flex-wrap:wrap;">' +
-                        '<div><div style="font-size:28px;font-weight:800;">' + fmt(s.total_customers) + '</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Total Customers</div></div>' +
-                        '<div><div style="font-size:28px;font-weight:800;color:var(--green);">' + fmt(s.active_customers) + '</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Active (12mo)</div></div>' +
-                    '</div>' +
-                '</div>' +
-                '<div class="card"><h2>Collection Health</h2>' +
-                    (function() {
-                        var cc = (_reconData && _reconData.cash_collection) || {};
-                        return '<div style="display:flex;gap:24px;flex-wrap:wrap;">' +
-                            '<div><div style="font-size:28px;font-weight:800;color:' + (cc.collection_rate_pct > 90 ? 'var(--green)' : cc.collection_rate_pct > 75 ? 'var(--amber)' : 'var(--red)') + ';">' + fmtPct(cc.collection_rate_pct) + '</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Collection Rate</div></div>' +
-                            '<div><div style="font-size:28px;font-weight:800;color:var(--blue);">' + fmtK(cc.expected_next_12_weeks) + '</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Expected 12-wk</div></div>' +
-                        '</div>';
-                    })() +
-                '</div>' +
-            '</div>';
+            // Operational metrics
+            '<div class="card-grid card-grid-4" style="margin-bottom:16px;">' +
+                '<div class="card kpi"><div class="kpi-val blue">' + fmtK(op.revenue_per_customer) + '</div><div class="kpi-label">Revenue / Customer</div><div class="kpi-sub">' + fmt(s.active_customers) + ' active</div></div>' +
+                '<div class="card kpi"><div class="kpi-val">' + fmtPct(op.collection_rate_pct) + '</div><div class="kpi-label">Collection Rate</div><div class="kpi-sub">' + (op.collection_rate_pct >= 95 ? 'Excellent' : op.collection_rate_pct >= 85 ? 'Good' : 'Needs attention') + '</div></div>' +
+                '<div class="card kpi"><div class="kpi-val">' + (op.avg_customer_lifetime_months || 0).toFixed(0) + 'mo</div><div class="kpi-label">Avg Customer Life</div><div class="kpi-sub">' + fmtPct(op.avg_growth_pct_3mo) + ' growth trend</div></div>' +
+                '<div class="card kpi"><div class="kpi-val amber">' + (op.break_even_orders_per_month || 0).toFixed(0) + '</div><div class="kpi-label">Orders / Month</div><div class="kpi-sub">to sustain ' + fmtK(op.break_even_monthly_revenue) + '/mo</div></div>' +
+            '</div>' +
+
+            // Customer insight previews (invest + churn risk)
+            customerInsightHTML +
+
+            // Economic context (compact, below the action-oriented content)
+            econHTML;
     }
 
     /* ══════════════════════════════════════════════════════
@@ -674,14 +736,33 @@
        ══════════════════════════════════════════════════════ */
     function renderCustomers() {
         var customers = (_ecoData.customer_profitability || []).slice(0, 30);
+        var act = _actions || {};
+
+        // Build lookup: customer_number -> action tag
+        var tagMap = {};
+        (act.invest || []).forEach(function(c) {
+            tagMap[c.customer_number] = {label: c.sub_type === 'rising_star' ? 'Rising' : c.sub_type === 'loyal_vip' ? 'VIP' : c.sub_type === 'new_promising' ? 'New' : c.sub_type === 'sleeping_giant' ? 'Sleeping' : 'Invest', color: 'var(--green)', bg: 'rgba(34,197,94,.1)'};
+        });
+        (act.stop_spending || []).forEach(function(c) {
+            tagMap[c.customer_number] = {label: 'Stop', color: 'var(--red)', bg: 'rgba(239,68,68,.1)'};
+        });
+        (act.chase_payment || []).forEach(function(c) {
+            if (!tagMap[c.customer_number]) tagMap[c.customer_number] = {label: 'Chase', color: 'var(--amber)', bg: 'rgba(245,158,11,.1)'};
+        });
+        (act.churn_risk || []).forEach(function(c) {
+            if (!tagMap[c.customer_number]) tagMap[c.customer_number] = {label: 'Churn', color: 'var(--purple)', bg: 'rgba(168,85,247,.1)'};
+        });
 
         document.getElementById('pane-customers').innerHTML =
             '<div class="card"><h2>Customer Profitability Ranking</h2>' +
-                '<table class="ctable"><thead><tr><th>Customer</th><th style="text-align:right">Revenue</th><th>Reliability</th><th style="text-align:right">Invoices</th><th style="text-align:right">Outstanding</th><th style="text-align:right">Monthly Avg</th></tr></thead><tbody>' +
+                '<table class="ctable"><thead><tr><th>Customer</th><th>Action</th><th style="text-align:right">Revenue</th><th>Reliability</th><th style="text-align:right">Invoices</th><th style="text-align:right">Outstanding</th><th style="text-align:right">Monthly Avg</th></tr></thead><tbody>' +
                 customers.map(function(c) {
                     var rel = c.payment_reliability || 0;
                     var relClr = rel >= 80 ? 'var(--green)' : rel >= 60 ? 'var(--amber)' : 'var(--red)';
+                    var tag = tagMap[c.customer_number];
+                    var tagHTML = tag ? '<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' + tag.bg + ';color:' + tag.color + ';">' + tag.label + '</span>' : '<span style="font-size:10px;color:var(--muted);">—</span>';
                     return '<tr><td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + esc(c.name) + '">' + esc(c.name) + '</td>' +
+                        '<td>' + tagHTML + '</td>' +
                         '<td style="text-align:right;font-weight:600;">' + fmtK(c.net_revenue) + '</td>' +
                         '<td><div class="reliability-bar"><div class="reliability-fill" style="width:' + rel + '%;background:' + relClr + ';"></div></div><span style="font-size:12px;color:' + relClr + ';">' + rel + '</span></td>' +
                         '<td style="text-align:right">' + c.invoice_count + '</td>' +
