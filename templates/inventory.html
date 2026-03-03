@@ -333,6 +333,7 @@
         <button class="tab-btn" data-tab="products" onclick="switchTab('products')">Products</button>
         <button class="tab-btn" data-tab="performance" onclick="switchTab('performance')">Performance</button>
         <button class="tab-btn" data-tab="buying" onclick="switchTab('buying')">Buying &amp; Pricing</button>
+        <button class="tab-btn" data-tab="prints" onclick="switchTab('prints')">Print Forecaster</button>
         <button class="tab-btn" data-tab="forecast" onclick="switchTab('forecast')">Forecast</button>
     </div>
 
@@ -342,6 +343,7 @@
         <div id="pane-products" class="pane"></div>
         <div id="pane-performance" class="pane"></div>
         <div id="pane-buying" class="pane"></div>
+        <div id="pane-prints" class="pane"></div>
         <div id="pane-forecast" class="pane"></div>
 
         <div id="loadingState" class="loading-overlay" style="display:none;">
@@ -395,7 +397,7 @@
         return '';
     }
 
-    var _allData = null, _forecast = null, _productFilter = 'all', _productSearch = '';
+    var _allData = null, _forecast = null, _printForecast = null, _productFilter = 'all', _productSearch = '';
 
     /* ── Tab switching ── */
     function switchTab(id) {
@@ -428,10 +430,13 @@
             renderAll(data);
             fetch('/api/forecast').then(function(r) { return r.json(); }).then(function(fc) {
                 _forecast = fc;
-                // Re-render overview with market context from forecast
                 var a = data.analysis || {}, r = data.recommendations || {}, p = data.projections || {};
                 renderOverview(a, r, p, fc);
                 renderForecastPane(data, fc);
+            }).catch(function() {});
+            fetch('/api/inventory/print-forecast').then(function(r) { return r.json(); }).then(function(pf) {
+                _printForecast = pf;
+                renderPrintForecaster(pf);
             }).catch(function() {});
         });
     }
@@ -957,6 +962,211 @@
         if (!fc && !weeks.length) {
             document.getElementById('pane-forecast').innerHTML = '<div class="empty-state"><h2>No Forecast Data Yet</h2><p>Click Refresh Data to generate projections. Both WooCommerce and e-conomic data are needed for the full strategic forecast.</p></div>';
         }
+    }
+
+    /* ══════════════════════════════════════════════════════
+       PRINT FORECASTER TAB
+       ══════════════════════════════════════════════════════ */
+    function renderPrintForecaster(pf) {
+        if (!pf || !pf.total_jersey_products) {
+            document.getElementById('pane-prints').innerHTML =
+                '<div class="empty-state"><h2>No Jersey Prints Found</h2>' +
+                '<p>No jersey products detected. Make sure products have the "jersey / fast" attribute or "jersey" in their category/name.</p></div>';
+            return;
+        }
+
+        var s = pf.summary || {};
+        var so = pf.supplier_order || {};
+        var seasonal = pf.seasonal_outlook || {};
+        var timeline = pf.stockout_timeline || [];
+        var designs = pf.design_forecasts || [];
+        var ranking = pf.design_ranking || [];
+
+        // Color helpers
+        function actionColor(a) {
+            if (a === 'REORDER_NOW') return 'var(--red)';
+            if (a === 'REORDER_SOON') return 'var(--amber)';
+            if (a === 'OVERSTOCK' || a === 'PHASE_OUT') return 'var(--purple)';
+            if (a === 'WELL_STOCKED') return 'var(--green)';
+            return 'var(--muted)';
+        }
+        function actionLabel(a) {
+            return a.replace(/_/g, ' ');
+        }
+        function riskBar(score) {
+            var color = score >= 70 ? 'var(--red)' : score >= 40 ? 'var(--amber)' : 'var(--green)';
+            return '<div style="display:flex;align-items:center;gap:6px;">' +
+                '<div style="flex:1;height:6px;background:var(--border);border-radius:3px;max-width:60px;">' +
+                '<div style="height:100%;width:' + score + '%;background:' + color + ';border-radius:3px;"></div></div>' +
+                '<span style="font-size:11px;color:' + color + ';">' + score + '</span></div>';
+        }
+        function confBadge(c) {
+            var cls = c === 'high' ? 'green' : c === 'medium' ? 'amber' : 'red';
+            return '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,.06);color:var(--' + cls + ');">' + c + '</span>';
+        }
+
+        // === SEASONAL OUTLOOK BANNER ===
+        var seasonalHTML = '';
+        if (seasonal.outlook_months) {
+            var demandBars = seasonal.outlook_months.map(function(m) {
+                var barH = Math.max(m.demand_factor * 60, 5);
+                var color = m.demand_level === 'Peak' ? 'var(--green)' : m.demand_level === 'High' ? 'var(--blue)' : m.demand_level === 'Moderate' ? 'var(--amber)' : 'var(--red)';
+                return '<div style="text-align:center;flex:1;">' +
+                    '<div style="height:80px;display:flex;flex-direction:column;justify-content:flex-end;">' +
+                    '<div style="width:100%;height:' + barH + 'px;background:' + color + ';border-radius:4px 4px 0 0;opacity:.7;"></div></div>' +
+                    '<div style="font-size:11px;color:var(--muted);margin-top:4px;">' + esc(m.month_name.substring(0,3)) + '</div>' +
+                    '<div style="font-size:10px;color:' + color + ';">' + esc(m.demand_level) + '</div></div>';
+            }).join('');
+            seasonalHTML = '<div class="card" style="margin-bottom:16px;">' +
+                '<h2>Jersey Seasonal Outlook</h2>' +
+                '<div style="display:flex;gap:8px;margin:12px 0;">' + demandBars + '</div>' +
+                '<p style="font-size:13px;color:var(--muted);margin-top:8px;">' + esc(seasonal.advice) + '</p>' +
+            '</div>';
+        }
+
+        // === KPI ROW ===
+        var kpiHTML = '<div class="card-grid card-grid-4" style="margin-bottom:16px;">' +
+            '<div class="card kpi"><div class="kpi-val">' + pf.total_jersey_products + '</div><div class="kpi-label">Jersey Prints</div></div>' +
+            '<div class="card kpi"><div class="kpi-val red">' + s.reorder_now_count + '</div><div class="kpi-label">Reorder NOW</div></div>' +
+            '<div class="card kpi"><div class="kpi-val amber">' + s.reorder_soon_count + '</div><div class="kpi-label">Reorder Soon</div></div>' +
+            '<div class="card kpi"><div class="kpi-val ' + (s.stockout_risk_products > 0 ? 'red' : 'green') + '">' + s.stockout_risk_products + '</div><div class="kpi-label">Stockout Risk</div></div>' +
+        '</div>';
+
+        // === SUPPLIER ORDER SUMMARY ===
+        var orderHTML = '';
+        if (so.items && so.items.length) {
+            var orderRows = so.items.map(function(item) {
+                var urgCls = item.urgency === 'REORDER_NOW' ? 'today' : 'this_week';
+                return '<tr>' +
+                    '<td class="name" title="' + esc(item.name) + '">' + esc(item.name) + '</td>' +
+                    '<td>' + esc(item.sku || '\u2014') + '</td>' +
+                    '<td style="text-align:right;">' + item.current_stock + '</td>' +
+                    '<td style="text-align:right;font-weight:700;">' + item.quantity + '</td>' +
+                    '<td style="text-align:right;">' + item.weekly_demand.toFixed(1) + '/wk</td>' +
+                    '<td>' + (item.days_until_stockout < 999 ? item.days_until_stockout + 'd' : '\u2014') + '</td>' +
+                    '<td><span class="urgency ' + urgCls + '">' + actionLabel(item.urgency) + '</span></td>' +
+                    '<td>' + confBadge(item.confidence) + '</td>' +
+                '</tr>';
+            }).join('');
+
+            orderHTML = '<div class="card" style="margin-bottom:16px;">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">' +
+                    '<h2>Supplier Order \u2014 Ready to Send</h2>' +
+                    '<div style="display:flex;gap:16px;align-items:center;">' +
+                        '<span style="font-size:13px;color:var(--muted);">' + so.item_count + ' designs / ' + so.total_units + ' units</span>' +
+                        (so.urgent_count > 0 ? '<span class="urgency today">' + so.urgent_count + ' URGENT</span>' : '') +
+                        '<button class="btn btn-outline" onclick="copySupplierOrder()" id="copyOrderBtn" style="font-size:12px;padding:5px 12px;">Copy Order</button>' +
+                    '</div>' +
+                '</div>' +
+                '<p style="font-size:13px;color:var(--muted);margin-bottom:12px;">' + esc(so.order_note) + '</p>' +
+                '<p style="font-size:12px;color:var(--muted);margin-bottom:8px;">Lead time: ' + pf.lead_time_weeks + ' weeks from Turkey. MOQ: ' + (pf.moq_per_design || 50) + 'm per design. All quantities rounded up to MOQ.</p>' +
+                '<p style="font-size:12px;color:var(--amber);margin-bottom:12px;">Note: This does NOT track inbound orders (stock already ordered but not yet received). If you have a pending order from Turkey, factor that in.</p>' +
+                '<div class="table-wrap"><table class="data-table"><thead><tr>' +
+                    '<th>Design</th><th>SKU</th><th>Stock</th><th>Order Qty</th><th>Demand</th><th>Stockout</th><th>Urgency</th><th>Conf.</th>' +
+                '</tr></thead><tbody>' + orderRows + '</tbody></table></div>' +
+            '</div>';
+        } else {
+            orderHTML = '<div class="card" style="margin-bottom:16px;">' +
+                '<h2>Supplier Order</h2>' +
+                '<p style="color:var(--green);margin-top:8px;">' + esc(so.order_note || 'All jersey prints are well stocked.') + '</p>' +
+            '</div>';
+        }
+
+        // === STOCKOUT TIMELINE ===
+        var timelineHTML = '';
+        if (timeline.length) {
+            var timelineRows = timeline.slice(0, 15).map(function(t) {
+                var gapColor = t.will_have_gap ? 'var(--red)' : 'var(--green)';
+                var daysColor = t.days_until_stockout < 14 ? 'var(--red)' : t.days_until_stockout < 28 ? 'var(--amber)' : 'var(--muted)';
+                return '<tr>' +
+                    '<td class="name" title="' + esc(t.name) + '">' + esc(t.name) + '</td>' +
+                    '<td style="text-align:right;color:' + daysColor + ';font-weight:600;">' + t.days_until_stockout + 'd</td>' +
+                    '<td style="text-align:right;">' + t.current_stock + '</td>' +
+                    '<td style="text-align:right;">' + t.weekly_rate.toFixed(1) + '/wk</td>' +
+                    '<td>' + esc(t.stockout_date) + '</td>' +
+                    '<td style="color:' + gapColor + ';">' + (t.will_have_gap ? t.gap_days + ' day gap' : 'OK') + '</td>' +
+                '</tr>';
+            }).join('');
+            timelineHTML = '<div class="card" style="margin-bottom:16px;">' +
+                '<h2>Stockout Timeline</h2>' +
+                '<p style="font-size:12px;color:var(--muted);margin-bottom:12px;">When each design runs out vs. when a supplier delivery could arrive (' + pf.lead_time_weeks + '-week lead time).</p>' +
+                '<div class="table-wrap"><table class="data-table"><thead><tr>' +
+                    '<th>Design</th><th>Runs Out</th><th>Stock</th><th>Demand</th><th>Stockout Date</th><th>Delivery Gap</th>' +
+                '</tr></thead><tbody>' + timelineRows + '</tbody></table></div>' +
+            '</div>';
+        }
+
+        // === DESIGN RANKING ===
+        var rankHTML = '';
+        if (ranking.length) {
+            var rankRows = ranking.slice(0, 20).map(function(r, i) {
+                var verdictColor = r.verdict === 'Star Design' ? 'var(--green)' : r.verdict === 'Solid Performer' ? 'var(--blue)' : r.verdict === 'Under-performer' ? 'var(--amber)' : 'var(--red)';
+                return '<tr>' +
+                    '<td style="font-weight:600;color:var(--muted);">' + (i+1) + '</td>' +
+                    '<td class="name" title="' + esc(r.name) + '">' + esc(r.name) + '</td>' +
+                    '<td style="text-align:right;font-weight:700;">' + r.score.toFixed(0) + '</td>' +
+                    '<td>' + dirIcon(r.direction) + '</td>' +
+                    '<td style="text-align:right;">' + r.recent_90d_qty + '</td>' +
+                    '<td style="text-align:right;">' + fmtK(r.total_revenue) + '</td>' +
+                    '<td style="text-align:right;">' + r.stock_quantity + '</td>' +
+                    '<td style="color:' + verdictColor + ';font-weight:600;font-size:12px;">' + esc(r.verdict) + '</td>' +
+                '</tr>';
+            }).join('');
+            rankHTML = '<div class="card" style="margin-bottom:16px;">' +
+                '<h2>Design Performance Ranking</h2>' +
+                '<p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Score based on revenue (40%), trend direction (30%), and recent 90-day demand (30%).</p>' +
+                '<div class="table-wrap"><table class="data-table"><thead><tr>' +
+                    '<th>#</th><th>Design</th><th>Score</th><th>Trend</th><th>90d Sales</th><th>Revenue</th><th>Stock</th><th>Verdict</th>' +
+                '</tr></thead><tbody>' + rankRows + '</tbody></table></div>' +
+            '</div>';
+        }
+
+        // === FULL DESIGN FORECASTS (collapsible detail) ===
+        var detailRows = designs.slice(0, 30).map(function(d) {
+            return '<tr>' +
+                '<td class="name" title="' + esc(d.name) + '">' + esc(d.name) + '</td>' +
+                '<td style="text-align:right;">' + d.current_stock + '</td>' +
+                '<td style="text-align:right;">' + d.current_weekly_rate.toFixed(1) + '</td>' +
+                '<td style="text-align:right;">' + d.adjusted_weekly_rate.toFixed(1) + '</td>' +
+                '<td style="text-align:right;">' + d.weeks_of_stock.toFixed(0) + 'w</td>' +
+                '<td style="text-align:right;font-weight:700;">' + d.forecast_demand_8w + '</td>' +
+                '<td style="text-align:right;">' + d.suggested_reorder_qty + '</td>' +
+                '<td>' + riskBar(d.stockout_risk_score) + '</td>' +
+                '<td><span style="color:' + actionColor(d.action) + ';font-weight:600;font-size:12px;">' + actionLabel(d.action) + '</span></td>' +
+                '<td style="font-size:11px;color:var(--muted);max-width:250px;">' + esc(d.reason) + '</td>' +
+            '</tr>';
+        }).join('');
+        var detailHTML = '<div class="card">' +
+            '<h2>All Design Forecasts</h2>' +
+            '<p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Demand forecasts adjusted for seasonal trends (x' + (seasonal.upcoming_avg_factor || 1).toFixed(2) + ') and velocity direction. Safety stock included.</p>' +
+            '<div class="table-wrap"><table class="data-table"><thead><tr>' +
+                '<th>Design</th><th>Stock</th><th>Rate/wk</th><th>Adj Rate</th><th>Stock Left</th><th>8w Demand</th><th>Reorder</th><th>Risk</th><th>Action</th><th>Reason</th>' +
+            '</tr></thead><tbody>' + detailRows + '</tbody></table></div>' +
+        '</div>';
+
+        document.getElementById('pane-prints').innerHTML = seasonalHTML + kpiHTML + orderHTML + timelineHTML + rankHTML + detailHTML;
+    }
+
+    function copySupplierOrder() {
+        if (!_printForecast || !_printForecast.supplier_order) return;
+        var so = _printForecast.supplier_order;
+        var lines = ['JERSEY PRINT REORDER — ' + new Date().toLocaleDateString('da-DK'), ''];
+        lines.push('Lead time: ' + _printForecast.lead_time_weeks + ' weeks');
+        lines.push('MOQ: ' + (_printForecast.moq_per_design || 50) + 'm per design');
+        lines.push('Total: ' + so.total_units + ' units across ' + so.item_count + ' designs');
+        lines.push('');
+        so.items.forEach(function(item, i) {
+            lines.push((i+1) + '. ' + item.name + (item.sku ? ' (' + item.sku + ')' : ''));
+            lines.push('   Quantity: ' + item.quantity + '  |  Current stock: ' + item.current_stock + '  |  Demand: ' + item.weekly_demand.toFixed(1) + '/week');
+            if (item.days_until_stockout < 999) lines.push('   Stockout in: ' + item.days_until_stockout + ' days');
+            lines.push('');
+        });
+        if (so.order_note) lines.push(so.order_note);
+        navigator.clipboard.writeText(lines.join('\n')).then(function() {
+            var btn = document.getElementById('copyOrderBtn');
+            btn.textContent = 'Copied!';
+            setTimeout(function() { btn.textContent = 'Copy Order'; }, 2000);
+        });
     }
 
     /* ── Init ── */

@@ -360,6 +360,7 @@ woo_cache = {
     "recommendations": None,
     "projections": None,
     "intelligence": None,
+    "print_forecast": None,
     "last_refresh": None,
     "refreshing": False,
     "error": None,
@@ -513,6 +514,23 @@ def inventory_recommendations():
     if not woo_cache["recommendations"]:
         return jsonify({"error": "No data yet."}), 404
     return jsonify(woo_cache["recommendations"])
+
+
+@app.route("/api/inventory/print-forecast")
+def inventory_print_forecast():
+    """Jersey print demand forecast for supplier ordering."""
+    if not woo_cache["print_forecast"]:
+        return jsonify({"error": "No data yet. Click Refresh to analyze."}), 404
+    return jsonify(woo_cache["print_forecast"])
+
+
+@app.route("/api/inventory/print-forecast/supplier-order")
+def print_forecast_supplier_order():
+    """Supplier order summary — ready to email to Turkey."""
+    forecast = woo_cache.get("print_forecast")
+    if not forecast:
+        return jsonify({"error": "No data yet."}), 404
+    return jsonify(forecast.get("supplier_order", {}))
 
 
 # ======================================================================
@@ -773,6 +791,7 @@ def _run_woo_analysis():
         from woo_intel.analyzer import InventoryAnalyzer
         from woo_intel.recommender import ActionRecommender
         from woo_intel.projections import RevenueProjector
+        from woo_intel.print_forecaster import PrintForecaster
         from smart_intel.engine import SmartAnalyzer
 
         logger.info("Connecting to WooCommerce at %s...", config.WOOCOMMERCE_URL)
@@ -811,6 +830,13 @@ def _run_woo_analysis():
         )
         intelligence = smart.analyze()
 
+        # Jersey Print Forecaster (reorder predictions for Turkish supplier)
+        lead_time = getattr(config, "SUPPLIER_LEAD_TIME_WEEKS", 5)
+        moq = getattr(config, "SUPPLIER_MOQ_PER_DESIGN", 50)
+        forecaster = PrintForecaster(analysis, lead_time_weeks=lead_time,
+                                     moq_per_design=moq)
+        print_forecast = forecaster.forecast_all()
+
         # Trim large lists before caching to save memory
         # (API endpoints already cap these, but the cache itself was unbounded)
         if "velocity" in analysis:
@@ -824,6 +850,7 @@ def _run_woo_analysis():
         woo_cache["recommendations"] = recommendations
         woo_cache["projections"] = projections
         woo_cache["intelligence"] = intelligence
+        woo_cache["print_forecast"] = print_forecast
         woo_cache["last_refresh"] = datetime.now().isoformat()
 
         logger.info(
@@ -834,7 +861,7 @@ def _run_woo_analysis():
         )
 
         # Free raw API data (analysis results are kept in cache)
-        del products, orders, analyzer, recommender, projector, smart, woo
+        del products, orders, analyzer, recommender, projector, smart, forecaster, woo
         gc.collect()
 
     except Exception as e:

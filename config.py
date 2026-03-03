@@ -31,6 +31,15 @@ WOOCOMMERCE_URL = os.environ.get("WOOCOMMERCE_URL", "")  # e.g. https://jydsksto
 WOOCOMMERCE_KEY = os.environ.get("WOOCOMMERCE_KEY", "")
 WOOCOMMERCE_SECRET = os.environ.get("WOOCOMMERCE_SECRET", "")
 
+# Supplier lead time (Turkey): how many weeks from placing an order to receiving stock.
+# Used by the Print Forecaster to calculate stockout risk and reorder timing.
+# Override via environment variable if your supplier has different lead times.
+SUPPLIER_LEAD_TIME_WEEKS = int(os.environ.get("SUPPLIER_LEAD_TIME_WEEKS", "5"))
+
+# Minimum order quantity per design from supplier (meters).
+# Turkey MOQ: 50 meters per design. All reorder suggestions are rounded up to this.
+SUPPLIER_MOQ_PER_DESIGN = int(os.environ.get("SUPPLIER_MOQ_PER_DESIGN", "50"))
+
 # e-conomic REST API (Visma e-conomic — invoices, customers, payments)
 # Setup: In e-conomic → Apps → New App → role: Read-only
 #   1. Copy the App Secret Token → set as ECONOMIC_APP_SECRET
