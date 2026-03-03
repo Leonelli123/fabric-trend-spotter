@@ -359,6 +359,7 @@ woo_cache = {
     "analysis": None,
     "recommendations": None,
     "projections": None,
+    "intelligence": None,
     "last_refresh": None,
     "refreshing": False,
     "error": None,
@@ -512,6 +513,60 @@ def inventory_recommendations():
     if not woo_cache["recommendations"]:
         return jsonify({"error": "No data yet."}), 404
     return jsonify(woo_cache["recommendations"])
+
+
+# ======================================================================
+# Smart Intelligence
+# ======================================================================
+
+@app.route("/intelligence")
+def intelligence_dashboard():
+    """Smart Intelligence dashboard — cross-system analysis."""
+    return render_template(
+        "intelligence.html",
+        woo_cache=woo_cache,
+        woo_configured=bool(config.WOOCOMMERCE_URL and config.WOOCOMMERCE_KEY),
+        eco_cache=eco_cache,
+        eco_configured=bool(config.ECONOMIC_APP_SECRET and config.ECONOMIC_GRANT_TOKEN),
+    )
+
+
+@app.route("/api/intelligence/data")
+def intelligence_data():
+    """Full smart intelligence data."""
+    if not woo_cache["intelligence"]:
+        return jsonify({"error": "No data yet. Refresh WooCommerce data first."}), 404
+    return jsonify({
+        "intelligence": woo_cache["intelligence"],
+        "last_refresh": woo_cache["last_refresh"],
+    })
+
+
+@app.route("/api/intelligence/category-trends")
+def intelligence_category_trends():
+    """Category trend data."""
+    intel = woo_cache.get("intelligence")
+    if not intel:
+        return jsonify([])
+    return jsonify(intel.get("category_trends", []))
+
+
+@app.route("/api/intelligence/smart-remove")
+def intelligence_smart_remove():
+    """Smart removal candidates."""
+    intel = woo_cache.get("intelligence")
+    if not intel:
+        return jsonify([])
+    return jsonify(intel.get("smart_remove", []))
+
+
+@app.route("/api/intelligence/smart-keep")
+def intelligence_smart_keep():
+    """Smart keep candidates."""
+    intel = woo_cache.get("intelligence")
+    if not intel:
+        return jsonify([])
+    return jsonify(intel.get("smart_keep", []))
 
 
 # ======================================================================
@@ -710,6 +765,7 @@ def _run_woo_analysis():
         from woo_intel.analyzer import InventoryAnalyzer
         from woo_intel.recommender import ActionRecommender
         from woo_intel.projections import RevenueProjector
+        from smart_intel.engine import SmartAnalyzer
 
         logger.info("Connecting to WooCommerce at %s...", config.WOOCOMMERCE_URL)
         woo = WooConnector(
@@ -740,16 +796,26 @@ def _run_woo_analysis():
             "category_turnover": projector.get_inventory_turnover_by_category(),
         }
 
+        # Smart Intelligence (runs on full analysis before trimming)
+        smart = SmartAnalyzer(
+            woo_analysis=analysis,
+            eco_analysis=eco_cache.get("analysis"),
+        )
+        intelligence = smart.analyze()
+
         # Trim large lists before caching to save memory
         # (API endpoints already cap these, but the cache itself was unbounded)
         if "velocity" in analysis:
             analysis["velocity"] = analysis["velocity"][:200]
         if "dead_stock" in analysis:
             analysis["dead_stock"] = analysis["dead_stock"][:100]
+        # monthly_categories is only needed by SmartAnalyzer, free it now
+        analysis.pop("monthly_categories", None)
 
         woo_cache["analysis"] = analysis
         woo_cache["recommendations"] = recommendations
         woo_cache["projections"] = projections
+        woo_cache["intelligence"] = intelligence
         woo_cache["last_refresh"] = datetime.now().isoformat()
 
         logger.info(
@@ -760,7 +826,7 @@ def _run_woo_analysis():
         )
 
         # Free raw API data (analysis results are kept in cache)
-        del products, orders, analyzer, recommender, projector, woo
+        del products, orders, analyzer, recommender, projector, smart, woo
         gc.collect()
 
     except Exception as e:

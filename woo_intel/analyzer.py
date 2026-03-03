@@ -540,6 +540,44 @@ class InventoryAnalyzer:
         }
 
     # ------------------------------------------------------------------
+    # Monthly Category Data (for Smart Intelligence)
+    # ------------------------------------------------------------------
+
+    def get_monthly_category_data(self) -> dict:
+        """Monthly revenue and quantity breakdown per category.
+
+        Returns {category_name: [{month, revenue, quantity, order_count}, ...]}
+        sorted chronologically.  Used by SmartAnalyzer for category trends.
+        """
+        # {category -> {month_key -> {revenue, quantity, order_ids}}}
+        monthly = defaultdict(lambda: defaultdict(lambda: {
+            "revenue": 0, "quantity": 0, "order_ids": set(),
+        }))
+
+        for pid, sales in self._sales_by_product.items():
+            product = self.products.get(pid, {})
+            categories = product.get("categories", [])
+            for sale in sales:
+                month_key = sale["date"].strftime("%Y-%m")
+                for cat in categories:
+                    monthly[cat][month_key]["revenue"] += sale["revenue"]
+                    monthly[cat][month_key]["quantity"] += sale["quantity"]
+                    monthly[cat][month_key]["order_ids"].add(sale["order_id"])
+
+        result = {}
+        for cat, months in monthly.items():
+            result[cat] = [
+                {
+                    "month": mk,
+                    "revenue": round(months[mk]["revenue"], 2),
+                    "quantity": months[mk]["quantity"],
+                    "order_count": len(months[mk]["order_ids"]),
+                }
+                for mk in sorted(months.keys())
+            ]
+        return result
+
+    # ------------------------------------------------------------------
     # Full analysis (all modules combined)
     # ------------------------------------------------------------------
 
@@ -555,6 +593,7 @@ class InventoryAnalyzer:
         categories = self.get_category_performance()
         seasonal = self.get_seasonal_insights()
         geography = self.get_geography_breakdown()
+        monthly_categories = self.get_monthly_category_data()
 
         total_revenue = sum(o["total"] for o in self.orders)
         total_inventory_value = sum(
@@ -585,6 +624,7 @@ class InventoryAnalyzer:
             "categories": categories,
             "seasonal": seasonal,
             "geography": geography,
+            "monthly_categories": monthly_categories,
         }
 
 

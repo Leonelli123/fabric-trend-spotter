@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Intelligence — Fabric Trend Spotter</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        :root {
+            --bg: #0f1117; --bg-card: #1a1d27; --bg-hover: #22263a;
+            --border: #2a2e3f; --text: #e4e6f0; --muted: #8b8fa3;
+            --green: #22c55e; --red: #ef4444; --amber: #f59e0b;
+            --blue: #3b82f6; --purple: #a855f7; --teal: #14b8a6;
+            --accent: #6c63ff;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+
+        .page-header { padding: 20px 24px 0; max-width: 1400px; margin: 0 auto; }
+        .header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+        .header-row h1 { font-size: 22px; font-weight: 700; }
+        .back { color: var(--muted); text-decoration: none; font-size: 13px; }
+        .back:hover { color: var(--text); }
+        .meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
+        .btn { padding: 8px 18px; border-radius: 8px; border: none; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .2s; }
+        .btn-primary { background: var(--accent); color: #fff; }
+        .btn-primary:hover { filter: brightness(1.15); }
+        .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+        .btn-outline { background: var(--bg-card); color: var(--text); border: 1px solid var(--border); text-decoration: none; }
+        .btn-outline:hover { border-color: var(--accent); }
+
+        .tab-bar { display: flex; gap: 2px; max-width: 1400px; margin: 16px auto 0; padding: 0 24px; border-bottom: 1px solid var(--border); overflow-x: auto; }
+        .tab-btn { padding: 10px 20px; font-size: 13px; font-weight: 600; color: var(--muted); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; transition: all .2s; }
+        .tab-btn:hover { color: var(--text); }
+        .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+        .content { max-width: 1400px; margin: 0 auto; padding: 24px; }
+        .pane { display: none; }
+        .pane.active { display: block; }
+
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+        .card-grid { display: grid; gap: 16px; }
+        .card-grid-2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+        .card-grid-3 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+        .card-grid-4 { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+        .card h2 { font-size: 16px; font-weight: 700; margin-bottom: 12px; }
+        .card h3 { font-size: 14px; font-weight: 600; margin: 16px 0 8px; }
+
+        .kpi { text-align: center; padding: 16px; }
+        .kpi-val { font-size: 26px; font-weight: 800; }
+        .kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-top: 2px; }
+        .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+        .kpi-val.green { color: var(--green); }
+        .kpi-val.red { color: var(--red); }
+        .kpi-val.amber { color: var(--amber); }
+        .kpi-val.blue { color: var(--blue); }
+        .kpi-val.teal { color: var(--teal); }
+
+        /* Priority actions */
+        .action-list { list-style: none; }
+        .action-item { display: flex; align-items: flex-start; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+        .action-item:last-child { border-bottom: none; }
+        .urgency { padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; white-space: nowrap; }
+        .urgency.today { background: rgba(239,68,68,.15); color: var(--red); }
+        .urgency.this_week { background: rgba(245,158,11,.15); color: var(--amber); }
+        .urgency.opportunity { background: rgba(20,184,166,.15); color: var(--teal); }
+        .action-text .title { font-weight: 600; font-size: 13px; }
+        .action-text .detail { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+        /* Category trend rows */
+        .cat-trend { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,.04); }
+        .cat-trend:last-child { border-bottom: none; }
+        .cat-trend .name { font-weight: 600; font-size: 14px; width: 180px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .cat-trend .stats { display: flex; gap: 16px; flex: 1; align-items: center; font-size: 12px; color: var(--muted); }
+        .cat-trend .stats strong { color: var(--text); }
+        .dir-badge { padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+        .dir-badge.growing { background: rgba(34,197,94,.15); color: var(--green); }
+        .dir-badge.stable { background: rgba(59,130,246,.15); color: var(--blue); }
+        .dir-badge.declining { background: rgba(239,68,68,.15); color: var(--red); }
+        .dir-badge.dead { background: rgba(255,255,255,.06); color: var(--muted); }
+        .dir-badge.new { background: rgba(168,85,247,.15); color: var(--purple); }
+        .momentum-badge { font-size: 10px; font-weight: 600; }
+        .momentum-badge.accelerating { color: var(--green); }
+        .momentum-badge.decelerating { color: var(--red); }
+        .momentum-badge.steady, .momentum-badge.flat { color: var(--muted); }
+        .growth-val { font-weight: 700; font-size: 12px; }
+        .growth-val.pos { color: var(--green); }
+        .growth-val.neg { color: var(--red); }
+        .growth-val.flat { color: var(--muted); }
+
+        /* Mini chart */
+        .mini-chart { display: flex; align-items: flex-end; gap: 2px; height: 28px; }
+        .mini-bar { flex: 1; border-radius: 2px 2px 0 0; min-height: 2px; background: var(--accent); opacity: .6; transition: height .3s ease; }
+        .mini-bar:last-child { opacity: 1; }
+
+        /* Dead category cards */
+        .dead-cat { padding: 14px; border-left: 3px solid; border-radius: 0 8px 8px 0; margin-bottom: 8px; background: var(--bg-card); }
+        .dead-cat.critical { border-color: var(--red); }
+        .dead-cat.warning { border-color: var(--amber); }
+        .dead-cat.seasonal { border-color: var(--purple); }
+        .dead-cat .cat-title { font-weight: 700; font-size: 14px; }
+        .dead-cat .cat-meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
+        .dead-cat .cat-reasons { list-style: none; margin-top: 6px; }
+        .dead-cat .cat-reasons li { font-size: 12px; color: var(--muted); padding: 2px 0; }
+        .dead-cat .cat-reasons li::before { content: "\2022 "; color: var(--red); }
+        .dead-cat.seasonal .cat-reasons li::before { color: var(--purple); }
+        .dead-cat .cat-action { font-size: 12px; color: var(--accent); margin-top: 6px; font-weight: 600; }
+        .dead-cat .capital { font-size: 11px; color: var(--amber); margin-top: 4px; }
+
+        /* Product table */
+        .ptable { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .ptable th { text-align: left; padding: 8px; font-size: 10px; text-transform: uppercase; color: var(--muted); letter-spacing: .05em; border-bottom: 1px solid var(--border); cursor: pointer; }
+        .ptable th:hover { color: var(--text); }
+        .ptable td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,.03); }
+        .ptable tr:hover td { background: var(--bg-hover); }
+        .ptable .name { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        /* Score bar */
+        .score-bar { width: 80px; height: 8px; background: rgba(255,255,255,.06); border-radius: 4px; overflow: hidden; display: inline-block; vertical-align: middle; margin-right: 6px; }
+        .score-fill { height: 100%; border-radius: 4px; }
+        .score-fill.high { background: linear-gradient(90deg, var(--red), var(--amber)); }
+        .score-fill.medium { background: linear-gradient(90deg, var(--amber), var(--blue)); }
+        .score-fill.low { background: var(--blue); }
+        .score-fill.keep-high { background: linear-gradient(90deg, var(--green), var(--teal)); }
+        .score-fill.keep-medium { background: linear-gradient(90deg, var(--teal), var(--blue)); }
+        .score-fill.keep-low { background: var(--blue); }
+        .score-val { font-weight: 700; font-size: 12px; }
+
+        /* Signal pills */
+        .signal-row { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+        .signal-pill { font-size: 9px; padding: 1px 6px; border-radius: 3px; font-weight: 600; }
+        .signal-pill.hot { background: rgba(239,68,68,.12); color: var(--red); }
+        .signal-pill.warm { background: rgba(245,158,11,.12); color: var(--amber); }
+        .signal-pill.cool { background: rgba(59,130,246,.12); color: var(--blue); }
+        .signal-pill.good { background: rgba(34,197,94,.12); color: var(--green); }
+
+        /* Action tag */
+        .action-tag { font-size: 11px; padding: 3px 10px; border-radius: 6px; font-weight: 600; display: inline-block; margin-top: 4px; }
+        .action-tag.remove { background: rgba(239,68,68,.1); color: var(--red); border: 1px solid rgba(239,68,68,.2); }
+        .action-tag.keep { background: rgba(34,197,94,.1); color: var(--green); border: 1px solid rgba(34,197,94,.2); }
+
+        /* Reason list */
+        .reasons { list-style: none; margin-top: 4px; }
+        .reasons li { font-size: 11px; color: var(--muted); padding: 1px 0; }
+        .reasons li::before { content: "\2192 "; color: var(--accent); }
+
+        /* Show more */
+        .show-more { display: block; margin: 16px auto 0; }
+        .count-label { font-size: 12px; color: var(--muted); margin-top: 8px; }
+
+        /* Empty / Loading */
+        .loading-overlay { text-align: center; padding: 80px 20px; }
+        .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 16px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+        .empty-state h2 { color: var(--text); margin-bottom: 8px; }
+
+        /* Stale banner */
+        .stale-banner { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.25); border-radius: 8px; padding: 10px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--amber); }
+
+        @media (max-width: 768px) {
+            .cat-trend { flex-direction: column; align-items: flex-start; gap: 6px; }
+            .cat-trend .name { width: auto; }
+            .card-grid-4 { grid-template-columns: 1fr 1fr; }
+            .tab-btn { padding: 8px 14px; font-size: 12px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="page-header">
+        <div class="header-row">
+            <div>
+                <a href="/inventory" class="back">&larr; Back to Inventory</a>
+                <h1>Smart Intelligence</h1>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;">
+                <a href="/financials" class="btn btn-outline">Financials &rarr;</a>
+                <button id="refreshBtn" class="btn btn-primary" onclick="refreshData()">Refresh Data</button>
+            </div>
+        </div>
+        <p class="meta" id="lastRefresh">
+            {% if woo_cache.last_refresh %}Last updated: {{ woo_cache.last_refresh[:16] }}{% else %}No data yet &mdash; click Refresh{% endif %}
+        </p>
+    </div>
+
+    {% if not woo_configured %}
+    <div class="content">
+        <div class="card empty-state">
+            <h2>WooCommerce Not Configured</h2>
+            <p>Set <code>WOOCOMMERCE_URL</code>, <code>WOOCOMMERCE_KEY</code>, and <code>WOOCOMMERCE_SECRET</code> to enable Smart Intelligence.</p>
+        </div>
+    </div>
+    {% else %}
+
+    <div class="tab-bar">
+        <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">Overview</button>
+        <button class="tab-btn" data-tab="categories" onclick="switchTab('categories')">Category Trends</button>
+        <button class="tab-btn" data-tab="remove" onclick="switchTab('remove')">Smart Remove</button>
+        <button class="tab-btn" data-tab="keep" onclick="switchTab('keep')">Smart Keep</button>
+    </div>
+
+    <div class="content">
+        <div id="pane-overview" class="pane active"></div>
+        <div id="pane-categories" class="pane"></div>
+        <div id="pane-remove" class="pane"></div>
+        <div id="pane-keep" class="pane"></div>
+
+        <div id="loadingState" class="loading-overlay" style="display:none;">
+            <div class="spinner"></div>
+            <p>Running Smart Intelligence...</p>
+        </div>
+    </div>
+
+    <script>
+    function fmt(n) { return (n == null || isNaN(n)) ? '\u2014' : Math.round(n).toLocaleString('da-DK'); }
+    function fmtK(n) { if (n == null || isNaN(n)) return '\u2014'; return n >= 1000 ? (n/1000).toFixed(1).replace('.', ',') + 'k' : Math.round(n).toString(); }
+    function esc(s) { var d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+    var _data = null;
+
+    function switchTab(id) {
+        document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.tab === id); });
+        document.querySelectorAll('.pane').forEach(function(p) { p.classList.toggle('active', p.id === 'pane-' + id); });
+    }
+
+    function refreshData() {
+        var btn = document.getElementById('refreshBtn');
+        btn.disabled = true; btn.textContent = 'Refreshing...';
+        document.getElementById('loadingState').style.display = 'block';
+        fetch('/api/inventory/refresh', {method: 'POST'}).then(function(r) { return r.json(); }).then(function() { pollStatus(); }).catch(function() { btn.disabled = false; btn.textContent = 'Refresh Data'; });
+    }
+
+    function pollStatus() {
+        fetch('/api/inventory/status').then(function(r) { return r.json(); }).then(function(s) {
+            if (s.refreshing) { setTimeout(pollStatus, 3000); return; }
+            if (s.error) { alert('Error: ' + s.error); }
+            document.getElementById('refreshBtn').disabled = false;
+            document.getElementById('refreshBtn').textContent = 'Refresh Data';
+            document.getElementById('loadingState').style.display = 'none';
+            if (s.has_data) loadData();
+        });
+    }
+
+    function loadData() {
+        fetch('/api/intelligence/data').then(function(r) { return r.json(); }).then(function(data) {
+            _data = data;
+            if (data.last_refresh) {
+                document.getElementById('lastRefresh').textContent = 'Last updated: ' + data.last_refresh.substring(0, 16);
+            }
+            var intel = data.intelligence || {};
+            renderOverview(intel);
+            renderCategories(intel.category_trends || []);
+            renderRemove(intel.smart_remove || []);
+            renderKeep(intel.smart_keep || []);
+        }).catch(function(e) {
+            document.getElementById('pane-overview').innerHTML =
+                '<div class="card empty-state"><h2>No Intelligence Data Yet</h2><p>Click Refresh Data to analyze your inventory.</p></div>';
+        });
+    }
+
+    /* ── Overview ── */
+    function renderOverview(intel) {
+        var s = intel.summary || {};
+        var h = '';
+
+        /* Top actions */
+        var actions = s.top_actions || [];
+        if (actions.length) {
+            h += '<div class="card"><h2>Priority Actions</h2><ul class="action-list">';
+            actions.forEach(function(a) {
+                h += '<li class="action-item"><span class="urgency ' + esc(a.urgency) + '">' + esc(a.urgency.replace('_', ' ')) + '</span>'
+                  + '<div class="action-text"><div class="title">' + esc(a.title) + '</div><div class="detail">' + esc(a.detail) + '</div></div></li>';
+            });
+            h += '</ul></div>';
+        }
+
+        /* KPI cards */
+        h += '<div class="card-grid card-grid-4">';
+        h += kpi(s.growing_categories || 0, 'Growing', '', 'green');
+        h += kpi(s.declining_categories || 0, 'Declining', '', 'red');
+        h += kpi(s.remove_candidates || 0, 'Remove', fmt(s.strong_remove_capital || 0) + ' at risk', 'red');
+        h += kpi(s.keep_candidates || 0, 'Smart Keep', fmt(s.keep_capital_protected || 0) + ' protected', 'teal');
+        h += '</div>';
+
+        /* Quick summary */
+        h += '<div class="card-grid card-grid-2">';
+
+        /* Category health overview */
+        h += '<div class="card"><h2>Category Health</h2>';
+        h += '<p style="font-size:13px;color:var(--muted);margin-bottom:12px;">'
+          + (s.total_categories || 0) + ' categories analyzed &mdash; '
+          + (s.growing_categories || 0) + ' growing, '
+          + (s.stable_categories || 0) + ' stable, '
+          + (s.declining_categories || 0) + ' declining, '
+          + (s.dead_categories || 0) + ' dead</p>';
+
+        var cats = intel.category_trends || [];
+        cats.slice(0, 8).forEach(function(c) {
+            h += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;">'
+              + '<span class="dir-badge ' + c.direction + '">' + c.direction + '</span>'
+              + '<span style="font-size:13px;font-weight:600;flex:1;">' + esc(c.category) + '</span>'
+              + '<span style="font-size:12px;color:var(--muted);">' + fmt(c.total_revenue) + '</span>'
+              + '</div>';
+        });
+        h += '</div>';
+
+        /* Capital summary */
+        h += '<div class="card"><h2>Capital Intelligence</h2>';
+        var removeCapital = s.remove_capital_at_risk || 0;
+        var keepCapital = s.keep_capital_protected || 0;
+        var strongRemove = s.strong_remove_capital || 0;
+
+        h += '<div style="margin-bottom:16px;">'
+          + '<div style="font-size:13px;color:var(--muted);margin-bottom:8px;">Capital at risk in removal candidates</div>'
+          + '<div style="font-size:28px;font-weight:800;color:var(--red);">' + fmt(removeCapital) + '</div>'
+          + '<div style="font-size:12px;color:var(--muted);margin-top:4px;">' + fmt(strongRemove) + ' in high-confidence removals (score 75+)</div>'
+          + '</div>';
+
+        h += '<div>'
+          + '<div style="font-size:13px;color:var(--muted);margin-bottom:8px;">Capital in smart-keep products</div>'
+          + '<div style="font-size:28px;font-weight:800;color:var(--teal);">' + fmt(keepCapital) + '</div>'
+          + '<div style="font-size:12px;color:var(--muted);margin-top:4px;">These products have data-backed reasons to stay</div>'
+          + '</div>';
+        h += '</div>';
+
+        h += '</div>';
+
+        /* Dead categories */
+        var dead = intel.dead_categories || [];
+        if (dead.length) {
+            h += '<div class="card"><h2>Dead Categories (' + dead.length + ')</h2>';
+            dead.forEach(function(d) {
+                h += '<div class="dead-cat ' + d.severity + '">'
+                  + '<div class="cat-title">' + esc(d.category) + '</div>'
+                  + '<div class="cat-meta">' + d.product_count + ' products \u00B7 ' + d.active_products + ' active \u00B7 ' + d.dead_products + ' dead \u00B7 Revenue: ' + fmt(d.total_revenue) + '</div>';
+                if (d.capital_tied > 0) {
+                    h += '<div class="capital">Capital tied: ' + fmt(d.capital_tied) + '</div>';
+                }
+                h += '<ul class="cat-reasons">';
+                (d.reasons || []).forEach(function(r) { h += '<li>' + esc(r) + '</li>'; });
+                h += '</ul>';
+                h += '<div class="cat-action">' + esc(d.recommendation) + '</div>';
+                h += '</div>';
+            });
+            h += '</div>';
+        }
+
+        document.getElementById('pane-overview').innerHTML = h;
+    }
+
+    function kpi(val, label, sub, color) {
+        return '<div class="card kpi"><div class="kpi-val ' + (color || '') + '">' + (typeof val === 'number' ? fmt(val) : val) + '</div>'
+            + '<div class="kpi-label">' + label + '</div>'
+            + (sub ? '<div class="kpi-sub">' + sub + '</div>' : '') + '</div>';
+    }
+
+    /* ── Category Trends ── */
+    function renderCategories(cats) {
+        if (!cats.length) {
+            document.getElementById('pane-categories').innerHTML = '<div class="card empty-state"><h2>No category data</h2><p>Refresh to load.</p></div>';
+            return;
+        }
+        var h = '<div class="card"><h2>Category Trends (' + cats.length + ' categories)</h2>'
+            + '<p style="font-size:12px;color:var(--muted);margin-bottom:16px;">Revenue trend direction based on recent vs. historical monthly sales</p>';
+
+        cats.forEach(function(c) {
+            var growthCls = c.growth_pct > 5 ? 'pos' : c.growth_pct < -5 ? 'neg' : 'flat';
+            var growthStr = (c.growth_pct > 0 ? '+' : '') + c.growth_pct.toFixed(1) + '%';
+
+            h += '<div class="cat-trend">'
+              + '<div class="name" title="' + esc(c.category) + '">' + esc(c.category) + '</div>'
+              + '<div class="stats">'
+              + '<span><strong>' + fmt(c.total_revenue) + '</strong> revenue</span>'
+              + '<span>' + c.product_count + ' products</span>'
+              + '<span class="growth-val ' + growthCls + '">' + growthStr + '</span>'
+              + '<span class="dir-badge ' + c.direction + '">' + c.direction + '</span>'
+              + '<span class="momentum-badge ' + c.momentum + '">' + momentumIcon(c.momentum) + '</span>'
+              + '</div>'
+              + miniChart(c.monthly || [])
+              + '</div>';
+        });
+
+        h += '</div>';
+        document.getElementById('pane-categories').innerHTML = h;
+    }
+
+    function momentumIcon(m) {
+        if (m === 'accelerating') return '\u25B2\u25B2';
+        if (m === 'decelerating') return '\u25BC\u25BC';
+        if (m === 'steady') return '\u2192';
+        return '\u00B7';
+    }
+
+    function miniChart(monthly) {
+        if (!monthly.length) return '';
+        var max = Math.max.apply(null, monthly.map(function(m) { return m.revenue; })) || 1;
+        var h = '<div class="mini-chart">';
+        monthly.forEach(function(m) {
+            var pct = Math.max((m.revenue / max) * 100, 5);
+            h += '<div class="mini-bar" style="height:' + pct + '%" title="' + m.month + ': ' + fmt(m.revenue) + '"></div>';
+        });
+        h += '</div>';
+        return h;
+    }
+
+    /* ── Smart Remove ── */
+    var _removeVisible = 25;
+    function renderRemove(items) {
+        if (!items.length) {
+            document.getElementById('pane-remove').innerHTML = '<div class="card empty-state"><h2>No removal candidates</h2><p>All products are performing well.</p></div>';
+            return;
+        }
+        var totalCapital = 0;
+        items.forEach(function(i) { totalCapital += i.capital_tied; });
+
+        var h = '<div class="card"><h2>Smart Remove (' + items.length + ' candidates)</h2>'
+            + '<p style="font-size:12px;color:var(--muted);margin-bottom:4px;">Products scored on 6 signals: staleness, velocity, capital drag, category health, seasonal fit, history</p>'
+            + '<p style="font-size:14px;font-weight:700;color:var(--red);margin-bottom:16px;">Total capital at risk: ' + fmt(totalCapital) + '</p>';
+
+        h += '<table class="ptable"><thead><tr>'
+          + '<th>Score</th><th>Product</th><th>Price</th><th>Stock</th>'
+          + '<th>Capital</th><th>Sold</th><th>Last Sale</th><th>Signals</th>'
+          + '</tr></thead><tbody>';
+
+        items.slice(0, _removeVisible).forEach(function(r) {
+            var scoreCls = r.remove_score >= 75 ? 'high' : r.remove_score >= 60 ? 'medium' : 'low';
+            h += '<tr>'
+              + '<td><div class="score-bar"><div class="score-fill ' + scoreCls + '" style="width:' + r.remove_score + '%"></div></div><span class="score-val">' + r.remove_score.toFixed(0) + '</span></td>'
+              + '<td><div class="name" title="' + esc(r.name) + '">' + esc(r.name) + '</div>'
+              + '<div style="font-size:10px;color:var(--muted);">' + esc((r.categories || []).join(', ')) + '</div>'
+              + '<ul class="reasons">';
+            (r.reasons || []).forEach(function(reason) { h += '<li>' + esc(reason) + '</li>'; });
+            h += '</ul></td>'
+              + '<td>' + fmt(r.price) + '</td>'
+              + '<td>' + r.stock_quantity + '</td>'
+              + '<td style="color:var(--red);font-weight:600;">' + fmt(r.capital_tied) + '</td>'
+              + '<td>' + r.total_sold + '</td>'
+              + '<td>' + r.days_since_last_sale + 'd</td>'
+              + '<td>' + signalPills(r.signals || {}) + '</td>'
+              + '</tr>';
+        });
+
+        h += '</tbody></table>';
+        if (items.length > _removeVisible) {
+            h += '<p class="count-label">Showing ' + _removeVisible + ' of ' + items.length + '</p>'
+              + '<button class="btn btn-outline show-more" onclick="showMoreRemove()">Show More</button>';
+        }
+        h += '</div>';
+        document.getElementById('pane-remove').innerHTML = h;
+    }
+
+    function showMoreRemove() {
+        _removeVisible += 25;
+        var intel = (_data && _data.intelligence) || {};
+        renderRemove(intel.smart_remove || []);
+    }
+
+    function signalPills(signals) {
+        var h = '<div class="signal-row">';
+        var labels = {
+            staleness: 'Stale', velocity: 'Velocity', capital_drag: 'Capital',
+            category_health: 'Category', seasonal_fit: 'Season', history: 'History',
+            seasonal_potential: 'Season', category_growth: 'Category',
+            historical_performance: 'History', margin_signal: 'Margin', trend_relevance: 'Trend'
+        };
+        for (var key in signals) {
+            var val = signals[key];
+            var cls = val >= 70 ? 'hot' : val >= 50 ? 'warm' : val >= 30 ? 'cool' : 'good';
+            h += '<span class="signal-pill ' + cls + '" title="' + key + ': ' + val.toFixed(0) + '">' + (labels[key] || key) + ' ' + val.toFixed(0) + '</span>';
+        }
+        h += '</div>';
+        return h;
+    }
+
+    /* ── Smart Keep ── */
+    var _keepVisible = 25;
+    function renderKeep(items) {
+        if (!items.length) {
+            document.getElementById('pane-keep').innerHTML = '<div class="card empty-state"><h2>No smart-keep candidates</h2><p>No slow products have strong enough signals to recommend keeping.</p></div>';
+            return;
+        }
+        var totalCapital = 0;
+        items.forEach(function(i) { totalCapital += i.capital_tied; });
+
+        var h = '<div class="card"><h2>Smart Keep (' + items.length + ' products)</h2>'
+            + '<p style="font-size:12px;color:var(--muted);margin-bottom:4px;">Currently slow products with data-backed reasons to keep: seasonal potential, growing category, strong history, margin, trend alignment</p>'
+            + '<p style="font-size:14px;font-weight:700;color:var(--teal);margin-bottom:16px;">Capital protected: ' + fmt(totalCapital) + '</p>';
+
+        h += '<table class="ptable"><thead><tr>'
+          + '<th>Score</th><th>Product</th><th>Price</th><th>Stock</th>'
+          + '<th>Capital</th><th>Sold</th><th>Strategy</th><th>Signals</th>'
+          + '</tr></thead><tbody>';
+
+        items.slice(0, _keepVisible).forEach(function(k) {
+            var scoreCls = k.keep_score >= 70 ? 'keep-high' : k.keep_score >= 50 ? 'keep-medium' : 'keep-low';
+            h += '<tr>'
+              + '<td><div class="score-bar"><div class="score-fill ' + scoreCls + '" style="width:' + k.keep_score + '%"></div></div><span class="score-val" style="color:var(--teal);">' + k.keep_score.toFixed(0) + '</span></td>'
+              + '<td><div class="name" title="' + esc(k.name) + '">' + esc(k.name) + '</div>'
+              + '<div style="font-size:10px;color:var(--muted);">' + esc((k.categories || []).join(', ')) + '</div>'
+              + '<ul class="reasons">';
+            (k.reasons || []).forEach(function(reason) { h += '<li>' + esc(reason) + '</li>'; });
+            h += '</ul></td>'
+              + '<td>' + fmt(k.price) + '</td>'
+              + '<td>' + k.stock_quantity + '</td>'
+              + '<td style="color:var(--teal);font-weight:600;">' + fmt(k.capital_tied) + '</td>'
+              + '<td>' + k.total_sold + '</td>'
+              + '<td style="font-size:11px;max-width:200px;">' + esc(k.strategy) + '</td>'
+              + '<td>' + signalPills(k.signals || {}) + '</td>'
+              + '</tr>';
+        });
+
+        h += '</tbody></table>';
+        if (items.length > _keepVisible) {
+            h += '<p class="count-label">Showing ' + _keepVisible + ' of ' + items.length + '</p>'
+              + '<button class="btn btn-outline show-more" onclick="showMoreKeep()">Show More</button>';
+        }
+        h += '</div>';
+        document.getElementById('pane-keep').innerHTML = h;
+    }
+
+    function showMoreKeep() {
+        _keepVisible += 25;
+        var intel = (_data && _data.intelligence) || {};
+        renderKeep(intel.smart_keep || []);
+    }
+
+    /* ── Init ── */
+    {% if woo_cache.intelligence %}
+    loadData();
+    {% elif woo_cache.refreshing %}
+    document.getElementById('loadingState').style.display = 'block';
+    document.getElementById('refreshBtn').disabled = true;
+    document.getElementById('refreshBtn').textContent = 'Refreshing...';
+    pollStatus();
+    {% endif %}
+    </script>
+    {% endif %}
+</body>
+</html>
