@@ -658,6 +658,14 @@ def economic_reconciliation():
     return jsonify(eco_cache["reconciliation"])
 
 
+@app.route("/api/economic/actions")
+def economic_actions():
+    """Customer action intelligence — who to chase, nurture, win back."""
+    if not eco_cache["analysis"]:
+        return jsonify({"error": "No data yet."}), 404
+    return jsonify(eco_cache["analysis"].get("customer_actions", {}))
+
+
 @app.route("/api/forecast")
 def strategic_forecast():
     """Strategic forecasting — merges WooCommerce + e-conomic into actionable advice."""
