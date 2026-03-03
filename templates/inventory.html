@@ -1123,9 +1123,11 @@
 
         // === FULL DESIGN FORECASTS (collapsible detail) ===
         var detailRows = designs.slice(0, 30).map(function(d) {
+            var inboundCell = d.inbound_stock ? '<span style="color:var(--green);">+' + d.inbound_stock + '</span>' : '\u2014';
             return '<tr>' +
                 '<td class="name" title="' + esc(d.name) + '">' + esc(d.name) + '</td>' +
                 '<td style="text-align:right;">' + d.current_stock + '</td>' +
+                '<td style="text-align:right;">' + inboundCell + '</td>' +
                 '<td style="text-align:right;">' + d.current_weekly_rate.toFixed(1) + '</td>' +
                 '<td style="text-align:right;">' + d.adjusted_weekly_rate.toFixed(1) + '</td>' +
                 '<td style="text-align:right;">' + d.weeks_of_stock.toFixed(0) + 'w</td>' +
@@ -1138,13 +1140,238 @@
         }).join('');
         var detailHTML = '<div class="card">' +
             '<h2>All Design Forecasts</h2>' +
-            '<p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Demand forecasts adjusted for seasonal trends (x' + (seasonal.upcoming_avg_factor || 1).toFixed(2) + ') and velocity direction. Safety stock included.</p>' +
+            '<p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Demand forecasts adjusted for seasonal trends (x' + (seasonal.upcoming_avg_factor || 1).toFixed(2) + ') and velocity direction. Inbound = stock ordered from Turkey but not yet received.</p>' +
             '<div class="table-wrap"><table class="data-table"><thead><tr>' +
-                '<th>Design</th><th>Stock</th><th>Rate/wk</th><th>Adj Rate</th><th>Stock Left</th><th>8w Demand</th><th>Reorder</th><th>Risk</th><th>Action</th><th>Reason</th>' +
+                '<th>Design</th><th>Stock</th><th>Inbound</th><th>Rate/wk</th><th>Adj Rate</th><th>Stock Left</th><th>8w Demand</th><th>Reorder</th><th>Risk</th><th>Action</th><th>Reason</th>' +
             '</tr></thead><tbody>' + detailRows + '</tbody></table></div>' +
         '</div>';
 
-        document.getElementById('pane-prints').innerHTML = seasonalHTML + kpiHTML + orderHTML + timelineHTML + rankHTML + detailHTML;
+        // === EMAIL CONNECTION + PENDING ORDERS ===
+        var emailHTML = '<div id="email-section"></div>';
+
+        document.getElementById('pane-prints').innerHTML = emailHTML + seasonalHTML + kpiHTML + orderHTML + timelineHTML + rankHTML + detailHTML;
+
+        // Load email status asynchronously
+        loadEmailSection();
+    }
+
+    function loadEmailSection() {
+        fetch('/api/email/status').then(function(r) { return r.json(); }).then(function(status) {
+            var html = '';
+            if (!status.configured) {
+                html = '<div class="card" style="margin-bottom:16px;border-color:var(--border);">' +
+                    '<h2>Supplier Order Tracking</h2>' +
+                    '<p style="color:var(--muted);margin:8px 0;">Connect your Microsoft 365 email to automatically detect orders sent to your Turkish supplier.</p>' +
+                    '<p style="color:var(--muted);font-size:12px;">Setup: Set MS_CLIENT_ID, MS_CLIENT_SECRET, MS_TENANT_ID, and SUPPLIER_EMAIL env vars. <a href="https://portal.azure.com" target="_blank" style="color:var(--accent);">Azure Portal</a></p>' +
+                '</div>';
+            } else if (!status.connected) {
+                html = '<div class="card" style="margin-bottom:16px;border-color:var(--accent);">' +
+                    '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                        '<div><h2>Connect Email</h2>' +
+                        '<p style="color:var(--muted);margin:4px 0;font-size:13px;">Connect your Microsoft 365 to track orders sent to ' + esc(status.supplier_email || 'your supplier') + '</p></div>' +
+                        '<a href="/auth/login" class="btn btn-primary">Connect Microsoft 365</a>' +
+                    '</div>' +
+                '</div>';
+            } else {
+                html = '<div class="card" style="margin-bottom:16px;border-color:var(--green);">' +
+                    '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">' +
+                        '<div><h2>Email Connected</h2>' +
+                        '<p style="color:var(--green);font-size:12px;">Signed in as ' + esc(status.user || status.email || '') + ' &mdash; tracking orders to ' + esc(status.supplier_email || '') + '</p></div>' +
+                        '<div style="display:flex;gap:8px;">' +
+                            '<button class="btn btn-outline" onclick="scanEmails()" id="scanBtn" style="font-size:12px;padding:5px 12px;">Scan for Orders</button>' +
+                            '<button class="btn btn-outline" onclick="showManualOrder()" style="font-size:12px;padding:5px 12px;">Add Order Manually</button>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
+            }
+
+            document.getElementById('email-section').innerHTML = html;
+
+            // Always load pending orders (they can exist from manual entry too)
+            loadPendingOrders();
+        }).catch(function() {
+            loadPendingOrders();
+        });
+    }
+
+    function loadPendingOrders() {
+        fetch('/api/email/pending-orders').then(function(r) { return r.json(); }).then(function(data) {
+            if (!data.pending_count) return;
+            var orders = data.orders || [];
+            var html = '<div class="card" style="margin-bottom:16px;">' +
+                '<h2>Pending Supplier Orders (' + data.pending_count + ')</h2>' +
+                '<p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Stock on order from Turkey. Total: ' + data.total_pending_qty + ' units in transit.</p>';
+
+            orders.forEach(function(order) {
+                var items = order.items || [];
+                var orderDate = order.order_date ? new Date(order.order_date).toLocaleDateString('da-DK') : '\u2014';
+                var deliveryDate = order.expected_delivery ? new Date(order.expected_delivery).toLocaleDateString('da-DK') : '\u2014';
+
+                html += '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;">' +
+                    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
+                        '<div>' +
+                            '<strong style="font-size:13px;">' + esc(order.subject || 'Order') + '</strong>' +
+                            '<span style="font-size:11px;color:var(--muted);margin-left:8px;">Ordered: ' + orderDate + ' \u2192 Expected: ' + deliveryDate + '</span>' +
+                        '</div>' +
+                        '<div style="display:flex;gap:6px;">' +
+                            '<button class="btn btn-outline" onclick="receiveOrder(\'' + esc(order.order_id) + '\')" style="font-size:11px;padding:3px 8px;">Mark Received</button>' +
+                            '<button class="btn btn-outline" onclick="deleteOrder(\'' + esc(order.order_id) + '\')" style="font-size:11px;padding:3px 8px;color:var(--red);">Delete</button>' +
+                        '</div>' +
+                    '</div>' +
+                    '<table style="width:100%;font-size:12px;"><tbody>';
+                items.forEach(function(item) {
+                    html += '<tr><td style="padding:2px 0;">' + esc(item.design) + (item.matched_product ? ' <span style="color:var(--green);font-size:10px;">\u2713 matched</span>' : '') + '</td><td style="text-align:right;font-weight:600;">' + item.quantity + 'm</td></tr>';
+                });
+                html += '</tbody></table></div>';
+            });
+            html += '</div>';
+
+            // Insert after email section
+            var section = document.getElementById('email-section');
+            section.insertAdjacentHTML('afterend', '<div id="pending-orders-section">' + html + '</div>');
+        }).catch(function() {});
+    }
+
+    function scanEmails() {
+        var btn = document.getElementById('scanBtn');
+        btn.disabled = true; btn.textContent = 'Scanning...';
+        fetch('/api/email/search-orders').then(function(r) { return r.json(); }).then(function(data) {
+            btn.disabled = false; btn.textContent = 'Scan for Orders';
+            if (data.error) { alert(data.error); return; }
+            var orders = (data.orders || []).filter(function(o) { return o.is_order; });
+            if (!orders.length) { alert('No order emails found in the last 180 days to your supplier.'); return; }
+            showScannedOrders(orders);
+        }).catch(function() { btn.disabled = false; btn.textContent = 'Scan for Orders'; });
+    }
+
+    function showScannedOrders(orders) {
+        var html = '<div class="card" style="margin-bottom:16px;border-color:var(--blue);">' +
+            '<h2>Found ' + orders.length + ' Order Emails</h2>' +
+            '<p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Review and confirm to add to pending orders. The parser extracts design names and quantities from your email text.</p>';
+
+        orders.forEach(function(order, idx) {
+            var items = order.items || [];
+            var dateStr = order.date ? new Date(order.date).toLocaleDateString('da-DK') : '\u2014';
+            html += '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;" id="scanned-order-' + idx + '">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
+                    '<div><strong>' + esc(order.subject) + '</strong><span style="font-size:11px;color:var(--muted);margin-left:8px;">' + dateStr + '</span></div>' +
+                    (items.length ? '<button class="btn btn-primary" onclick="confirmScannedOrder(' + idx + ')" style="font-size:11px;padding:4px 10px;">Confirm & Add</button>' : '<span style="color:var(--amber);font-size:11px;">No items detected</span>') +
+                '</div>';
+            if (items.length) {
+                html += '<table style="width:100%;font-size:12px;"><tbody>';
+                items.forEach(function(item) {
+                    html += '<tr><td>' + esc(item.design) + (item.matched_product ? ' <span style="color:var(--green);font-size:10px;">\u2713 ' + esc(item.matched_product).substring(0, 30) + '</span>' : '') + '</td><td style="text-align:right;font-weight:600;">' + item.quantity + 'm</td><td style="text-align:right;"><span style="font-size:10px;color:var(--muted);">' + item.confidence + '</span></td></tr>';
+                });
+                html += '</tbody></table>';
+            } else {
+                html += '<details style="margin-top:4px;"><summary style="font-size:11px;color:var(--muted);cursor:pointer;">Show email text</summary><pre style="font-size:11px;color:var(--muted);white-space:pre-wrap;max-height:150px;overflow-y:auto;margin-top:4px;">' + esc(order.raw_text || '').substring(0, 500) + '</pre></details>';
+            }
+            html += '</div>';
+        });
+        html += '</div>';
+
+        // Store orders for confirm action
+        window._scannedOrders = orders;
+
+        var existing = document.getElementById('scanned-orders-section');
+        if (existing) existing.remove();
+        var section = document.getElementById('email-section');
+        section.insertAdjacentHTML('afterend', '<div id="scanned-orders-section">' + html + '</div>');
+    }
+
+    function confirmScannedOrder(idx) {
+        var order = window._scannedOrders && window._scannedOrders[idx];
+        if (!order) return;
+        fetch('/api/email/confirm-order', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                email_id: order.email_id,
+                subject: order.subject,
+                date: order.date,
+                items: order.items,
+            }),
+        }).then(function(r) { return r.json(); }).then(function(data) {
+            var el = document.getElementById('scanned-order-' + idx);
+            if (el) el.style.opacity = '0.4';
+            // Refresh pending orders
+            var ps = document.getElementById('pending-orders-section');
+            if (ps) ps.remove();
+            loadPendingOrders();
+        });
+    }
+
+    function showManualOrder() {
+        var html = '<div class="card" style="margin-bottom:16px;border-color:var(--accent);" id="manual-order-form">' +
+            '<h2>Add Order Manually</h2>' +
+            '<p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Enter the designs and quantities you ordered from Turkey.</p>' +
+            '<div id="manual-items">' +
+                '<div class="manual-item-row" style="display:flex;gap:8px;margin-bottom:6px;">' +
+                    '<input type="text" placeholder="Design name" style="flex:2;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;">' +
+                    '<input type="number" placeholder="Qty (meters)" min="10" style="flex:1;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;">' +
+                '</div>' +
+            '</div>' +
+            '<div style="display:flex;gap:8px;margin-top:8px;">' +
+                '<button class="btn btn-outline" onclick="addManualRow()" style="font-size:12px;">+ Add Design</button>' +
+                '<button class="btn btn-primary" onclick="submitManualOrder()" style="font-size:12px;">Save Order</button>' +
+                '<button class="btn btn-outline" onclick="document.getElementById(\'manual-order-form\').remove()" style="font-size:12px;">Cancel</button>' +
+            '</div>' +
+        '</div>';
+        var section = document.getElementById('email-section');
+        var existing = document.getElementById('manual-order-form');
+        if (existing) existing.remove();
+        section.insertAdjacentHTML('afterend', html);
+    }
+
+    function addManualRow() {
+        var container = document.getElementById('manual-items');
+        var row = document.createElement('div');
+        row.className = 'manual-item-row';
+        row.style.cssText = 'display:flex;gap:8px;margin-bottom:6px;';
+        row.innerHTML = '<input type="text" placeholder="Design name" style="flex:2;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;">' +
+            '<input type="number" placeholder="Qty (meters)" min="10" style="flex:1;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;">';
+        container.appendChild(row);
+    }
+
+    function submitManualOrder() {
+        var rows = document.querySelectorAll('#manual-items .manual-item-row');
+        var items = [];
+        rows.forEach(function(row) {
+            var inputs = row.querySelectorAll('input');
+            var design = inputs[0].value.trim();
+            var qty = parseInt(inputs[1].value) || 0;
+            if (design && qty >= 10) items.push({design: design, quantity: qty});
+        });
+        if (!items.length) { alert('Add at least one design with quantity >= 10.'); return; }
+        fetch('/api/email/add-manual-order', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({items: items, note: 'Manual order entry'}),
+        }).then(function(r) { return r.json(); }).then(function(data) {
+            document.getElementById('manual-order-form').remove();
+            var ps = document.getElementById('pending-orders-section');
+            if (ps) ps.remove();
+            loadPendingOrders();
+        });
+    }
+
+    function receiveOrder(orderId) {
+        fetch('/api/email/pending-orders/' + orderId + '/receive', {method: 'POST'})
+            .then(function() {
+                var ps = document.getElementById('pending-orders-section');
+                if (ps) ps.remove();
+                loadPendingOrders();
+            });
+    }
+
+    function deleteOrder(orderId) {
+        if (!confirm('Delete this pending order?')) return;
+        fetch('/api/email/pending-orders/' + orderId, {method: 'DELETE'})
+            .then(function() {
+                var ps = document.getElementById('pending-orders-section');
+                if (ps) ps.remove();
+                loadPendingOrders();
+            });
     }
 
     function copySupplierOrder() {

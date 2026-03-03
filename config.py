@@ -40,6 +40,20 @@ SUPPLIER_LEAD_TIME_WEEKS = int(os.environ.get("SUPPLIER_LEAD_TIME_WEEKS", "5"))
 # Turkey MOQ: 50 meters per design. All reorder suggestions are rounded up to this.
 SUPPLIER_MOQ_PER_DESIGN = int(os.environ.get("SUPPLIER_MOQ_PER_DESIGN", "50"))
 
+# Microsoft 365 / Outlook Email Integration (for supplier order tracking)
+# Setup:
+#   1. Go to portal.azure.com → App registrations → New registration
+#   2. Name: "Fabric Trend Spotter", Redirect URI: https://your-app.com/auth/callback
+#   3. Under "Certificates & secrets" → New client secret → copy the Value
+#   4. Under "API permissions" → Add → Microsoft Graph → Delegated → Mail.Read
+#   5. Set these environment variables:
+MS_CLIENT_ID = os.environ.get("MS_CLIENT_ID", "")
+MS_CLIENT_SECRET = os.environ.get("MS_CLIENT_SECRET", "")
+MS_TENANT_ID = os.environ.get("MS_TENANT_ID", "common")  # "common" for multi-tenant
+
+# The supplier's email address — used to search sent emails for orders
+SUPPLIER_EMAIL = os.environ.get("SUPPLIER_EMAIL", "")  # e.g. orders@supplier-turkey.com
+
 # e-conomic REST API (Visma e-conomic — invoices, customers, payments)
 # Setup: In e-conomic → Apps → New App → role: Read-only
 #   1. Copy the App Secret Token → set as ECONOMIC_APP_SECRET

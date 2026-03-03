@@ -56,16 +56,20 @@ class PrintForecaster:
     """Forecasts jersey print reorder quantities from sales data."""
 
     def __init__(self, analysis: dict, lead_time_weeks: int = 5,
-                 moq_per_design: int = 50):
+                 moq_per_design: int = 50,
+                 inbound_stock: dict[str, int] | None = None):
         """
         Args:
             analysis: Full inventory analysis from InventoryAnalyzer.run_full_analysis()
             lead_time_weeks: Supplier lead time in weeks (Turkey default: 5)
             moq_per_design: Minimum order quantity per design in meters (Turkey: 50)
+            inbound_stock: {product_name: quantity} of stock already ordered
+                           but not yet received. Subtracted from reorder suggestions.
         """
         self.analysis = analysis
         self.lead_time_weeks = lead_time_weeks
         self.moq = moq_per_design
+        self.inbound_stock = inbound_stock or {}
         self._now = datetime.utcnow()
         self._current_month = self._now.month
 
@@ -230,12 +234,16 @@ class PrintForecaster:
         safety_weeks = self._get_safety_weeks(direction, velocity_change)
         safety_stock = round(adjusted_rate * safety_weeks)
 
-        # Weeks of stock remaining at current rate
-        weeks_of_stock = stock / effective_rate if effective_rate > 0 else 999
+        # Check for inbound stock (already ordered from supplier)
+        inbound = self._get_inbound_for(v["name"])
+        effective_stock = stock + inbound
+
+        # Weeks of stock remaining at current rate (including inbound)
+        weeks_of_stock = effective_stock / effective_rate if effective_rate > 0 else 999
 
         # Stockout risk: will we run out before supplier can deliver?
         will_stockout_before_delivery = (
-            stock < demand_during_lead and effective_rate > 0
+            stock < demand_during_lead and effective_rate > 0 and inbound == 0
         )
         days_until_stockout = (
             round(stock / (effective_rate / 7)) if effective_rate > 0 else 999
@@ -243,12 +251,15 @@ class PrintForecaster:
         stockout_risk_score = self._calc_stockout_risk(
             weeks_of_stock, direction, velocity_change, has_recent
         )
+        # Reduce risk score if stock is inbound
+        if inbound > 0:
+            stockout_risk_score = max(stockout_risk_score - 30, 0)
 
         # Suggested reorder quantity
-        # = forecast demand + safety stock - current stock (but not negative)
+        # = forecast demand + safety stock - (current stock + inbound) (but not negative)
         # Then round UP to the supplier's minimum order quantity (MOQ)
         ideal_stock_target = forecast_8w + safety_stock
-        raw_reorder = max(ideal_stock_target - stock, 0)
+        raw_reorder = max(ideal_stock_target - effective_stock, 0)
         if raw_reorder > 0 and self.moq > 0:
             # Round up to nearest MOQ (e.g. 50m minimum per design)
             suggested_reorder = max(math.ceil(raw_reorder / self.moq) * self.moq, self.moq)
@@ -275,6 +286,8 @@ class PrintForecaster:
             "categories": v.get("categories", []),
             # Current state
             "current_stock": stock,
+            "inbound_stock": inbound,
+            "effective_stock": effective_stock,
             "weeks_of_stock": round(weeks_of_stock, 1),
             "days_until_stockout": min(days_until_stockout, 999),
             # Velocity
@@ -381,6 +394,20 @@ class PrintForecaster:
             score = max(score - 10, 0)
 
         return min(score, 100)
+
+    def _get_inbound_for(self, product_name: str) -> int:
+        """Get inbound stock for a product from pending supplier orders."""
+        if not self.inbound_stock:
+            return 0
+        # Direct match
+        if product_name in self.inbound_stock:
+            return self.inbound_stock[product_name]
+        # Case-insensitive partial match
+        name_lower = product_name.lower()
+        for key, qty in self.inbound_stock.items():
+            if key.lower() in name_lower or name_lower in key.lower():
+                return qty
+        return 0
 
     def _classify_action(self, weeks_of_stock, direction, has_recent,
                          stock, suggested_qty, recent_90d_qty,

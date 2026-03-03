@@ -2,9 +2,10 @@
 
 import gc
 import logging
+import os
 import threading
 from datetime import datetime, timedelta
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, redirect
 from database import (
     init_db, get_latest_trends, get_trend_history, get_recent_listings,
     get_scrape_stats, get_forecasts, get_trend_images,
@@ -534,6 +535,232 @@ def print_forecast_supplier_order():
 
 
 # ======================================================================
+# Email Intelligence — Supplier Order Tracking (Microsoft 365)
+# ======================================================================
+
+# Singleton instances for email connector and order tracker
+_outlook = None
+_order_tracker = None
+
+
+def _get_outlook():
+    """Lazy-init OutlookConnector."""
+    global _outlook
+    if _outlook is None and config.MS_CLIENT_ID:
+        from email_intel.connector import OutlookConnector
+        base_url = config.WOOCOMMERCE_URL or "http://localhost:5000"
+        # Determine redirect URI from the app's base URL
+        redirect_uri = os.environ.get(
+            "MS_REDIRECT_URI",
+            base_url.rstrip("/") + "/auth/callback",
+        )
+        _outlook = OutlookConnector(
+            client_id=config.MS_CLIENT_ID,
+            client_secret=config.MS_CLIENT_SECRET,
+            tenant_id=config.MS_TENANT_ID,
+            redirect_uri=redirect_uri,
+        )
+        # Try to restore tokens from disk
+        token_file = os.path.join("data", "ms_tokens.json")
+        if os.path.exists(token_file):
+            try:
+                import json as _j
+                with open(token_file) as f:
+                    tokens = _j.load(f)
+                _outlook.set_tokens(
+                    tokens.get("access_token", ""),
+                    tokens.get("refresh_token", ""),
+                    tokens.get("expires_at", 0),
+                )
+                logger.info("Restored Microsoft 365 tokens from disk")
+            except Exception as e:
+                logger.warning("Could not restore MS tokens: %s", e)
+    return _outlook
+
+
+def _get_order_tracker():
+    """Lazy-init PendingOrderTracker."""
+    global _order_tracker
+    if _order_tracker is None:
+        from email_intel.tracker import PendingOrderTracker
+        lead_time = getattr(config, "SUPPLIER_LEAD_TIME_WEEKS", 5)
+        _order_tracker = PendingOrderTracker(lead_time_weeks=lead_time)
+    return _order_tracker
+
+
+def _save_ms_tokens():
+    """Persist Microsoft tokens to disk."""
+    if _outlook:
+        import json as _j
+        os.makedirs("data", exist_ok=True)
+        with open(os.path.join("data", "ms_tokens.json"), "w") as f:
+            _j.dump(_outlook.get_tokens(), f)
+
+
+@app.route("/auth/login")
+def ms_login():
+    """Redirect to Microsoft login page."""
+    outlook = _get_outlook()
+    if not outlook:
+        return jsonify({"error": "Microsoft 365 not configured. Set MS_CLIENT_ID, MS_CLIENT_SECRET."}), 400
+    auth_url = outlook.get_auth_url(state="email_connect")
+    return redirect(auth_url)
+
+
+@app.route("/auth/callback")
+def ms_callback():
+    """Handle Microsoft OAuth callback."""
+    code = request.args.get("code")
+    error = request.args.get("error")
+    if error:
+        return f"Authentication failed: {error} — {request.args.get('error_description', '')}", 400
+    if not code:
+        return "No authorization code received.", 400
+
+    outlook = _get_outlook()
+    if not outlook:
+        return "Microsoft 365 not configured.", 400
+
+    try:
+        outlook.exchange_code(code)
+        _save_ms_tokens()
+        # Redirect back to inventory page (Print Forecaster tab)
+        return redirect("/inventory#prints")
+    except Exception as e:
+        logger.error("OAuth exchange failed: %s", e)
+        return f"Authentication failed: {e}", 400
+
+
+@app.route("/api/email/status")
+def email_status():
+    """Check if Microsoft 365 email is connected."""
+    outlook = _get_outlook()
+    if not outlook:
+        return jsonify({
+            "configured": False,
+            "connected": False,
+            "message": "Set MS_CLIENT_ID, MS_CLIENT_SECRET, MS_TENANT_ID env vars.",
+        })
+    connected = outlook.is_authenticated
+    profile = outlook.get_user_profile() if connected else None
+    return jsonify({
+        "configured": True,
+        "connected": connected,
+        "user": profile.get("displayName") if profile else None,
+        "email": profile.get("mail") or (profile.get("userPrincipalName") if profile else None),
+        "supplier_email": config.SUPPLIER_EMAIL,
+    })
+
+
+@app.route("/api/email/search-orders")
+def email_search_orders():
+    """Search sent emails for supplier orders."""
+    outlook = _get_outlook()
+    if not outlook or not outlook.is_authenticated:
+        return jsonify({"error": "Not connected to Microsoft 365. Click Connect Email."}), 401
+
+    supplier_email = config.SUPPLIER_EMAIL
+    if not supplier_email:
+        return jsonify({"error": "Set SUPPLIER_EMAIL env var to your Turkish supplier's email address."}), 400
+
+    days_back = int(request.args.get("days", 180))
+
+    # Search emails
+    emails = outlook.search_sent_emails(supplier_email, days_back=days_back)
+    if not emails:
+        return jsonify({"emails": [], "orders": [], "message": f"No emails found to {supplier_email} in the last {days_back} days."})
+
+    # Parse order data from emails
+    from email_intel.parser import parse_multiple_emails
+    # Get known product names for fuzzy matching
+    product_names = []
+    if woo_cache.get("analysis"):
+        velocity = woo_cache["analysis"].get("velocity", [])
+        product_names = [v["name"] for v in velocity]
+
+    parsed = parse_multiple_emails(emails, product_names)
+
+    return jsonify({
+        "total_emails": len(emails),
+        "order_emails": len([p for p in parsed if p["is_order"]]),
+        "orders": parsed,
+    })
+
+
+@app.route("/api/email/confirm-order", methods=["POST"])
+def email_confirm_order():
+    """Confirm a parsed order and add to pending tracker."""
+    tracker = _get_order_tracker()
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided."}), 400
+
+    email_data = {
+        "email_id": data.get("email_id", ""),
+        "subject": data.get("subject", ""),
+        "date": data.get("date", ""),
+    }
+    items = data.get("items", [])
+    if not items:
+        return jsonify({"error": "No items to confirm."}), 400
+
+    order_id = tracker.add_order_from_email(email_data, confirmed_items=items)
+    return jsonify({"order_id": order_id, "status": "confirmed"})
+
+
+@app.route("/api/email/add-manual-order", methods=["POST"])
+def email_add_manual_order():
+    """Add a pending order manually (without email parsing)."""
+    tracker = _get_order_tracker()
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided."}), 400
+
+    items = data.get("items", [])
+    if not items:
+        return jsonify({"error": "No items provided."}), 400
+
+    order_id = tracker.add_manual_order(
+        items=items,
+        order_date=data.get("order_date"),
+        note=data.get("note", ""),
+    )
+    return jsonify({"order_id": order_id, "status": "added"})
+
+
+@app.route("/api/email/pending-orders")
+def email_pending_orders():
+    """Get all pending supplier orders."""
+    tracker = _get_order_tracker()
+    return jsonify(tracker.get_summary())
+
+
+@app.route("/api/email/pending-orders/<order_id>/receive", methods=["POST"])
+def email_receive_order(order_id):
+    """Mark a pending order as received."""
+    tracker = _get_order_tracker()
+    if tracker.mark_received(order_id):
+        return jsonify({"status": "received"})
+    return jsonify({"error": "Order not found."}), 404
+
+
+@app.route("/api/email/pending-orders/<order_id>", methods=["DELETE"])
+def email_delete_order(order_id):
+    """Delete a pending order."""
+    tracker = _get_order_tracker()
+    if tracker.delete_order(order_id):
+        return jsonify({"status": "deleted"})
+    return jsonify({"error": "Order not found."}), 404
+
+
+@app.route("/api/email/inbound-stock")
+def email_inbound_stock():
+    """Get inbound stock per product (for Print Forecaster integration)."""
+    tracker = _get_order_tracker()
+    return jsonify(tracker.get_inbound_stock())
+
+
+# ======================================================================
 # Smart Intelligence
 # ======================================================================
 
@@ -833,8 +1060,13 @@ def _run_woo_analysis():
         # Jersey Print Forecaster (reorder predictions for Turkish supplier)
         lead_time = getattr(config, "SUPPLIER_LEAD_TIME_WEEKS", 5)
         moq = getattr(config, "SUPPLIER_MOQ_PER_DESIGN", 50)
+        # Get inbound stock from pending orders (if email tracking is active)
+        inbound = {}
+        if _order_tracker:
+            inbound = _order_tracker.get_inbound_stock()
         forecaster = PrintForecaster(analysis, lead_time_weeks=lead_time,
-                                     moq_per_design=moq)
+                                     moq_per_design=moq,
+                                     inbound_stock=inbound)
         print_forecast = forecaster.forecast_all()
 
         # Trim large lists before caching to save memory
